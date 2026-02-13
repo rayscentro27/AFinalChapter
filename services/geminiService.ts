@@ -160,7 +160,7 @@ export const generateSocialVideo = async (prompt: string, aspectRatio: '16:9' | 
         await new Promise(r => setTimeout(r, 10000));
         operation = await ai.operations.getVideosOperation({ operation });
     }
-    return `${operation.response?.generatedVideos?.[0]?.video?.uri}&key=${process.env.API_KEY}`;
+    return `${operation.response?.generatedVideos?.[0]?.video?.uri}&key=${getApiKey()}`;
 };
 
 export const verifyBiometricIdentity = async (cameraBase64: string, idBase64: string) => {
