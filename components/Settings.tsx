@@ -10,7 +10,7 @@ import {
   Info, Users, UserPlus, Trash2, MapPin, Mail, Link as LinkIcon, GitBranch,
   Plus, ChevronRight, Play, Settings as SettingsIcon, Filter, MousePointer2, X,
   Music, DollarSign, Star, Gauge, PlusCircle, ZapOff, Bot, TrendingUp, Cpu,
-  Landmark
+  Landmark, Mail as MailIcon
 } from 'lucide-react';
 import { AgencyBranding, User, PipelineRule, Contact, ViewMode, AutoReplyRule, AiEmployee } from '../types';
 import { BACKEND_CONFIG } from '../adapters/config';
@@ -86,6 +86,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
               { id: 'connectivity', label: 'API Matrix', icon: Zap },
               { id: 'intelligence', label: 'Neural Link', icon: BrainCircuit },
               { id: 'ai_workforce', label: 'AI Workforce', icon: Bot },
+              { id: 'marketing_nodes', label: 'Marketing Nodes', icon: MailIcon },
               { id: 'autoreply', label: 'Auto-Reply', icon: MessageSquare },
               { id: 'team', label: 'Staff Node', icon: Users },
               { id: 'social', label: 'Social Link', icon: Share2 },
@@ -174,7 +175,61 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
                 </div>
             )}
 
-            {/* Other tabs remain consistent with previous implementation but inherit refined typography */}
+            {activeTab === 'marketing_nodes' && (
+                <div className="p-10 space-y-10 animate-fade-in">
+                    <div className="bg-[#0B0C10] p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><MailIcon size={300}/></div>
+                        <div className="relative z-10">
+                            <div className="inline-flex items-center gap-2 bg-[#66FCF1]/10 text-[#66FCF1] px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest mb-8 border border-[#66FCF1]/20">
+                                <Smartphone size={12}/> Comms Architecture
+                            </div>
+                            <h3 className="text-4xl font-black uppercase tracking-tighter flex items-center gap-4 mb-4">
+                                Marketing Node Sync
+                            </h3>
+                            <p className="text-slate-400 text-sm leading-relaxed max-w-lg font-medium">
+                                Link your MailerLite account to synchronize CRM leads directly into your marketing funnels.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#66FCF1] transition-all shadow-sm">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-1">MailerLite API Key</label>
+                            <input 
+                                type="password" 
+                                value={localBranding.mailerLite?.apiKey || ''}
+                                onChange={e => setLocalBranding({ ...localBranding, mailerLite: { ...localBranding.mailerLite, apiKey: e.target.value, autoSync: localBranding.mailerLite?.autoSync || false } })}
+                                placeholder="Enter MailerLite v2 API Key"
+                                className="w-full p-4 bg-white border border-slate-200 rounded-xl font-mono text-xs focus:ring-2 focus:ring-[#66FCF1] outline-none"
+                            />
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#66FCF1] transition-all shadow-sm">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-1">MailerLite Group ID</label>
+                            <input 
+                                type="text" 
+                                value={localBranding.mailerLite?.groupId || ''}
+                                onChange={e => setLocalBranding({ ...localBranding, mailerLite: { ...localBranding.mailerLite, groupId: e.target.value, autoSync: localBranding.mailerLite?.autoSync || false } })}
+                                placeholder="e.g. 11042942"
+                                className="w-full p-4 bg-white border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-[#66FCF1] outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-sm flex items-center justify-between">
+                        <div>
+                            <h4 className="font-black text-slate-900 uppercase text-sm tracking-tight">Lead Auto-Migration</h4>
+                            <p className="text-xs text-slate-500 mt-1">Automatically push new CRM registrations to MailerLite.</p>
+                        </div>
+                        <button 
+                            onClick={() => setLocalBranding({ ...localBranding, mailerLite: { ...localBranding.mailerLite, autoSync: !localBranding.mailerLite?.autoSync } })}
+                            className={`w-14 h-8 rounded-full transition-all flex items-center p-1 ${localBranding.mailerLite?.autoSync ? 'bg-[#059669] justify-end' : 'bg-slate-200 justify-start'}`}
+                        >
+                            <div className="w-6 h-6 bg-white rounded-full shadow-lg"></div>
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {activeTab === 'general' && (
               <div className="p-12 space-y-10 animate-fade-in">
                  <div>

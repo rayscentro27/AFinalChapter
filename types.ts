@@ -82,6 +82,7 @@ export interface Contact {
     sentiment?: SentimentLevel;
     triageReason?: string;
     intensity?: AiIntensity;
+    mailerLiteSynced?: boolean;
   };
   forensicReports?: ForensicReport[];
   bankabilityData?: {
@@ -92,7 +93,6 @@ export interface Contact {
     character: number;
   };
   onboardingComplete?: boolean;
-  // Added properties to resolve multiple errors
   referralData?: ReferralData;
   battleCard?: SalesBattleCard;
   tier2Data?: Tier2Data;
@@ -142,7 +142,6 @@ export interface Activity {
   description: string;
   date: string;
   user?: string;
-  // Added optional properties to support ActivityTimeline
   duration?: string;
   outcome?: string;
 }
@@ -201,10 +200,14 @@ export interface AgencyBranding {
     autoPilot: boolean;
     rating?: number;
     reviewCount?: number;
-    // Added optional property to resolve ReputationManager error
     lastSync?: string;
   };
   tierPrices?: { Bronze: number; Silver: number; Gold: number };
+  mailerLite?: {
+    apiKey?: string;
+    groupId?: string;
+    autoSync: boolean;
+  };
 }
 
 export enum ViewMode {
@@ -254,7 +257,6 @@ export enum ViewMode {
   MESSAGING_BRIDGE = 'MESSAGING_BRIDGE',
   SUPERVISOR_TRIAGE = 'SUPERVISOR_TRIAGE',
   STRATEGY_SANDBOX = 'STRATEGY_SANDBOX',
-  // Added members to ViewMode enum to resolve multiple errors
   REVIEW_QUEUE = 'REVIEW_QUEUE',
   SYNDICATION = 'SYNDICATION',
   PARTNERS = 'PARTNERS',
@@ -262,7 +264,6 @@ export enum ViewMode {
   ADMIN_CMS = 'ADMIN_CMS'
 }
 
-// Additional Placeholder Interfaces for missing components
 export interface FundingOffer {
   id: string;
   lenderName: string;
@@ -760,7 +761,6 @@ export interface EnrichedData {
   icebreakers: string[];
 }
 
-// Added missing interfaces to resolve multiple errors
 export interface AutoReplyRule {
   id: string;
   trigger: string;

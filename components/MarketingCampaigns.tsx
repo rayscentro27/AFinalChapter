@@ -7,9 +7,10 @@ import {
   AlertCircle, Layout, Plus, Trash2, Calendar, Music as TikTokIcon, Key, ExternalLink,
   AlertTriangle, Settings, ArrowRight, BrainCircuit, Youtube, Link as LinkIcon, Layers,
   Download, Search, Globe, MapPin, BarChart3, ListChecks, Type, Copy, Phone, Building2, Fingerprint,
-  Save, LayoutDashboard, Target, MessageSquare, ShieldCheck, X, TrendingUp, Lightbulb
+  Save, LayoutDashboard, Target, MessageSquare, ShieldCheck, X, TrendingUp, Lightbulb, Mail as MailIcon
 } from 'lucide-react';
 import * as geminiService from '../services/geminiService';
+import * as mailerliteService from '../services/mailerliteService';
 import EmailCampaignManager from './EmailCampaignManager';
 
 interface MarketingCampaignsProps {
@@ -35,6 +36,9 @@ const MarketingCampaigns: React.FC<MarketingCampaignsProps> = ({ contacts, brand
   // Strategy State
   const [marketingDirectives, setMarketingDirectives] = useState<any[]>([]);
   const [isAnalyzingStrategy, setIsAnalyzingStrategy] = useState(false);
+
+  // MailerLite State
+  const [isSyncingMailerLite, setIsSyncingMailerLite] = useState(false);
 
   // Sync when global branding changes
   useEffect(() => {
@@ -77,6 +81,13 @@ const MarketingCampaigns: React.FC<MarketingCampaignsProps> = ({ contacts, brand
     };
     checkKey();
   }, []);
+
+  const handleSyncMailerLite = async () => {
+      setIsSyncingMailerLite(true);
+      const res = await mailerliteService.bulkSyncLeads(contacts, branding);
+      setIsSyncingMailerLite(false);
+      alert(`MailerLite protocol execution: ${res.successful} entities synchronized out of ${res.total}.`);
+  };
 
   const handleRunSEO = async () => {
     if (!seoIndustry || !seoTargetMarket) return;
@@ -280,6 +291,22 @@ const MarketingCampaigns: React.FC<MarketingCampaignsProps> = ({ contacts, brand
                     </button>
                  </div>
 
+                 {branding.mailerLite?.apiKey && (
+                   <div className="mt-6 p-6 bg-emerald-50 border border-emerald-200 rounded-[1.5rem] shadow-sm animate-fade-in">
+                      <p className="text-xs text-emerald-800 font-black uppercase tracking-widest flex items-center gap-2 mb-3">
+                        <MailIcon size={16} /> MailerLite Sync Node
+                      </p>
+                      <button 
+                        onClick={handleSyncMailerLite} 
+                        disabled={isSyncingMailerLite}
+                        className="w-full py-3 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-500 transition-all shadow-lg"
+                      >
+                        {isSyncingMailerLite ? <RefreshCw className="animate-spin" size={14}/> : <RefreshCw size={14} />} 
+                        Sync Global Contacts
+                      </button>
+                   </div>
+                 )}
+
                  {!hasKey && (
                    <div className="mt-6 p-6 bg-amber-50 border border-amber-200 rounded-[1.5rem] shadow-sm">
                       <p className="text-xs text-amber-800 font-black uppercase tracking-widest flex items-center gap-2 mb-3">
@@ -439,7 +466,7 @@ const MarketingCampaigns: React.FC<MarketingCampaignsProps> = ({ contacts, brand
                         className="bg-emerald-50 text-slate-950 px-12 py-6 rounded-[2rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:bg-emerald-400 transition-all flex items-center justify-center gap-4 active:scale-95 disabled:opacity-50"
                     >
                         {isAnalyzingStrategy ? <RefreshCw className="animate-spin" size={24}/> : <Sparkles size={24}/>}
-                        {isAnalyzingStrategy ? 'Scrutinizing CRM...' : 'Audit Market Opportunity'}
+                        {isAnalyzingStrategy ? 'Scrutinizing...' : 'Audit Market Opportunity'}
                     </button>
                 </div>
               </div>
