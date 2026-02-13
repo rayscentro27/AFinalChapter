@@ -32,6 +32,29 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
   const [localBranding, setLocalBranding] = useState<AgencyBranding>(branding);
   const [isSyncingSocial, setIsSyncingSocial] = useState<string | null>(null);
 
+
+  const socialPlatforms: { id: string; label: string; icon: any; hint: string }[] = [
+    { id: 'instagram', label: 'Instagram', icon: Instagram, hint: '@handle or profile URL' },
+    { id: 'facebook', label: 'Facebook', icon: Facebook, hint: 'Page URL' },
+    { id: 'linkedin', label: 'LinkedIn', icon: Linkedin, hint: 'Company page URL' },
+    { id: 'google_business', label: 'Google Business', icon: MapPin, hint: 'Business name or maps URL' },
+  ];
+
+  const upsertSocialConnection = (
+    platform: string,
+    patch: Partial<{ handle: string; connected: boolean }>
+  ) => {
+    setLocalBranding(prev => {
+      const list = prev.socialConnections ? [...prev.socialConnections] : [];
+      const idx = list.findIndex(s => s.platform === platform);
+      const current = idx >= 0 ? list[idx] : { platform, handle: '', connected: false };
+      const next = { ...current, ...patch };
+      if (idx >= 0) list[idx] = next;
+      else list.push(next);
+      return { ...prev, socialConnections: list };
+    });
+  };
+
   const [staffEmail, setStaffEmail] = useState('');
   const [staffName, setStaffName] = useState('');
   const [staffSplit, setStaffSplit] = useState(50);
@@ -229,6 +252,170 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
                     </div>
                 </div>
             )}
+
+
+            {activeTab === 'social' && (
+                <div className="p-10 space-y-10 animate-fade-in">
+                    <div className="bg-[#0B0C10] p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><Share2 size={300}/></div>
+                        <div className="relative z-10">
+                            <div className="inline-flex items-center gap-2 bg-[#66FCF1]/10 text-[#66FCF1] px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest mb-8 border border-[#66FCF1]/20">
+                                <Link2 size={12}/> Social Graph
+                            </div>
+                            <h3 className="text-4xl font-black uppercase tracking-tighter flex items-center gap-4 mb-4">
+                                Social Link
+                            </h3>
+                            <p className="text-slate-400 text-sm leading-relaxed max-w-lg font-medium">
+                                Store your social handles and profile URLs for quick access. This does not yet sync data from platforms; it only links your identity layer.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {socialPlatforms.map(p => {
+                          const conn = (localBranding.socialConnections || []).find(s => s.platform === p.id) || { platform: p.id, handle: '', connected: false };
+                          const Icon = p.icon;
+                          const syncing = isSyncingSocial === p.id;
+                          return (
+                            <div key={p.id} className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#66FCF1] transition-all shadow-sm">
+                                <div className="flex items-center justify-between gap-4 mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2.5 bg-white border border-slate-200 rounded-2xl shadow-sm text-slate-500 group-hover:text-[#66FCF1] transition-colors">
+                                            <Icon size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{p.label}</p>
+                                            <p className="text-[10px] text-slate-500 font-medium mt-1">{conn.connected ? 'Connected' : 'Not linked'}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (syncing) return;
+                                          setIsSyncingSocial(p.id);
+                                          window.setTimeout(() => {
+                                            upsertSocialConnection(p.id, { connected: !conn.connected });
+                                            setIsSyncingSocial(null);
+                                            setSuccessMsg(`${p.label} ${conn.connected ? 'disconnected' : 'connected'}.`);
+                                            window.setTimeout(() => setSuccessMsg(''), 2000);
+                                          }, 700);
+                                        }}
+                                        className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                                          conn.connected
+                                            ? 'bg-white text-slate-700 border-slate-200 hover:border-red-200 hover:text-red-600'
+                                            : 'bg-slate-950 text-white border-white/10 hover:bg-[#66FCF1] hover:text-slate-950'
+                                        } ${syncing ? 'opacity-70 cursor-wait' : ''}`}
+                                    >
+                                        {syncing ? 'Syncing...' : conn.connected ? 'Disconnect' : 'Connect'}
+                                    </button>
+                                </div>
+
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1">Handle / URL</label>
+                                <input
+                                    type="text"
+                                    value={conn.handle || ''}
+                                    onChange={e => upsertSocialConnection(p.id, { handle: e.target.value })}
+                                    placeholder={p.hint}
+                                    className="w-full p-4 bg-white border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-[#66FCF1] outline-none"
+                                />
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    <div className="p-10 bg-blue-50 border border-blue-100 rounded-[3rem] flex items-start gap-6">
+                        <div className="p-4 bg-blue-600 rounded-3xl text-white shadow-lg"><Info size={24}/></div>
+                        <div>
+                            <h4 className="text-lg font-black text-blue-900 uppercase tracking-tight mb-2">Note</h4>
+                            <p className="text-sm text-blue-800 leading-relaxed font-medium">
+                                Click <span className="font-black">Push Global Config</span> to save these links to your agency branding state.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'intelligence' && (
+                <div className="p-12 space-y-8 animate-fade-in">
+                    <div className="p-10 bg-slate-50 border border-slate-200 rounded-[3rem]">
+                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Neural Link</h3>
+                        <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                            This module is not wired up yet. Configure your AI key in <span className="font-black">API Matrix</span> to enable AI-powered features throughout the OS.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'ai_workforce' && (
+                <div className="p-12 space-y-8 animate-fade-in">
+                    <div className="p-10 bg-slate-50 border border-slate-200 rounded-[3rem]">
+                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">AI Workforce</h3>
+                        <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                            Workforce management UI is not implemented yet. For now, use <span className="font-black">Neural Floor</span> for agent operations.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'autoreply' && (
+                <div className="p-12 space-y-8 animate-fade-in">
+                    <div className="p-10 bg-slate-50 border border-slate-200 rounded-[3rem]">
+                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Auto-Reply</h3>
+                        <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                            Auto-reply rules UI is not implemented yet. This tab is a placeholder so you don’t hit a blank screen.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'team' && (
+                <div className="p-12 space-y-8 animate-fade-in">
+                    <div className="p-10 bg-slate-50 border border-slate-200 rounded-[3rem]">
+                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Staff Node</h3>
+                        <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                            Team invites and role provisioning are not implemented in the UI yet.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'billing' && (
+                <div className="p-12 space-y-10 animate-fade-in">
+                    <div className="p-10 bg-slate-50 border border-slate-200 rounded-[3rem]">
+                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Capital Tiers</h3>
+                        <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                            Configure subscription pricing for your client portal.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {(['Bronze', 'Silver', 'Gold'] as const).map(tier => (
+                            <div key={tier} className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-sm">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1">{tier} Tier (USD)</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    value={localBranding.tierPrices?.[tier] ?? 0}
+                                    onChange={e => {
+                                      const n = Number(e.target.value || 0);
+                                      setLocalBranding(prev => ({
+                                        ...prev,
+                                        tierPrices: {
+                                          Bronze: prev.tierPrices?.Bronze ?? 0,
+                                          Silver: prev.tierPrices?.Silver ?? 0,
+                                          Gold: prev.tierPrices?.Gold ?? 0,
+                                          [tier]: n,
+                                        },
+                                      }));
+                                    }}
+                                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-black text-2xl tracking-tight outline-none focus:ring-2 focus:ring-[#66FCF1]"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
 
             {activeTab === 'general' && (
               <div className="p-12 space-y-10 animate-fade-in">
