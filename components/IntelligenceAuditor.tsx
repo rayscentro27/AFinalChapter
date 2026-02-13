@@ -124,7 +124,7 @@ const IntelligenceAuditor: React.FC = () => {
                 {researchLogs.map((log, i) => (
                     <div key={i} className={`animate-fade-in flex gap-3 ${i === 0 ? 'text-blue-400 font-bold' : 'text-slate-500'}`}>
                         <span className="opacity-30">[{new Date().toLocaleTimeString([], { hour12: false })}]</span>
-                        <span>>> {log}</span>
+                        <span>{'>> '}{log}</span>
                     </div>
                 ))}
                 {!isAnalyzing && researchLogs.length === 0 && (

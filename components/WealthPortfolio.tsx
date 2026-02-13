@@ -238,7 +238,7 @@ const WealthPortfolio: React.FC<WealthPortfolioProps> = ({ contacts, onUpdateCon
                         <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center shrink-0 border border-red-100 shadow-sm"><AlertTriangle size={24}/></div>
                         <div>
                             <p className="text-xs font-black text-slate-900 uppercase tracking-tight">Idle Liquidity Risk</p>
-                            <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">Entities with >$50k funded but 0% reinvestment are 40% more likely to default on high-cost tranches.</p>
+                            <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">Entities with &gt;$50k funded but 0% reinvestment are 40% more likely to default on high-cost tranches.</p>
                         </div>
                     </div>
                     <div className="flex items-start gap-4">

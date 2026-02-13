@@ -249,7 +249,7 @@ const PowerDialer: React.FC<PowerDialerProps> = ({ queue, onUpdateContact, onClo
                     {thinkingHUD.length === 0 && <p className="text-slate-700 italic">Awaiting neural turns...</p>}
                     {thinkingHUD.map((thought, i) => (
                         <div key={i} className="text-indigo-200 animate-fade-in border-l border-indigo-500/30 pl-2">
-                            <span className="text-indigo-600">>></span> {thought}
+                            <span className="text-indigo-600">{'>>'}</span> {thought}
                         </div>
                     ))}
                 </div>

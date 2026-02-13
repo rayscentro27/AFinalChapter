@@ -41,7 +41,7 @@ const AgenticHUD: React.FC = () => {
                 <span className="text-[9px] font-black text-white uppercase tracking-[0.3em]">Agentic Core Active</span>
             </div>
             <div className="hidden lg:flex items-center gap-4 text-slate-500 text-[8px] font-mono uppercase truncate">
-                <span className="animate-fade-in key={logs[0]}">>> {logs[0]}</span>
+                <span className="animate-fade-in">{'>> '}{logs[0]}</span>
             </div>
         </div>
         <div className="flex items-center gap-4">
