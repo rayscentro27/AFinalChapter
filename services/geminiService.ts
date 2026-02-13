@@ -1,8 +1,32 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { generateContentWithPolicy, buildSlimConversation } from "./aiPolicy";
 import { Contact, MerchantPersona, SalesBattleCard, EnrichedData, FinancialSpreading, CreditMemo, Grant, Course, MarketReport, Stipulation, FundedDeal, RescuePlan, Investor, RiskAlert, EmailStep, PipelineRule, Review, NegativeItem, Lender, AgencyBranding, FundingOffer, InvestmentIdea, ClientTask, BusinessProfile, UnifiedMessage, Message, KnowledgeDoc, TrainingPair, ContentAudit, ForensicReport, SentimentLevel, AutoReplyRule, MarketPulse } from "../types";
 
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getApiKey = () => {
+  try {
+    const override = localStorage.getItem('nexus_override_API_KEY');
+    if (override && override.trim().length > 0) return override.trim();
+  } catch {
+    // ignore
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const envKey = (process as any)?.env?.API_KEY as string | undefined;
+  return envKey || '';
+};
+
+const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
+
+const generateContentShim = async (args: any) => {
+  const expectJson = args?.config?.responseMimeType === 'application/json';
+  const semantic = typeof args?.contents === 'string' && !args?.config?.tools;
+  const text = await generateContentWithPolicy(args, {
+    task: 'geminiService',
+    cache: { enabled: true, semantic },
+    router: { enabled: true, cascade: true },
+    expect: { json: expectJson, minChars: expectJson ? 2 : 1 },
+  });
+  return { text };
+};
 
 const MASTER_BLUEPRINT = `
 You are a Nexus Strategic Operating Officer. Your mission is to guide clients to a $1M+ SBA loan via a specific 4-Phase Capital Velocity Roadmap.
@@ -15,9 +39,34 @@ STRATEGIC DIRECTIVE:
 5. Phase 3 seasoning requires 6-9 months of operating reserves.
 `;
 
+const compactContactForLLM = (contact: Contact) => ({
+  id: contact.id,
+  name: contact.name,
+  email: contact.email,
+  phone: contact.phone,
+  company: contact.company,
+  status: contact.status,
+  lastContact: contact.lastContact,
+  value: contact.value,
+  revenue: contact.revenue,
+  timeInBusiness: contact.timeInBusiness,
+  source: contact.source,
+  aiPriority: contact.aiPriority,
+  aiReason: contact.aiReason,
+  aiScore: contact.aiScore,
+  callReady: contact.callReady,
+  automationMetadata: contact.automationMetadata,
+  businessProfile: contact.businessProfile
+    ? {
+        industry: contact.businessProfile.industry,
+        state: contact.businessProfile.state,
+        establishedDate: contact.businessProfile.establishedDate,
+      }
+    : undefined,
+});
+
 export const generateSystemThoughts = async (contacts: Contact[]): Promise<string[]> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `CRM State: ${JSON.stringify(contacts.map(c=>({company:c.company, status:c.status, value:c.value, intensity:c.automationMetadata?.intensity})))}. Generate 5 short, aggressive 'System Thoughts' about pipeline health, risk detection, or re-engagement priorities.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -26,8 +75,7 @@ export const generateSystemThoughts = async (contacts: Contact[]): Promise<strin
 };
 
 export const generateTier2Strategy = async (contact: Contact): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Generate a custom Phase 3/4 seasoning strategy for ${contact.company}. Focus on the 6-9 month reserve rule and 10% commission ROI. Return HTML.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -36,28 +84,27 @@ export const generateTier2Strategy = async (contact: Contact): Promise<string> =
 };
 
 export const processAutonomousStaffResponse = async (messages: Message[], contact: Contact): Promise<{ text: string, action?: any }> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const convo = await buildSlimConversation(messages);
+    const lead = compactContactForLLM(contact);
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
-        contents: `Conversation History: ${JSON.stringify(messages)}. Lead Profile: ${JSON.stringify(contact)}. Reply as a funding concierge. Determine if the client sounds Agitated/Critical. Return JSON: { text, sentiment: 'Positive'|'Neutral'|'Agitated'|'Critical' }`,
+        contents: `Conversation History: ${convo}. Lead Profile: ${JSON.stringify(lead)}. Reply as a funding concierge. Determine if the client sounds Agitated/Critical. Return JSON: { text, sentiment: 'Positive'|'Neutral'|'Agitated'|'Critical' }`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
     });
     try { return JSON.parse(response.text || "{}"); } catch { return { text: "Reviewing your file now." }; }
 };
 
 export const suggestAITasks = async (contact: Contact): Promise<Partial<ClientTask>[]> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
-        contents: `Analyze this client for the 4-Phase Roadmap: ${JSON.stringify(contact)}. Suggest 3 critical next-step tasks. Return JSON array.`,
+        contents: `Analyze this client for the 4-Phase Roadmap: ${JSON.stringify(compactContactForLLM(contact))}. Suggest 3 critical next-step tasks. Return JSON array.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
     });
     try { return JSON.parse(response.text || "[]"); } catch { return []; }
 };
 
 export const analyzeDocumentForensics = async (base64: string): Promise<{ trustScore: number; findings: string[] }> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: [
             { text: "Perform a forensic integrity audit on this document. Return JSON: { trustScore: 0-100, findings: string[] }" },
@@ -69,8 +116,7 @@ export const analyzeDocumentForensics = async (base64: string): Promise<{ trustS
 };
 
 export const extractFinancialsFromDocument = async (base64: string, mimeType: string): Promise<FinancialSpreading> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: [
             { text: "Extract 3 months of bank data. Return JSON: { months: [{ month, revenue, expenses, endingBalance, nsfCount, negativeDays }], lastUpdated }" },
@@ -82,8 +128,7 @@ export const extractFinancialsFromDocument = async (base64: string, mimeType: st
 };
 
 export const generateSalesBattleCard = async (contact: Contact): Promise<SalesBattleCard | null> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Generate a sales battle card for ${contact.company}. Focus on getting them to accept the 10% commission.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -92,8 +137,7 @@ export const generateSalesBattleCard = async (contact: Contact): Promise<SalesBa
 };
 
 export const auditContentValue = async (url: string): Promise<ContentAudit> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Forensic audit of this content URL: ${url}. Verify claims using search grounding.`,
         config: { 
@@ -120,8 +164,7 @@ export const generateSocialVideo = async (prompt: string, aspectRatio: '16:9' | 
 };
 
 export const verifyBiometricIdentity = async (cameraBase64: string, idBase64: string) => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: [
             { text: "Is the person in the camera frame the same as the person on the ID? Return JSON: { isMatch: boolean, confidence: 0-100, reason: string }" },
@@ -134,8 +177,7 @@ export const verifyBiometricIdentity = async (cameraBase64: string, idBase64: st
 };
 
 export const draftGrantAnswer = async (q: string, ctx: any, name: string): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Question: ${q}. Context: ${JSON.stringify(ctx)}. Grant: ${name}. Draft a high-converting answer.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -144,8 +186,7 @@ export const draftGrantAnswer = async (q: string, ctx: any, name: string): Promi
 };
 
 export const chatWithCRM = async (query: string, contacts: Contact[]) => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `User Query: ${query}. Available Contacts: ${JSON.stringify(contacts.map(c=>({id:c.id, company:c.company, status:c.status})))}. Decide if action is required. Return JSON: { text, actions: [{ name: 'draftDocument'|'updateStatus', args: any }] }`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -154,8 +195,7 @@ export const chatWithCRM = async (query: string, contacts: Contact[]) => {
 };
 
 export const generateLegalDocumentContent = async (type: string, data: any, templateName: string): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Draft a legal ${type} document for ${data.company} (Contact: ${data.name}) using template context: ${templateName}.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -164,8 +204,7 @@ export const generateLegalDocumentContent = async (type: string, data: any, temp
 };
 
 export const analyzeDealStructure = async (financialSpreading: FinancialSpreading, amount: number): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Analyze this deal structure. Amount requested: $${amount}. Financials: ${JSON.stringify(financialSpreading)}. Return JSON: { riskAssessment: string, maxApproval: number, recommendation: string }`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -174,8 +213,7 @@ export const analyzeDealStructure = async (financialSpreading: FinancialSpreadin
 };
 
 export const refineNoteContent = async (note: string): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Refine and professionalize this sales note: "${note}"`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -184,8 +222,7 @@ export const refineNoteContent = async (note: string): Promise<string> => {
 };
 
 export const analyzeContract = async (base64: string): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: [
             { text: "Perform a neural audit on this funding contract. Return JSON: { safetyScore: 0-100, trueApr: string, summary: string, recommendation: 'Sign'|'Negotiate' }" },
@@ -197,8 +234,7 @@ export const analyzeContract = async (base64: string): Promise<any> => {
 };
 
 export const generateSEOStrategy = async (industry: string, targetMarket: string): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Generate a high-yield SEO strategy for industry "${industry}" in "${targetMarket}". Return JSON.`,
         config: { responseMimeType: "application/json", tools: [{ googleSearch: {} }], systemInstruction: MASTER_BLUEPRINT }
@@ -207,8 +243,7 @@ export const generateSEOStrategy = async (industry: string, targetMarket: string
 };
 
 export const optimizeGBP = async (description: string, location: string): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Optimize this Google Business Profile for "${location}". Return JSON.`,
         config: { responseMimeType: "application/json", tools: [{ googleSearch: {} }], systemInstruction: MASTER_BLUEPRINT }
@@ -217,8 +252,7 @@ export const optimizeGBP = async (description: string, location: string): Promis
 };
 
 export const generateViralHooks = async (topic: string): Promise<string[]> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Generate 5 viral hooks for: "${topic}".`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -227,8 +261,7 @@ export const generateViralHooks = async (topic: string): Promise<string[]> => {
 };
 
 export const generateDirectoryCitations = async (branding: AgencyBranding): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Generate citation formats for: ${JSON.stringify(branding)}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -237,8 +270,7 @@ export const generateDirectoryCitations = async (branding: AgencyBranding): Prom
 };
 
 export const generateSocialBios = async (branding: AgencyBranding): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Generate social bios for: ${JSON.stringify(branding)}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -247,8 +279,7 @@ export const generateSocialBios = async (branding: AgencyBranding): Promise<any>
 };
 
 export const generateMarketingDirectives = async (contacts: Contact[]): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Analyze CRM pipeline and suggest 3 high-probability marketing directives. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -257,8 +288,7 @@ export const generateMarketingDirectives = async (contacts: Contact[]): Promise<
 };
 
 export const transformVideoToDirective = async (youtubeUrl: string): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Deconstruct this video: ${youtubeUrl} into a creative directive.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -267,8 +297,7 @@ export const transformVideoToDirective = async (youtubeUrl: string): Promise<str
 };
 
 export const generateSocialCaption = async (platform: string, prompt: string): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Generate a high-converting ${platform} caption for: "${prompt}"`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -277,8 +306,7 @@ export const generateSocialCaption = async (platform: string, prompt: string): P
 };
 
 export const generateWorkflowFromPrompt = async (prompt: string): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Generate a CRM automation workflow JSON: "${prompt}".`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -287,28 +315,25 @@ export const generateWorkflowFromPrompt = async (prompt: string): Promise<any> =
 };
 
 export const analyzeCallStrategy = async (transcript: {role: string, text: string}[], contact: Contact): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
-        contents: `Analyze transcript: ${JSON.stringify(transcript)}. Lead: ${JSON.stringify(contact)}. Provide a 1-sentence tactical pivot.`,
+        contents: `Analyze transcript: ${JSON.stringify(transcript)}. Lead: ${JSON.stringify(compactContactForLLM(contact))}. Provide a 1-sentence tactical pivot.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
     });
     return response.text || "Maintain Rapport.";
 };
 
 export const predictCommonObjections = async (contact: Contact): Promise<string[]> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
-        contents: `Predict 3 objections for: ${JSON.stringify(contact)}.`,
+        contents: `Predict 3 objections for: ${JSON.stringify(compactContactForLLM(contact))}.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
     });
     return (response.text || "").split('\n').filter(l => l.trim().length > 0).slice(0, 3);
 };
 
 export const generateObjectionResponse = async (contact: Contact, objection: string): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Provide rebuttal for: "${objection}".`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -317,8 +342,7 @@ export const generateObjectionResponse = async (contact: Contact, objection: str
 };
 
 export const enrichLeadData = async (companyName: string, website: string): Promise<EnrichedData> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Enrich data for: "${companyName}", website: "${website}". Return JSON.`,
         config: { responseMimeType: "application/json", tools: [{ googleSearch: {} }], systemInstruction: MASTER_BLUEPRINT }
@@ -327,8 +351,7 @@ export const enrichLeadData = async (companyName: string, website: string): Prom
 };
 
 export const explainNeuralThinking = async (transcript: {role: string; text: string}[], contact: Contact): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Explain AI 'thinking' during call. 1 concise sentence.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -337,18 +360,16 @@ export const explainNeuralThinking = async (transcript: {role: string; text: str
 };
 
 export const generateMeetingPrep = async (contact: Contact): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
-        contents: `Generate meeting prep for: ${JSON.stringify(contact)}. Return JSON.`,
+        contents: `Generate meeting prep for: ${JSON.stringify(compactContactForLLM(contact))}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
     });
     try { return JSON.parse(response.text || "{}"); } catch { return null; }
 };
 
 export const processMeetingDebrief = async (transcript: string): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Process meeting debrief: "${transcript}". Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -357,8 +378,7 @@ export const processMeetingDebrief = async (transcript: string): Promise<any> =>
 };
 
 export const generateAnalyticsInsights = async (contacts: Contact[]): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Analyze portfolio and provide revenue insights.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -367,8 +387,7 @@ export const generateAnalyticsInsights = async (contacts: Contact[]): Promise<st
 };
 
 export const generateBusinessPlanSection = async (section: string, data: any): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Write ${section} for business plan.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -377,8 +396,7 @@ export const generateBusinessPlanSection = async (section: string, data: any): P
 };
 
 export const generateContractAmendment = async (content: string, prompt: string): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Apply amendment: "${prompt}".`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -387,8 +405,7 @@ export const generateContractAmendment = async (content: string, prompt: string)
 };
 
 export const generateLegalDisclosure = async (templateName: string, jurisdiction: string, context: any): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Generate disclosure for ${templateName} in ${jurisdiction}.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -397,8 +414,7 @@ export const generateLegalDisclosure = async (templateName: string, jurisdiction
 };
 
 export const searchPlaces = async (query: string): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Search Maps for: "${query}". Return JSON.`,
         config: { responseMimeType: "application/json", tools: [{ googleSearch: {} }], systemInstruction: MASTER_BLUEPRINT }
@@ -407,8 +423,7 @@ export const searchPlaces = async (query: string): Promise<any> => {
 };
 
 export const generateLandingPageCopy = async (industry: string, offer: string): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Generate landing page copy for ${industry}.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -417,8 +432,7 @@ export const generateLandingPageCopy = async (industry: string, offer: string): 
 };
 
 export const analyzeCompetitors = async (company: string, industry: string, location: string): Promise<MarketReport> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Audit competitors for ${company}. Return JSON.`,
         config: { responseMimeType: "application/json", tools: [{ googleSearch: {} }], systemInstruction: MASTER_BLUEPRINT }
@@ -427,8 +441,7 @@ export const analyzeCompetitors = async (company: string, industry: string, loca
 };
 
 export const parseLenderGuidelines = async (base64: string): Promise<Partial<Lender>> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: [
             { text: "Parse lender guidelines. Return JSON." },
@@ -440,8 +453,7 @@ export const parseLenderGuidelines = async (base64: string): Promise<Partial<Len
 };
 
 export const extractStipsFromText = async (text: string): Promise<Stipulation[]> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Extract documents from: "${text}". Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -453,8 +465,7 @@ export const extractStipsFromText = async (text: string): Promise<Stipulation[]>
 };
 
 export const verifyDocumentContent = async (base64: string, mimeType: string, stipName: string, context: any): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: [
             { text: `Verify document for: "${stipName}". Return JSON.` },
@@ -466,8 +477,7 @@ export const verifyDocumentContent = async (base64: string, mimeType: string, st
 };
 
 export const generateRenewalPitch = async (deal: FundedDeal, contact: Contact): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Generate renewal pitch for ${contact.company}.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -476,18 +486,16 @@ export const generateRenewalPitch = async (deal: FundedDeal, contact: Contact): 
 };
 
 export const generateRescuePlan = async (contact: Contact): Promise<RescuePlan> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
-        contents: `Generate rescue plan for: ${JSON.stringify(contact)}. Return JSON.`,
+        contents: `Generate rescue plan for: ${JSON.stringify(compactContactForLLM(contact))}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
     });
     try { return JSON.parse(response.text || "{}"); } catch { throw new Error("Rescue plan failed"); }
 };
 
 export const generateInvestorReport = async (investor: Investor, deals: any[]): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Generate report for investor ${investor.name}.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -496,8 +504,7 @@ export const generateInvestorReport = async (investor: Investor, deals: any[]): 
 };
 
 export const generateApplicationCoverLetter = async (contact: Contact, lenderName: string): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Write cover letter for ${contact.company} to ${lenderName}.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -506,8 +513,7 @@ export const generateApplicationCoverLetter = async (contact: Contact, lenderNam
 };
 
 export const generateMockGoogleReviews = async (businessName: string): Promise<Review[]> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Generate 3 Google reviews for "${businessName}". Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -516,8 +522,7 @@ export const generateMockGoogleReviews = async (businessName: string): Promise<R
 };
 
 export const analyzeReviewSentiment = async (reviews: Review[]): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Analyze sentiment: ${JSON.stringify(reviews)}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -526,8 +531,7 @@ export const analyzeReviewSentiment = async (reviews: Review[]): Promise<any> =>
 };
 
 export const generateReviewReply = async (review: Review): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Write response for: "${review.comment}".`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -536,8 +540,7 @@ export const generateReviewReply = async (review: Review): Promise<string> => {
 };
 
 export const verifyBusinessPresence = async (name: string, location: string): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Verify GBP for "${name}" in "${location}". Return JSON.`,
         config: { responseMimeType: "application/json", tools: [{ googleSearch: {} }], systemInstruction: MASTER_BLUEPRINT }
@@ -546,8 +549,7 @@ export const verifyBusinessPresence = async (name: string, location: string): Pr
 };
 
 export const analyzeRiskEvent = async (alert: RiskAlert): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Analyze risk: ${JSON.stringify(alert)}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -556,8 +558,7 @@ export const analyzeRiskEvent = async (alert: RiskAlert): Promise<any> => {
 };
 
 export const generateCourseCurriculum = async (topic: string, audience: string): Promise<Course> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Generate course for ${topic}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -566,8 +567,7 @@ export const generateCourseCurriculum = async (topic: string, audience: string):
 };
 
 export const generateCollectionsMessage = async (contactName: string, daysPastDue: number, amount: number): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Draft collections message for ${contactName}.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -576,18 +576,16 @@ export const generateCollectionsMessage = async (contactName: string, daysPastDu
 };
 
 export const generateCreditMemo = async (contact: Contact): Promise<CreditMemo> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
-        contents: `Generate Credit Memo for: ${JSON.stringify(contact)}. Return JSON.`,
+        contents: `Generate Credit Memo for: ${JSON.stringify(compactContactForLLM(contact))}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
     });
     try { return JSON.parse(response.text || "{}"); } catch { throw new Error("Memo failed"); }
 };
 
 export const generateEntityVisual = async (prompt: string): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-2.5-flash-image',
         contents: `Professional cinematic representation of ${prompt}`,
     });
@@ -600,8 +598,7 @@ export const generateEntityVisual = async (prompt: string): Promise<string> => {
 };
 
 export const generateEmailDripSequence = async (goal: string, audience: string, agencyName: string): Promise<EmailStep[]> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Generate 3-step drip for ${goal}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -610,8 +607,7 @@ export const generateEmailDripSequence = async (goal: string, audience: string, 
 };
 
 export const generateEmailSubject = async (campaignName: string, stepIdx: number): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Generate subject for step ${stepIdx + 1} of ${campaignName}.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -620,8 +616,7 @@ export const generateEmailSubject = async (campaignName: string, stepIdx: number
 };
 
 export const generateEmailBody = async (campaignName: string, stepIdx: number): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Generate email body for step ${stepIdx + 1} of ${campaignName}.`,
         config: { systemInstruction: MASTER_BLUEPRINT }
@@ -630,8 +625,7 @@ export const generateEmailBody = async (campaignName: string, stepIdx: number): 
 };
 
 export const analyzeYouTubeVideo = async (url: string): Promise<{ title: string; steps: string[] }> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Extract 5 steps from video: ${url}. Return JSON.`,
         config: { responseMimeType: "application/json", tools: [{ googleSearch: {} }], systemInstruction: MASTER_BLUEPRINT }
@@ -640,8 +634,7 @@ export const analyzeYouTubeVideo = async (url: string): Promise<{ title: string;
 };
 
 export const findHighIntentLeads = async (query: string): Promise<any> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Search for leads matching: "${query}". Return JSON.`,
         config: { responseMimeType: "application/json", tools: [{ googleSearch: {} }], systemInstruction: MASTER_BLUEPRINT }
@@ -650,8 +643,7 @@ export const findHighIntentLeads = async (query: string): Promise<any> => {
 };
 
 export const generateMarketPulse = async (): Promise<MarketPulse[]> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-flash-preview',
         contents: `Generate 5 realistic lender activity 'pulses'. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -663,8 +655,7 @@ export const generateMarketPulse = async (): Promise<MarketPulse[]> => {
 };
 
 export const ghostHunterReengage = async (contact: Contact): Promise<string> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Draft re-engagement email for ${contact.company}.`,
         config: { tools: [{ googleSearch: {} }], systemInstruction: MASTER_BLUEPRINT }
@@ -673,8 +664,7 @@ export const ghostHunterReengage = async (contact: Contact): Promise<string> => 
 };
 
 export const executeAutonomousDelegation = async (audit: ContentAudit, contacts: Contact[]): Promise<{ updatedContacts: Contact[], actions: string[] }> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Decide CRM moves based on audit: ${audit.strategicValue}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -690,8 +680,7 @@ export const executeAutonomousDelegation = async (audit: ContentAudit, contacts:
 };
 
 export const generateForensicCertificate = async (metadata: any, contact: Contact): Promise<ForensicReport> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Issue forensic certificate for ${contact.company}. Return JSON.`,
         config: { responseMimeType: "application/json", systemInstruction: MASTER_BLUEPRINT }
@@ -701,8 +690,7 @@ export const generateForensicCertificate = async (metadata: any, contact: Contac
 
 // Added findGrants function to resolve GrantManager error
 export const findGrants = async (topic: string): Promise<Grant[]> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Search for business grants matching this profile: ${topic}. Return JSON array of Grant objects.`,
         config: { 
@@ -724,8 +712,7 @@ export const findGrants = async (topic: string): Promise<Grant[]> => {
 
 // Added generateInvestmentIdea function to resolve InvestmentLab error
 export const generateInvestmentIdea = async (youtubeUrl: string, contact: Contact): Promise<InvestmentIdea | null> => {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
+    const response = await generateContentShim({
         model: 'gemini-3-pro-preview',
         contents: `Deconstruct this investment strategy video: ${youtubeUrl} and tailor it for a business with ${contact.revenue} monthly revenue. Return JSON.`,
         config: { 
