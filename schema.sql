@@ -1,88 +1,43 @@
 
--- 1. PROFILES TABLE (Links to Auth.Users)
-CREATE TABLE public.profiles (
-  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  name TEXT,
-  role TEXT DEFAULT 'client',
-  onboarding_complete BOOLEAN DEFAULT false,
-  commission_split INTEGER DEFAULT 50,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
+-- Nexus Financial OS: Genesis Schema
+-- Purpose: Multi-tenant capital management and neural auditing
 
--- 2. CONTACTS TABLE (Lead & Client Data)
-CREATE TABLE public.contacts (
-  id TEXT PRIMARY KEY,
+-- 1. Tenants (Your Clients/Entities)
+CREATE TABLE IF NOT EXISTS public.tenants (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  phone TEXT,
-  company TEXT,
-  status TEXT DEFAULT 'Lead',
-  value NUMERIC DEFAULT 0,
-  revenue NUMERIC,
-  time_in_business INTEGER,
-  source TEXT,
-  notes TEXT,
-  checklist JSONB DEFAULT '{}'::jsonb,
-  client_tasks JSONB DEFAULT '[]'::jsonb,
-  persona TEXT,
-  thinking_log JSONB DEFAULT '[]'::jsonb,
-  documents JSONB DEFAULT '[]'::jsonb,
-  activities JSONB DEFAULT '[]'::jsonb,
-  invoices JSONB DEFAULT '[]'::jsonb,
-  business_profile JSONB DEFAULT '{}'::jsonb,
-  credit_analysis JSONB DEFAULT '{}'::jsonb,
-  message_history JSONB DEFAULT '[]'::jsonb,
-  connected_banks JSONB DEFAULT '[]'::jsonb,
-  offers JSONB DEFAULT '[]'::jsonb,
-  submissions JSONB DEFAULT '[]'::jsonb,
-  financial_spreading JSONB DEFAULT '{}'::jsonb,
-  notifications JSONB DEFAULT '[]'::jsonb,
-  ledger JSONB DEFAULT '[]'::jsonb,
-  negative_items JSONB DEFAULT '[]'::jsonb,
-  subscription JSONB DEFAULT '{}'::jsonb,
-  compliance JSONB DEFAULT '{}'::jsonb,
-  stipulations JSONB DEFAULT '[]'::jsonb,
-  funded_deals JSONB DEFAULT '[]'::jsonb,
-  rescue_plan JSONB DEFAULT '{}'::jsonb,
-  credit_memo JSONB DEFAULT '{}'::jsonb,
-  ai_priority TEXT DEFAULT 'Cold',
-  ai_reason TEXT,
-  ai_score INTEGER DEFAULT 50,
-  xp INTEGER DEFAULT 0,
-  onboarding_complete BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  slug TEXT UNIQUE NOT NULL,
+  status TEXT DEFAULT 'active',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- 3. BRANDING TABLE (Agency Settings)
-CREATE TABLE public.branding (
-  id TEXT PRIMARY KEY DEFAULT 'global',
-  name TEXT DEFAULT 'Nexus Funding',
-  primary_color TEXT DEFAULT '#10b981',
-  hero_headline TEXT,
-  hero_subheadline TEXT,
-  hero_video_url TEXT,
-  contact_email TEXT,
-  contact_phone TEXT,
-  physical_address TEXT,
-  website_url TEXT,
-  social_connections JSONB DEFAULT '[]'::jsonb,
-  google_business JSONB DEFAULT '{}'::jsonb,
-  tier_prices JSONB DEFAULT '{"Bronze": 97, "Silver": 197, "Gold": 497}'::jsonb,
-  ai_cognition JSONB DEFAULT '{"expertiseMode": false, "thinkingBudget": 0}'::jsonb,
-  auto_reply_rules JSONB DEFAULT '[]'::jsonb,
-  ai_employees JSONB DEFAULT '[]'::jsonb,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+-- 2. Tenant Memberships (Mapping users to entities)
+CREATE TABLE IF NOT EXISTS public.tenant_memberships (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
+  role TEXT DEFAULT 'admin',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- ENABLE ROW LEVEL SECURITY
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.branding ENABLE ROW LEVEL SECURITY;
+-- 3. Audit Logs (Powers the Sentinel Alert System)
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID REFERENCES public.tenants(id),
+  user_id UUID,
+  action TEXT NOT NULL,
+  entity_type TEXT,
+  entity_id TEXT,
+  meta JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
 
--- POLICIES (Simplistic for MVP, should be refined for production)
-CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "Admins can view all contacts" ON public.contacts FOR SELECT USING (true);
-CREATE POLICY "Public branding is viewable by everyone" ON public.branding FOR SELECT USING (true);
-CREATE POLICY "Admins can update branding" ON public.branding FOR ALL USING (true);
-CREATE POLICY "Admins can manage contacts" ON public.contacts FOR ALL USING (true);
+-- 4. Enable Realtime for High-Magnitude Alerts
+ALTER PUBLICATION supabase_realtime ADD TABLE audit_logs;
+
+-- 5. Row Level Security (RLS) - Simplistic for initial activation
+ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow authenticated access to tenants" ON public.tenants FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated access to logs" ON public.audit_logs FOR ALL USING (auth.role() = 'authenticated');

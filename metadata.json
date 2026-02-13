@@ -1,9 +1,9 @@
 {
-  "name": "TheFInalChapter",
+  "name": "Nexus Financial OS",
   "description": "The complete AI Operating System for business funding. Features automated compliance vetting, forensic audits, and guided application calls.",
   "requestFramePermissions": [
-    "microphone",
     "camera",
+    "microphone",
     "geolocation"
   ]
 }
