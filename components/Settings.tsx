@@ -25,7 +25,26 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavigate }) => {
-  const [activeTab, setActiveTab] = useState('connectivity');
+  const validTabs = new Set([
+    'connectivity',
+    'intelligence',
+    'ai_workforce',
+    'marketing_nodes',
+    'autoreply',
+    'team',
+    'social',
+    'billing',
+    'general',
+  ]);
+
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const fromStorage = localStorage.getItem('nexus_settings_activeTab') || 'connectivity';
+      return validTabs.has(fromStorage) ? fromStorage : 'connectivity';
+    } catch (e) {
+      return 'connectivity';
+    }
+  });
   const [successMsg, setSuccessMsg] = useState('');
   const [hasAiKey, setHasAiKey] = useState(false);
   
@@ -73,6 +92,25 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
     const apiKey = process.env.API_KEY || apiKeys.GEMINI;
     setHasAiKey(!!apiKey && apiKey.length > 5);
   }, [apiKeys.GEMINI]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nexus_settings_activeTab', activeTab);
+    } catch (e) {
+      // Ignore
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const onTab = (event: Event) => {
+      const e = event as CustomEvent;
+      const next = (e && typeof (e as any).detail === 'string') ? (e as any).detail : null;
+      if (next && validTabs.has(next)) setActiveTab(next);
+    };
+
+    window.addEventListener('nexus:settings-tab', onTab as EventListener);
+    return () => window.removeEventListener('nexus:settings-tab', onTab as EventListener);
+  }, []);
 
   const handleUpdateApiKey = (key: string, value: string) => {
     setApiKeys(prev => ({ ...prev, [key]: value }));

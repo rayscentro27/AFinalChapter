@@ -42,6 +42,23 @@ const UserHeader: React.FC = () => {
     window.location.hash = 'login';
   };
 
+  const goToSettingsTab = (tabId: string) => {
+    try {
+      localStorage.setItem('nexus_settings_activeTab', tabId);
+    } catch (e) {
+      // Ignore storage failures (private mode, etc.)
+    }
+
+    window.location.hash = 'settings';
+
+    // If Settings is already mounted, this switches tabs immediately.
+    try {
+      window.dispatchEvent(new CustomEvent('nexus:settings-tab', { detail: tabId }));
+    } catch (e) {
+      // No-op
+    }
+  };
+
   if (loading) {
     return (
       <header className="flex justify-between items-center px-6 py-3 bg-[#0B0C10] border-b border-white/5 w-full z-[100]">
@@ -95,14 +112,14 @@ const UserHeader: React.FC = () => {
               
               <button 
                 className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-slate-300 hover:bg-[#66FCF1]/10 hover:text-[#66FCF1] transition-all text-left uppercase tracking-widest"
-                onClick={() => { setIsMenuOpen(false); }}
+                onClick={() => { setIsMenuOpen(false); goToSettingsTab('general'); }}
               >
                 <UserCircle size={16} /> Identity Profile
               </button>
               
               <button 
                 className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-slate-300 hover:bg-[#66FCF1]/10 hover:text-[#66FCF1] transition-all text-left uppercase tracking-widest"
-                onClick={() => { setIsMenuOpen(false); }}
+                onClick={() => { setIsMenuOpen(false); goToSettingsTab('connectivity'); }}
               >
                 <Settings size={16} /> OS Parameters
               </button>
