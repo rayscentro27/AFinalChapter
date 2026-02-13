@@ -84,7 +84,7 @@ const Dashboard: React.FC<DashboardProps> = ({ contacts = [], onFocusContact }) 
                                 High magnitude <span className="text-red-500">Inventory.</span>
                             </h2>
                             <p className="text-red-100 text-lg md:text-xl font-medium leading-relaxed opacity-90 max-w-xl">
-                                System has detected {highValueDeals.length} entities with magnitude >$100k awaiting final protocol.
+                                System has detected {highValueDeals.length} entities with magnitude &gt;$100k awaiting final protocol.
                             </p>
                         </div>
                         <div className="grid grid-cols-2 gap-4 shrink-0">
