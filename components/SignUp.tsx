@@ -12,7 +12,7 @@ interface SignUpProps {
 }
 
 const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
-  const { signUp } = useAuth();
+  const { signIn } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     company: '',
@@ -42,7 +42,7 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
           data: {
             name: sanitizeString(formData.name),
             company: sanitizeString(formData.company),
-            role: 'admin'
+            role: 'client'
           }
         }
       });
@@ -64,15 +64,27 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
       if (tenantError) throw tenantError;
 
       // 3. Map User to Tenant
-      const { error: memberError } = await supabase
+      // SECURITY: the DB should decide the authoritative role (first user becomes admin).
+      const { data: membership, error: memberError } = await supabase
         .from('tenant_memberships')
         .insert({
           tenant_id: tenant.id,
           user_id: authData.user.id,
-          role: 'admin'
-        });
+        })
+        .select('role')
+        .single();
 
       if (memberError) throw memberError;
+
+      const memberRole = String(membership?.role || 'client');
+      const isOperator = ['admin', 'supervisor', 'sales', 'salesperson'].includes(memberRole);
+
+      // Refresh AuthContext with the authoritative role now that membership exists.
+      try {
+        await signIn(formData.email, formData.password);
+      } catch (e) {
+        // Non-fatal: session may already be active depending on Supabase settings.
+      }
 
       // 4. Update Parent State if required
       if (onRegister) {
@@ -85,7 +97,7 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
           });
       }
 
-      window.location.hash = 'portal';
+      window.location.hash = isOperator ? 'dashboard' : 'portal';
       
     } catch (err: any) {
       console.error("Infrastructure Error:", err);

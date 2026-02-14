@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Hexagon, Lock, Mail, ArrowRight, User, ShieldCheck, Building2, Phone, UserPlus, Sparkles, Info, X, AlertCircle, RefreshCw } from 'lucide-react';
 import { User as UserType } from '../types';
-import { isSupabaseConfigured } from '../lib/supabaseClient';
+import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import PhoneNotification from './PhoneNotification';
 import { data } from '../adapters';
@@ -23,6 +23,19 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
 
   useEffect(() => {
     const checkGenesis = async () => {
+      // Avoid relying on `tenants` reads before auth (RLS will block). Use a cheap RPC instead.
+      try {
+        if (isSupabaseConfigured) {
+          const { data: initialized, error } = await supabase.rpc('nexus_is_system_initialized');
+          if (!error && typeof initialized === 'boolean') {
+            setIsSystemEmpty(!initialized);
+            return;
+          }
+        }
+      } catch (e) {
+        // Fall back to legacy check
+      }
+
       const contacts = await data.getContacts();
       setIsSystemEmpty(!contacts || contacts.length === 0);
     };
