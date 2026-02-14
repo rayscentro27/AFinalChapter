@@ -1,4 +1,3 @@
-
 -- Nexus Financial OS: Genesis Schema
 -- Purpose: Multi-tenant capital management and neural auditing
 
@@ -12,11 +11,14 @@ CREATE TABLE IF NOT EXISTS public.tenants (
 );
 
 -- 2. Tenant Memberships (Mapping users to entities)
+-- SECURITY NOTE:
+-- - Treat this table as the source of truth for access control.
+-- - Do not trust `auth.users.user_metadata.role` (user-editable).
 CREATE TABLE IF NOT EXISTS public.tenant_memberships (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
   user_id UUID NOT NULL,
-  role TEXT DEFAULT 'admin',
+  role TEXT DEFAULT 'client',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
@@ -33,11 +35,184 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 );
 
 -- 4. Enable Realtime for High-Magnitude Alerts
-ALTER PUBLICATION supabase_realtime ADD TABLE audit_logs;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.audit_logs;
+EXCEPTION
+  WHEN duplicate_object THEN
+    NULL;
+  WHEN undefined_object THEN
+    NULL;
+END $$;
 
--- 5. Row Level Security (RLS) - Simplistic for initial activation
+-- 5. Row Level Security (RLS)
 ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tenant_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow authenticated access to tenants" ON public.tenants FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated access to logs" ON public.audit_logs FOR ALL USING (auth.role() = 'authenticated');
+-- 6. Helper Functions (security definer so RLS policies can call safely)
+CREATE OR REPLACE FUNCTION public.nexus_is_master_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.tenant_memberships tm
+    WHERE tm.user_id = auth.uid()
+      AND tm.role = 'admin'
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.nexus_can_access_tenant(t UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.nexus_is_master_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM public.tenant_memberships tm
+      WHERE tm.user_id = auth.uid()
+        AND tm.tenant_id = t
+    );
+$$;
+
+-- Used by the Login screen before auth. Safe to expose (returns only a boolean).
+CREATE OR REPLACE FUNCTION public.nexus_is_system_initialized()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.tenant_memberships tm
+    WHERE tm.role = 'admin'
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.nexus_is_system_initialized() TO anon, authenticated;
+
+-- 7. Bootstrap Role Assignment
+-- First membership inserted becomes the Master Admin. After that:
+-- - non-admin inserts are forced to 'client'
+-- - admin inserts may specify 'role'
+CREATE OR REPLACE FUNCTION public.nexus_assign_membership_role()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.tenant_memberships WHERE role = 'admin') THEN
+    NEW.role := 'admin';
+    RETURN NEW;
+  END IF;
+
+  IF public.nexus_is_master_admin() THEN
+    NEW.role := COALESCE(NULLIF(NEW.role, ''), 'client');
+    RETURN NEW;
+  END IF;
+
+  NEW.role := 'client';
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS nexus_assign_membership_role ON public.tenant_memberships;
+CREATE TRIGGER nexus_assign_membership_role
+BEFORE INSERT ON public.tenant_memberships
+FOR EACH ROW
+EXECUTE FUNCTION public.nexus_assign_membership_role();
+
+-- 8. Policies
+-- Drop legacy policies if present
+DROP POLICY IF EXISTS "Allow authenticated access to tenants" ON public.tenants;
+DROP POLICY IF EXISTS "Allow authenticated access to logs" ON public.audit_logs;
+
+-- Tenants
+DROP POLICY IF EXISTS tenants_select ON public.tenants;
+CREATE POLICY tenants_select ON public.tenants
+FOR SELECT
+USING (public.nexus_is_master_admin() OR public.nexus_can_access_tenant(id));
+
+DROP POLICY IF EXISTS tenants_insert ON public.tenants;
+CREATE POLICY tenants_insert ON public.tenants
+FOR INSERT
+WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS tenants_update ON public.tenants;
+CREATE POLICY tenants_update ON public.tenants
+FOR UPDATE
+USING (public.nexus_is_master_admin())
+WITH CHECK (public.nexus_is_master_admin());
+
+DROP POLICY IF EXISTS tenants_delete ON public.tenants;
+CREATE POLICY tenants_delete ON public.tenants
+FOR DELETE
+USING (public.nexus_is_master_admin());
+
+-- Tenant memberships
+DROP POLICY IF EXISTS memberships_select ON public.tenant_memberships;
+CREATE POLICY memberships_select ON public.tenant_memberships
+FOR SELECT
+USING (public.nexus_is_master_admin() OR user_id = auth.uid());
+
+DROP POLICY IF EXISTS memberships_insert ON public.tenant_memberships;
+CREATE POLICY memberships_insert ON public.tenant_memberships
+FOR INSERT
+WITH CHECK (
+  auth.role() = 'authenticated'
+  AND (
+    public.nexus_is_master_admin()
+    OR user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS memberships_update ON public.tenant_memberships;
+CREATE POLICY memberships_update ON public.tenant_memberships
+FOR UPDATE
+USING (public.nexus_is_master_admin())
+WITH CHECK (public.nexus_is_master_admin());
+
+DROP POLICY IF EXISTS memberships_delete ON public.tenant_memberships;
+CREATE POLICY memberships_delete ON public.tenant_memberships
+FOR DELETE
+USING (public.nexus_is_master_admin());
+
+-- Audit logs
+DROP POLICY IF EXISTS logs_select ON public.audit_logs;
+CREATE POLICY logs_select ON public.audit_logs
+FOR SELECT
+USING (public.nexus_is_master_admin() OR public.nexus_can_access_tenant(tenant_id));
+
+DROP POLICY IF EXISTS logs_insert ON public.audit_logs;
+CREATE POLICY logs_insert ON public.audit_logs
+FOR INSERT
+WITH CHECK (
+  auth.role() = 'authenticated'
+  AND (
+    public.nexus_is_master_admin()
+    OR (
+      user_id = auth.uid()
+      AND public.nexus_can_access_tenant(tenant_id)
+    )
+  )
+);
+
+DROP POLICY IF EXISTS logs_update ON public.audit_logs;
+CREATE POLICY logs_update ON public.audit_logs
+FOR UPDATE
+USING (public.nexus_is_master_admin())
+WITH CHECK (public.nexus_is_master_admin());
+
+DROP POLICY IF EXISTS logs_delete ON public.audit_logs;
+CREATE POLICY logs_delete ON public.audit_logs
+FOR DELETE
+USING (public.nexus_is_master_admin());
