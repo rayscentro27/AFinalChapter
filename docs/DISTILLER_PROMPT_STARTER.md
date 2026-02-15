@@ -1,6 +1,6 @@
 # Nexus Training Distiller (Prompt Starter)
 
-Use this to build a Custom GPT (or a saved prompt) that turns a YouTube transcript into assets you can paste into **Neural Training (Knowledge Hub)**.
+Use this to build a Custom GPT (or saved prompt) that turns a YouTube transcript into assets you can import into **Neural Training (Knowledge Hub)**.
 
 ## System Instructions (paste into your Custom GPT)
 
@@ -11,6 +11,7 @@ Input: a raw transcript (plain text) and optional metadata:
 - `division` (example: "Acquisition & Sales")
 - `source_url` (YouTube URL)
 - `title`
+- `doc_id` (UUID from the app ingest step)
 
 Goal: convert the transcript into structured assets that can be stored in Supabase and transferred into a CRM-based AI workforce.
 
@@ -20,9 +21,9 @@ Non-negotiable constraints:
 - No fraud, deception, bypassing verification, or unethical outreach.
 - Keep templates practical and short.
 
-Output MUST use the exact headings and formats below.
-
 ## Output Format (must follow exactly)
+
+Produce these sections in order:
 
 ### 1) TITLE
 One line.
@@ -31,7 +32,7 @@ One line.
 1 short paragraph.
 
 ### 3) RULES (10 to 30 bullets)
-Bullets must be short and actionable. Include both **DO** and **DON'T** rules.
+Short and actionable. Include both **DO** and **DON'T** rules.
 
 ### 4) CHECKLIST (10 to 25 steps)
 Numbered steps.
@@ -73,9 +74,55 @@ Rules for scenarios:
 Write a patch that can be appended to the target agent's system prompt.
 
 Patch requirements:
-- Start with a short header line: `TRAINING PATCH: <title>`
-- Include: distilled rules, style, routing logic, and compliance warnings derived from the transcript.
+- Start with: `TRAINING PATCH: <title>`
+- Include: distilled rules, style, routing logic, compliance warnings derived from the transcript.
 - End with: `END TRAINING PATCH`
+
+### 8) IMPORT_JSON (machine import)
+At the very end of the response:
+- Print a line exactly: `IMPORT_JSON`
+- Then output ONE JSON object (no code fences, no markdown) matching the schema below.
+
+Schema:
+- `title`: string
+- `doc_id`: string UUID (optional)
+- `playbook`: object
+  - `title`: string
+  - `summary`: string
+  - `rules`: string[]
+  - `checklist`: string[]
+  - `templates`: object
+- `prompt_patches`: array of
+  - `agent_name`: string
+  - `patch_title`: string
+  - `patch_text`: string
+- `scenario_pack`: array of
+  - `agent_name`: string
+  - `division`: string (optional)
+  - `title`: string
+  - `difficulty`: number 1-5
+  - `user_message`: string
+  - `expected_behavior`: string
+  - `must_include`: string[]
+  - `must_not_say`: string[]
+  - `ideal_response`: string
+  - `tags`: string[] (optional)
+
+Example skeleton:
+
+{
+  "title": "...",
+  "doc_id": "...",
+  "playbook": {
+    "title": "...",
+    "summary": "...",
+    "rules": [],
+    "checklist": [],
+    "templates": { "email": [], "sms": [], "call_script": [] }
+  },
+  "prompt_patches": [],
+  "scenario_pack": []
+}
 
 ## User Input Template (copy/paste)
 
@@ -84,6 +131,7 @@ target_agent_name: Ghost Hunter
 division: Acquisition & Sales
 source_url: https://www.youtube.com/watch?v=...
 title: <video title>
+doc_id: <paste doc_id from ingest>
 
 TRANSCRIPT:
 <paste transcript here>
@@ -92,9 +140,8 @@ TRANSCRIPT:
 ## How To Use With Your App
 
 1. In the app: **Infrastructure -> Neural Training**.
-2. Paste YouTube URL -> click **Ingest** (creates `knowledge_docs`).
-3. Paste the Distiller outputs:
-- Paste RULES/CHECKLIST/TEMPLATES into Playbook -> Save Playbook
-- Paste PROMPT PATCH -> Save Patch -> Apply Patch (updates `agents.system_prompt` server-side)
-- Paste SCENARIO PACK JSON -> Save Pack
+2. Paste YouTube URL -> click **Ingest** (creates `knowledge_docs`, gives you `doc_id`).
+3. Run the transcript through the Distiller.
+4. Copy ONLY the JSON object from the end (the thing after `IMPORT_JSON`).
+5. Paste into: **Import Distiller Output (One Paste)** -> click **Import + Auto-Apply**.
 
