@@ -41,6 +41,31 @@ type ApprovalQueueRow = {
   created_at: string;
 };
 
+type ApprovalDetail = {
+  score_id: string;
+  case_id: string;
+
+  agent_name: string | null;
+  scenario_title: string | null;
+
+  user_message: string | null;
+  expected_behavior: string | null;
+  must_include: string[] | null;
+  must_not_say: string[] | null;
+  ideal_response: string | null;
+
+  agent_output: string;
+
+  ai_accuracy: number;
+  ai_compliance: number;
+  ai_clarity: number;
+  ai_routing: number;
+  ai_notes: string;
+
+  created_at: string;
+};
+
+
 
 const NeuralFloor: React.FC<NeuralFloorProps> = ({ contacts, onUpdateContacts }) => {
   const [url, setUrl] = useState('');
@@ -51,6 +76,17 @@ const NeuralFloor: React.FC<NeuralFloorProps> = ({ contacts, onUpdateContacts })
   const [agentMetrics, setAgentMetrics] = useState<Record<string, AgentMetricRow>>({});
   const [approvalQueue, setApprovalQueue] = useState<ApprovalQueueRow[]>([]);
   const [metricsLoading, setMetricsLoading] = useState(false);
+
+  const [isApprovalOpen, setIsApprovalOpen] = useState(false);
+  const [approvalLoading, setApprovalLoading] = useState(false);
+  const [approvalDetail, setApprovalDetail] = useState<ApprovalDetail | null>(null);
+
+  const [humanAccuracy, setHumanAccuracy] = useState<number>(0);
+  const [humanCompliance, setHumanCompliance] = useState<number>(0);
+  const [humanClarity, setHumanClarity] = useState<number>(0);
+  const [humanRouting, setHumanRouting] = useState<number>(0);
+  const [humanNotes, setHumanNotes] = useState<string>('');
+  const [approveSaving, setApproveSaving] = useState(false);
 
   
   const [agentLogs, setAgentLogs] = useState<Record<string, string[]>>({
@@ -137,6 +173,152 @@ const NeuralFloor: React.FC<NeuralFloorProps> = ({ contacts, onUpdateContacts })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode]);
 
+
+
+  const clampScore = (n: number) => Math.max(0, Math.min(5, n));
+
+  const openApprovalModal = async (scoreId: string) => {
+    setIsApprovalOpen(true);
+    setApprovalLoading(true);
+    setApprovalDetail(null);
+
+    try {
+      const { data, error } = await supabase
+        .from('eval_scores')
+        .select(`
+          id,
+          ai_accuracy,
+          ai_compliance,
+          ai_clarity,
+          ai_routing,
+          ai_notes,
+          created_at,
+          eval_cases:case_id (
+            id,
+            agent_output,
+            agents:agent_id ( name ),
+            scenarios:scenario_id (
+              title,
+              user_message,
+              expected_behavior,
+              must_include,
+              must_not_say,
+              ideal_response
+            )
+          )
+        `)
+        .eq('id', scoreId)
+        .single();
+
+      if (error) throw error;
+
+      const detail: ApprovalDetail = {
+        score_id: data.id,
+        case_id: data.eval_cases?.id ?? '',
+
+        agent_name: data.eval_cases?.agents?.name ?? null,
+        scenario_title: data.eval_cases?.scenarios?.title ?? null,
+
+        user_message: data.eval_cases?.scenarios?.user_message ?? null,
+        expected_behavior: data.eval_cases?.scenarios?.expected_behavior ?? null,
+        must_include: data.eval_cases?.scenarios?.must_include ?? null,
+        must_not_say: data.eval_cases?.scenarios?.must_not_say ?? null,
+        ideal_response: data.eval_cases?.scenarios?.ideal_response ?? null,
+
+        agent_output: data.eval_cases?.agent_output ?? '',
+
+        ai_accuracy: data.ai_accuracy,
+        ai_compliance: data.ai_compliance,
+        ai_clarity: data.ai_clarity,
+        ai_routing: data.ai_routing,
+        ai_notes: data.ai_notes ?? '',
+
+        created_at: data.created_at,
+      };
+
+      setApprovalDetail(detail);
+
+      // Prefill human scores from AI suggestion.
+      setHumanAccuracy(detail.ai_accuracy);
+      setHumanCompliance(detail.ai_compliance);
+      setHumanClarity(detail.ai_clarity);
+      setHumanRouting(detail.ai_routing);
+      setHumanNotes('');
+    } catch (e: any) {
+      console.error('Failed to load approval detail:', e?.message || e);
+    } finally {
+      setApprovalLoading(false);
+    }
+  };
+
+  const closeApprovalModal = () => {
+    setIsApprovalOpen(false);
+    setApprovalDetail(null);
+  };
+
+  const approveEvaluation = async () => {
+    if (!approvalDetail) return;
+
+    setApproveSaving(true);
+    try {
+      const payload = {
+        human_accuracy: clampScore(Number(humanAccuracy)),
+        human_compliance: clampScore(Number(humanCompliance)),
+        human_clarity: clampScore(Number(humanClarity)),
+        human_routing: clampScore(Number(humanRouting)),
+        human_notes: humanNotes || '',
+        approved: true,
+        approved_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('eval_scores')
+        .update(payload)
+        .eq('id', approvalDetail.score_id);
+
+      if (error) throw error;
+
+      await loadTrainingTelemetry();
+      closeApprovalModal();
+    } catch (e: any) {
+      console.error('Approve failed:', e?.message || e);
+      alert('Approve failed. Check console for details.');
+    } finally {
+      setApproveSaving(false);
+    }
+  };
+
+  const saveFeedbackOnly = async () => {
+    if (!approvalDetail) return;
+
+    setApproveSaving(true);
+    try {
+      const payload = {
+        human_accuracy: clampScore(Number(humanAccuracy)),
+        human_compliance: clampScore(Number(humanCompliance)),
+        human_clarity: clampScore(Number(humanClarity)),
+        human_routing: clampScore(Number(humanRouting)),
+        human_notes: humanNotes || '',
+        approved: false,
+        approved_at: null,
+      };
+
+      const { error } = await supabase
+        .from('eval_scores')
+        .update(payload)
+        .eq('id', approvalDetail.score_id);
+
+      if (error) throw error;
+
+      await loadTrainingTelemetry();
+      closeApprovalModal();
+    } catch (e: any) {
+      console.error('Save feedback failed:', e?.message || e);
+      alert('Save feedback failed. Check console for details.');
+    } finally {
+      setApproveSaving(false);
+    }
+  };
 
   const handleAudit = async () => {
     if (!url.trim()) return;
@@ -361,7 +543,7 @@ const NeuralFloor: React.FC<NeuralFloorProps> = ({ contacts, onUpdateContacts })
                         </div>
 
                         <button
-                          onClick={() => alert(`Open approval modal next. case_id: ${q.case_id}`)}
+                          onClick={() => openApprovalModal(q.score_id)}
                           className="px-6 py-2 rounded-2xl bg-[#66FCF1] text-slate-950 text-[10px] font-black uppercase tracking-widest"
                         >
                           Review
@@ -462,6 +644,194 @@ const NeuralFloor: React.FC<NeuralFloorProps> = ({ contacts, onUpdateContacts })
           </div>
       )}
         </>
+      )}
+
+
+      {isApprovalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeApprovalModal} />
+
+          <div className="relative w-full max-w-5xl rounded-[2.5rem] border border-white/10 bg-slate-950 shadow-2xl overflow-hidden">
+            <div className="p-8 border-b border-white/10 flex items-start justify-between gap-6">
+              <div>
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Approval Review</h3>
+                <p className="text-xs text-slate-500 mt-2 font-medium">AI suggested scores to edit and approve (Hybrid scoring)</p>
+              </div>
+
+              <button
+                onClick={closeApprovalModal}
+                className="px-4 py-2 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-black uppercase tracking-widest"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
+              {approvalLoading && <div className="text-slate-400 text-sm">Loading case details...</div>}
+
+              {!approvalLoading && approvalDetail && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="rounded-[2rem] bg-white/5 border border-white/10 p-6">
+                      <div className="text-white font-black uppercase tracking-tight">{approvalDetail.agent_name || 'Unknown Agent'}</div>
+                      <div className="text-slate-400 text-sm mt-1">Scenario: {approvalDetail.scenario_title || 'Untitled'}</div>
+                      <div className="text-slate-600 text-xs mt-2">{new Date(approvalDetail.created_at).toLocaleString()}</div>
+                    </div>
+
+                    <div className="rounded-[2rem] bg-white/5 border border-white/10 p-6">
+                      <div className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">User Message</div>
+                      <div className="text-slate-200 text-sm whitespace-pre-wrap">{approvalDetail.user_message || '—'}</div>
+                    </div>
+
+                    <div className="rounded-[2rem] bg-white/5 border border-white/10 p-6">
+                      <div className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Expected Behavior</div>
+                      <div className="text-slate-200 text-sm whitespace-pre-wrap">{approvalDetail.expected_behavior || '—'}</div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="rounded-[2rem] bg-white/5 border border-white/10 p-6">
+                        <div className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Must Include</div>
+                        <ul className="space-y-1">
+                          {(approvalDetail.must_include || []).length == 0 ? (
+                            <li className="text-slate-500 text-sm">—</li>
+                          ) : (
+                            (approvalDetail.must_include || []).map((x, idx) => (
+                              <li key={idx} className="text-slate-200 text-sm"><span className="text-slate-500">* </span>{x}</li>
+                            ))
+                          )}
+                        </ul>
+                      </div>
+
+                      <div className="rounded-[2rem] bg-white/5 border border-white/10 p-6">
+                        <div className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Must Not Say</div>
+                        <ul className="space-y-1">
+                          {(approvalDetail.must_not_say || []).length == 0 ? (
+                            <li className="text-slate-500 text-sm">—</li>
+                          ) : (
+                            (approvalDetail.must_not_say || []).map((x, idx) => (
+                              <li key={idx} className="text-slate-200 text-sm"><span className="text-slate-500">* </span>{x}</li>
+                            ))
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[2rem] bg-white/5 border border-white/10 p-6">
+                      <div className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Ideal Response (Gold)</div>
+                      <div className="text-slate-200 text-sm whitespace-pre-wrap">{approvalDetail.ideal_response || '—'}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="rounded-[2rem] bg-white/5 border border-white/10 p-6">
+                      <div className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Agent Output</div>
+                      <div className="text-slate-200 text-sm whitespace-pre-wrap font-mono">{approvalDetail.agent_output || '—'}</div>
+                    </div>
+
+                    <div className="rounded-[2rem] bg-white/5 border border-white/10 p-6">
+                      <div className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">AI Notes</div>
+                      <div className="text-slate-200 text-sm whitespace-pre-wrap">{approvalDetail.ai_notes || '—'}</div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <div className="px-4 py-3 rounded-2xl bg-black/30 border border-white/10 text-xs text-slate-300">AI Acc: <span className="text-white font-mono">{approvalDetail.ai_accuracy}</span></div>
+                        <div className="px-4 py-3 rounded-2xl bg-black/30 border border-white/10 text-xs text-slate-300">AI Comp: <span className="text-white font-mono">{approvalDetail.ai_compliance}</span></div>
+                        <div className="px-4 py-3 rounded-2xl bg-black/30 border border-white/10 text-xs text-slate-300">AI Clar: <span className="text-white font-mono">{approvalDetail.ai_clarity}</span></div>
+                        <div className="px-4 py-3 rounded-2xl bg-black/30 border border-white/10 text-xs text-slate-300">AI Route: <span className="text-white font-mono">{approvalDetail.ai_routing}</span></div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[2rem] bg-white/5 border border-white/10 p-6">
+                      <div className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Human Scores (0-5)</div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <label className="text-xs text-slate-400">
+                          Accuracy
+                          <input
+                            type="number"
+                            min={0}
+                            max={5}
+                            value={humanAccuracy}
+                            onChange={(e) => setHumanAccuracy(clampScore(Number(e.target.value)))}
+                            className="mt-2 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white"
+                          />
+                        </label>
+
+                        <label className="text-xs text-slate-400">
+                          Compliance
+                          <input
+                            type="number"
+                            min={0}
+                            max={5}
+                            value={humanCompliance}
+                            onChange={(e) => setHumanCompliance(clampScore(Number(e.target.value)))}
+                            className="mt-2 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white"
+                          />
+                        </label>
+
+                        <label className="text-xs text-slate-400">
+                          Clarity
+                          <input
+                            type="number"
+                            min={0}
+                            max={5}
+                            value={humanClarity}
+                            onChange={(e) => setHumanClarity(clampScore(Number(e.target.value)))}
+                            className="mt-2 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white"
+                          />
+                        </label>
+
+                        <label className="text-xs text-slate-400">
+                          Routing
+                          <input
+                            type="number"
+                            min={0}
+                            max={5}
+                            value={humanRouting}
+                            onChange={(e) => setHumanRouting(clampScore(Number(e.target.value)))}
+                            className="mt-2 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white"
+                          />
+                        </label>
+                      </div>
+
+                      <label className="block text-xs text-slate-400 mt-4">
+                        Human Notes
+                        <textarea
+                          value={humanNotes}
+                          onChange={(e) => setHumanNotes(e.target.value)}
+                          rows={4}
+                          className="mt-2 w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 text-white"
+                          placeholder="Add notes for prompt adjustments..."
+                        />
+                      </label>
+
+                      <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-end">
+                        <button
+                          onClick={saveFeedbackOnly}
+                          disabled={approveSaving}
+                          className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                        >
+                          Save Feedback
+                        </button>
+
+                        <button
+                          onClick={approveEvaluation}
+                          disabled={approveSaving}
+                          className="px-6 py-3 rounded-2xl bg-[#66FCF1] text-slate-950 text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                        >
+                          {approveSaving ? 'Approving...' : 'Approve'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!approvalLoading && !approvalDetail && (
+                <div className="text-slate-400 text-sm">No case loaded. Close and try again.</div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
