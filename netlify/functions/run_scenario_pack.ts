@@ -7,6 +7,10 @@ const BodySchema = z.object({
   run_title: z.string().optional().default("Scenario Run"),
   mode: z.enum(["simulated", "live"]).optional().default("simulated"),
   max_scenarios: z.number().int().min(1).max(200).optional().default(30),
+
+  // Upgrade: better runtime behavior
+  concurrency: z.number().int().min(1).max(10).optional().default(3),
+  per_call_timeout_ms: z.number().int().min(1000).max(60000).optional().default(15000),
 });
 
 type AgentResponse = {
@@ -14,6 +18,16 @@ type AgentResponse = {
   version: number;
   tool_requests: Array<{ name: string; args: Record<string, unknown>; reason: string }>;
   final_answer: string;
+};
+
+type ItemInsert = {
+  run_id: string;
+  scenario_index: number;
+  scenario: any;
+  model_output: any;
+  passed: boolean;
+  score: number;
+  reasons: string[];
 };
 
 export const handler: Handler = async (event) => {
@@ -74,57 +88,82 @@ export const handler: Handler = async (event) => {
 
     if (runErr || !run) throw runErr;
 
-    // 3) Execute each scenario
+    const runId = String((run as any).id);
+
+    // 3) Execute scenarios with a small concurrency limit
+    const items: ItemInsert[] = [];
     const results: any[] = [];
-    let passCount = 0;
+
+    const pool = new PromisePool(body.concurrency);
 
     for (let i = 0; i < slice.length; i++) {
       const sc = slice[i];
-      const employee = String(sc.agent_name || agentName);
-      const user_message = String(sc.user_message || "");
+      pool.add(async () => {
+        const employee = String(sc.agent_name || agentName);
+        const user_message = String(sc.user_message || "");
 
-      try {
-        const agentRes = await callAgent(event, employee, user_message, {
-          doc_id: (pack as any).doc_id ?? undefined,
-          scenario: sc,
-        }, body.mode);
+        try {
+          const agentRes = await callAgentWithTimeout(
+            event,
+            employee,
+            user_message,
+            {
+              doc_id: (pack as any).doc_id ?? undefined,
+              scenario: sc,
+            },
+            body.mode,
+            body.per_call_timeout_ms
+          );
 
-        const scored = scoreScenario(sc, agentRes);
+          const scored = scoreScenario(sc, agentRes);
 
-        await supabase.from("scenario_run_items").insert({
-          run_id: (run as any).id,
-          scenario_index: i,
-          scenario: sc,
-          model_output: agentRes,
-          passed: scored.passed,
-          score: scored.score,
-          reasons: scored.reasons,
-        });
+          items.push({
+            run_id: runId,
+            scenario_index: i,
+            scenario: sc,
+            model_output: agentRes,
+            passed: scored.passed,
+            score: scored.score,
+            reasons: scored.reasons,
+          });
 
-        if (scored.passed) passCount++;
-        results.push({ index: i, passed: scored.passed, score: scored.score, reasons: scored.reasons });
-      } catch (e: any) {
-        const reasons = ["FAIL", `Agent call failed: ${e?.message || e}`];
-        await supabase.from("scenario_run_items").insert({
-          run_id: (run as any).id,
-          scenario_index: i,
-          scenario: sc,
-          model_output: { error: String(e?.message || e) },
-          passed: false,
-          score: 0,
-          reasons,
-        });
-        results.push({ index: i, passed: false, score: 0, reasons });
-      }
+          results.push({ index: i, passed: scored.passed, score: scored.score, reasons: scored.reasons });
+        } catch (e: any) {
+          const reasons = ["FAIL", `Agent call failed: ${e?.message || e}`];
+          items.push({
+            run_id: runId,
+            scenario_index: i,
+            scenario: sc,
+            model_output: { error: String(e?.message || e) },
+            passed: false,
+            score: 0,
+            reasons,
+          });
+
+          results.push({ index: i, passed: false, score: 0, reasons });
+        }
+      });
     }
+
+    await pool.run();
+
+    // Keep result order stable
+    results.sort((a, b) => a.index - b.index);
+    items.sort((a, b) => a.scenario_index - b.scenario_index);
+
+    // 4) Store results (batch insert)
+    const { error: insErr } = await supabase.from("scenario_run_items").insert(items);
+    if (insErr) throw insErr;
+
+    const passed = results.filter((r) => r.passed).length;
 
     return json(200, {
       ok: true,
-      run_id: (run as any).id,
+      run_id: runId,
       pack_title: (pack as any).title,
       scenarios_ran: slice.length,
-      passed: passCount,
-      failed: slice.length - passCount,
+      passed,
+      failed: slice.length - passed,
       results,
     });
   } catch (e: any) {
@@ -132,8 +171,48 @@ export const handler: Handler = async (event) => {
   }
 };
 
+class PromisePool {
+  private readonly concurrency: number;
+  private running = 0;
+  private queue: Array<() => Promise<void>> = [];
+
+  constructor(concurrency: number) {
+    this.concurrency = Math.max(1, concurrency);
+  }
+
+  add(task: () => Promise<void>) {
+    this.queue.push(task);
+  }
+
+  async run() {
+    return await new Promise<void>((resolve, reject) => {
+      const pump = () => {
+        if (this.queue.length === 0 && this.running === 0) {
+          resolve();
+          return;
+        }
+
+        while (this.running < this.concurrency && this.queue.length > 0) {
+          const task = this.queue.shift()!;
+          this.running++;
+
+          task()
+            .then(() => {
+              this.running--;
+              pump();
+            })
+            .catch((err) => {
+              reject(err);
+            });
+        }
+      };
+
+      pump();
+    });
+  }
+}
+
 async function getAuthedUser(supabaseUrl: string, apikey: string, token: string) {
-  // Verify JWT via Supabase Auth.
   const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
     headers: {
       apikey,
@@ -162,12 +241,31 @@ async function isAdminOrSupervisor(supabase: ReturnType<typeof createClient>, us
   }
 }
 
+async function callAgentWithTimeout(
+  event: any,
+  employee: string,
+  user_message: string,
+  context: any,
+  mode: "simulated" | "live",
+  timeoutMs: number
+): Promise<AgentResponse> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await callAgent(event, employee, user_message, context, mode, controller.signal);
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function callAgent(
   event: any,
   employee: string,
   user_message: string,
   context: any,
-  mode: "simulated" | "live"
+  mode: "simulated" | "live",
+  signal?: AbortSignal
 ): Promise<AgentResponse> {
   const payload = { employee, user_message, context, mode };
 
@@ -177,6 +275,7 @@ async function callAgent(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal,
   });
 
   const data = await res.json().catch(() => ({}));
@@ -190,12 +289,7 @@ function baseUrl(event: any) {
   const host = (event?.headers?.host || event?.headers?.Host) as string | undefined;
   if (proto && host) return `${proto}://${host}`;
 
-  return (
-    process.env.URL ||
-    process.env.DEPLOY_PRIME_URL ||
-    process.env.NETLIFY_URL ||
-    "http://localhost:8888"
-  );
+  return process.env.URL || process.env.DEPLOY_PRIME_URL || process.env.NETLIFY_URL || "http://localhost:8888";
 }
 
 function scoreScenario(sc: any, agentRes: any) {

@@ -26,6 +26,12 @@ create table if not exists public.scenario_run_items (
   created_at timestamptz not null default now()
 );
 
+create index if not exists scenario_runs_pack_id_idx
+on public.scenario_runs (pack_id);
+
+create index if not exists scenario_runs_created_at_idx
+on public.scenario_runs (created_at desc);
+
 create index if not exists scenario_run_items_run_id_idx
 on public.scenario_run_items (run_id);
 
