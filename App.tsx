@@ -55,6 +55,7 @@ import InfraMonitor from './components/InfraMonitor';
 import LeadScout from './components/LeadScout';
 import LenderRoom from './components/LenderRoom';
 import KnowledgeHub from './components/KnowledgeHub';
+import ScenarioRunner from './components/ScenarioRunner';
 import YouTubeVideoAnalyzer from './components/YouTubeVideoAnalyzer';
 import AffiliateMarketplace from './components/AffiliateMarketplace';
 import ForensicHub from './components/ForensicHub';
@@ -242,6 +243,7 @@ export const App = () => {
                     case ViewMode.LEAD_SCOUT: return <LeadScout onAddLead={addContact} />;
                     case ViewMode.LENDER_ROOM: return <LenderRoom contacts={contacts} />;
                     case ViewMode.KNOWLEDGE_HUB: return <KnowledgeHub />;
+                    case ViewMode.SCENARIO_RUNNER: return <ScenarioRunner />;
                     case ViewMode.PARTNER_MARKETPLACE: return <AffiliateMarketplace />;
                     case ViewMode.FORENSIC_HUB: return <ForensicHub contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.SUPERVISOR_TRIAGE: return <SupervisorTriage contacts={contacts} onUpdateContact={updateContact} />;
