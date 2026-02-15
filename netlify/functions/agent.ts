@@ -86,12 +86,14 @@ export const handler: Handler = async (event) => {
       return json(404, { error: `Agent not found: ${body.employee}` });
     }
 
+    const knowledgeContext = await loadKnowledgeContext(supabase, body.employee, body.user_message);
+
     const out = await callOpenAI({
       apiKey: openaiApiKey,
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       systemPrompt: String(agent.system_prompt || ""),
       userMessage: body.user_message,
-      context: body.context,
+      context: mergeContext(body.context, knowledgeContext),
       mode: body.mode,
     });
 
@@ -231,4 +233,62 @@ function safeJsonParse(s: string) {
   } catch {
     return null;
   }
+}
+
+function mergeContext(original: unknown, injected: Record<string, unknown>) {
+  if (original && typeof original === "object" && !Array.isArray(original)) {
+    return { ...(original as Record<string, unknown>), ...injected };
+  }
+  return injected;
+}
+
+async function loadKnowledgeContext(
+  supabase: ReturnType<typeof createClient>,
+  employeeName: string,
+  userMessage: string
+) {
+  const result: { playbooks: any[]; knowledge: any[] } = { playbooks: [], knowledge: [] };
+
+  // Best-effort. If the tables aren't created yet, don't fail the whole agent call.
+  try {
+    const { data: playbooks, error } = await supabase
+      .from("playbooks")
+      .select("title, summary, rules, checklist, templates, doc_id")
+      .order("created_at", { ascending: false })
+      .limit(2);
+
+    if (!error) result.playbooks = playbooks || [];
+  } catch {
+    // ignore
+  }
+
+  try {
+    const q = String(userMessage || "")
+      .split(/\s+/)
+      .slice(0, 6)
+      .join(" ")
+      .trim();
+
+    if (q) {
+      const { data: docs, error } = await supabase
+        .from("knowledge_docs")
+        .select("title, source_url, content")
+        .textSearch("content", q, { type: "plain" })
+        .order("created_at", { ascending: false })
+        .limit(2);
+
+      if (!error) {
+        result.knowledge = (docs || []).map((d: any) => ({
+          title: d.title,
+          source_url: d.source_url,
+          snippet: String(d.content || "").slice(0, 1200),
+          employee_hint: employeeName,
+        }));
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return result;
 }

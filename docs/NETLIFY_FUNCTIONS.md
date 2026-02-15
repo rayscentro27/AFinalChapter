@@ -25,9 +25,11 @@ npm install
 netlify dev
 ```
 
-Function endpoint:
+Function endpoints:
 
 - `POST http://localhost:8888/.netlify/functions/agent`
+- `POST http://localhost:8888/.netlify/functions/ingest_youtube`
+- `POST http://localhost:8888/.netlify/functions/apply_patch`
 
 ## Production env vars
 
@@ -35,7 +37,7 @@ In Netlify site settings, set:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `OPENAI_API_KEY`
-- Optional `OPENAI_MODEL`
+- `OPENAI_API_KEY` (required for `/agent`)
+- Optional `OPENAI_MODEL` (used by `/agent`)
 
 Security note: `SUPABASE_SERVICE_ROLE_KEY` must never be exposed to the browser (Vite `VITE_*` env vars).
