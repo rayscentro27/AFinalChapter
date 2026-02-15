@@ -6,7 +6,7 @@ import {
   Store, Shield, ShieldCheck, TrendingUp, Scale, Briefcase, 
   FileText, Fingerprint, Brain, Cpu, List, Box, ShieldAlert,
   ChevronRight, Facebook, Instagram, Linkedin, MessageCircle, 
-  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone
+  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone, FlaskConical
 } from 'lucide-react';
 import { ViewMode, AgencyBranding, Contact } from '../types';
 
@@ -121,6 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           <SidebarSection label="Infrastructure">
             <SidebarItem id={ViewMode.KNOWLEDGE_HUB} label="Neural Training" icon={Brain} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.SCENARIO_RUNNER} label="Scenario Runner" icon={FlaskConical} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.INFRA_MONITOR} label="Engine Room" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.SITEMAP} label="Core Sitemap" icon={List} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.SETTINGS} label="OS Settings" icon={Settings} currentView={currentView} onViewChange={handleNav} />
