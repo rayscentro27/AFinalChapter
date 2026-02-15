@@ -46,6 +46,11 @@ In Netlify site settings, set:
 Knowledge Vault (Option 2):
 - Run `docs/supabase/knowledge_vault.sql` in Supabase SQL Editor
 - Run `docs/supabase/scenario_runner.sql` in Supabase SQL Editor
+- Run `docs/supabase/agent_cache.sql` in Supabase SQL Editor (optional, enables /agent caching)
 - Use the Distiller prompt starter in `docs/DISTILLER_PROMPT_STARTER.md`
 
 Security note: `SUPABASE_SERVICE_ROLE_KEY` must never be exposed to the browser (Vite `VITE_*` env vars).
+
+
+Agent caching:
+- Set `AGENT_CACHE_TTL_HOURS` (optional, default 72)
