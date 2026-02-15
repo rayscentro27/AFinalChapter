@@ -29,6 +29,7 @@ Function endpoints:
 
 - `POST http://localhost:8888/.netlify/functions/agent`
 - `POST http://localhost:8888/.netlify/functions/ingest_youtube`
+- `POST http://localhost:8888/.netlify/functions/ingest_bulk`
 - `POST http://localhost:8888/.netlify/functions/apply_patch`
 - `POST http://localhost:8888/.netlify/functions/import_distiller`
 - `POST http://localhost:8888/.netlify/functions/run_scenario_pack`

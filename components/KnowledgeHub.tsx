@@ -62,6 +62,7 @@ const KnowledgeHub: React.FC = () => {
   const [tags, setTags] = useState('funding,sales');
   const [lang, setLang] = useState('en');
   const [docId, setDocId] = useState<string>('');
+  const [bulkUrls, setBulkUrls] = useState('');
 
   // Distilled assets
   const [playbookTitle, setPlaybookTitle] = useState('');
@@ -127,6 +128,61 @@ const KnowledgeHub: React.FC = () => {
       cancelled = true;
     };
   }, [canUseDb, refreshTick]);
+
+  const ingestBulk = async () => {
+    const raw = String(bulkUrls || '').trim();
+    if (!raw) {
+      setStatus('Missing URLs. Paste one YouTube URL per line.');
+      return;
+    }
+
+    const urls = raw
+      .split(/\n+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+    if (urls.length === 0) {
+      setStatus('Missing URLs.');
+      return;
+    }
+
+    setBusy(true);
+    setStatus('Bulk ingest running...');
+
+    try {
+      const res = await fetch('/.netlify/functions/ingest_bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          urls,
+          tags: tagsArr,
+          lang: (lang || 'en').trim(),
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStatus('Bulk ingest failed: ' + (data?.error || 'Unknown error'));
+        return;
+      }
+
+      const failed = Array.isArray(data?.results) ? data.results.filter((r) => !r?.ok) : [];
+
+      setStatus(
+        'Bulk ingest complete. success=' +
+          String(data?.success ?? 0) +
+          ' failed=' +
+          String(data?.failed ?? 0) +
+          (failed.length ? '\nFirst failures: ' + failed.slice(0, 5).map((f) => f.url).join(' | ') : '')
+      );
+
+      setRefreshTick((x) => x + 1);
+    } catch (e: any) {
+      setStatus('Bulk ingest failed: ' + (e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const ingestYoutube = async () => {
     if (!url.trim()) {
@@ -463,6 +519,42 @@ const KnowledgeHub: React.FC = () => {
             </div>
           </div>
 
+
+          {/* 1.25) Bulk ingest */}
+          <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl">
+            <div className="flex items-center justify-between gap-6 flex-wrap">
+              <div>
+                <h2 className="text-white text-2xl font-black uppercase tracking-tight">Bulk Ingest (URLs)</h2>
+                <p className="text-slate-400 text-sm mt-2">
+                  Paste one YouTube URL per line. Calls <span className="font-mono">/.netlify/functions/ingest_bulk</span>.
+                </p>
+              </div>
+              <button
+                onClick={ingestBulk}
+                disabled={busy}
+                className="px-6 py-3 rounded-2xl bg-[#66FCF1] text-slate-950 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
+              >
+                {busy ? <RefreshCw size={16} className="animate-spin" /> : <Upload size={16} />}
+                Bulk Ingest
+              </button>
+            </div>
+
+            <div className="mt-8">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">
+                URLs (one per line)
+              </label>
+              <textarea
+                value={bulkUrls}
+                onChange={(e) => setBulkUrls(e.target.value)}
+                rows={8}
+                className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 text-white font-mono text-xs"
+                placeholder="https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/watch?v=..."
+              />
+              <div className="mt-3 text-slate-500 text-xs">
+                Uses current Tags + Lang fields from the single ingest section.
+              </div>
+            </div>
+          </div>
           {/* 1.5) One paste import */}
           <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl">
             <div className="flex items-center justify-between gap-6 flex-wrap">
