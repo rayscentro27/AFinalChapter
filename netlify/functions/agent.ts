@@ -1,6 +1,7 @@
 import type { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { createHash } from "node:crypto";
 
 const BodySchema = z.object({
   employee: z.string().min(1),
@@ -55,6 +56,79 @@ const AgentJsonSchema = {
   required: ["tool_requests", "final_answer"],
 } as const;
 
+const CACHE_TTL_MS = (() => {
+  const hours = Number(process.env.AGENT_CACHE_TTL_HOURS || '72');
+  if (!Number.isFinite(hours) || hours <= 0) return 0;
+  return Math.floor(hours * 60 * 60 * 1000);
+})();
+
+function norm(s: string) {
+  return String(s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .slice(0, 800);
+}
+
+function sha256(s: string) {
+  return createHash('sha256').update(s, 'utf8').digest('hex');
+}
+
+function stableStringify(x: any): string {
+  if (x === null || x === undefined) return String(x);
+  if (typeof x !== 'object') return JSON.stringify(x);
+  if (Array.isArray(x)) return '[' + x.map(stableStringify).join(',') + ']';
+
+  const obj = x as Record<string, any>;
+  const keys = Object.keys(obj).sort();
+  return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}';
+}
+
+async function cacheLookup(supabase: any, cacheKey: string) {
+  try {
+    let q = supabase.from('agent_cache').select('response, created_at').eq('cache_key', cacheKey).maybeSingle();
+    const { data, error } = await q;
+    if (error) return null;
+
+    if (!data?.response) return null;
+
+    if (CACHE_TTL_MS > 0 && data.created_at) {
+      const cutoff = Date.now() - CACHE_TTL_MS;
+      const ts = Date.parse(String(data.created_at));
+      if (Number.isFinite(ts) && ts < cutoff) return null;
+    }
+
+    return data.response;
+  } catch {
+    // Table may not exist yet or RLS could block if misconfigured.
+    return null;
+  }
+}
+
+async function cacheStore(supabase: any, row: {
+  cache_key: string;
+  employee: string;
+  user_message: string;
+  context_hash: string;
+  response: any;
+}) {
+  try {
+    const { error } = await supabase
+      .from('agent_cache')
+      .upsert({
+        cache_key: row.cache_key,
+        employee: row.employee,
+        user_message: row.user_message,
+        context_hash: row.context_hash,
+        response: row.response,
+      });
+
+    if (error) return;
+  } catch {
+    // ignore
+  }
+}
+
 export const handler: Handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
@@ -93,21 +167,51 @@ export const handler: Handler = async (event) => {
       body.context
     );
 
+    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+    const mergedContext = mergeContext(body.context, knowledgeContext);
+
+    // Cache key includes employee, mode, model, agent version, normalized message, and merged context.
+    const msgNorm = norm(body.user_message || "");
+    const contextHash = sha256(stableStringify(mergedContext));
+    const cacheKey = sha256(
+      String(body.employee) +
+        "||mode:" + String(body.mode) +
+        "||model:" + String(model) +
+        "||agentv:" + String(agent.version ?? 1) +
+        "||ctx:" + String(contextHash) +
+        "||msg:" + String(msgNorm)
+    );
+
+    const hit = await cacheLookup(supabase, cacheKey);
+    if (hit) {
+      return json(200, { ...hit, cached: true });
+    }
+
     const out = await callOpenAI({
       apiKey: openaiApiKey,
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      model,
       systemPrompt: String(agent.system_prompt || ""),
       userMessage: body.user_message,
-      context: mergeContext(body.context, knowledgeContext),
+      context: mergedContext,
       mode: body.mode,
     });
 
-    return json(200, {
+    const responsePayload = {
       employee: agent.name,
       version: agent.version ?? 1,
       tool_requests: out.tool_requests,
       final_answer: out.final_answer,
+    };
+
+    await cacheStore(supabase, {
+      cache_key: cacheKey,
+      employee: body.employee,
+      user_message: body.user_message,
+      context_hash: contextHash,
+      response: responsePayload,
     });
+
+    return json(200, { ...responsePayload, cached: false });
   } catch (e: any) {
     const msg = typeof e?.message === "string" ? e.message : "Bad Request";
     return json(400, { error: msg });
