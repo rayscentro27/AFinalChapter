@@ -30,6 +30,7 @@ Function endpoints:
 - `POST http://localhost:8888/.netlify/functions/agent`
 - `POST http://localhost:8888/.netlify/functions/ingest_youtube`
 - `POST http://localhost:8888/.netlify/functions/apply_patch`
+- `POST http://localhost:8888/.netlify/functions/import_distiller`
 
 ## Production env vars
 

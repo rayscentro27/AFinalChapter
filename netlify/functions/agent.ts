@@ -86,7 +86,12 @@ export const handler: Handler = async (event) => {
       return json(404, { error: `Agent not found: ${body.employee}` });
     }
 
-    const knowledgeContext = await loadKnowledgeContext(supabase, body.employee, body.user_message);
+    const knowledgeContext = await loadKnowledgeContext(
+      supabase,
+      body.employee,
+      body.user_message,
+      body.context
+    );
 
     const out = await callOpenAI({
       apiKey: openaiApiKey,
@@ -245,45 +250,75 @@ function mergeContext(original: unknown, injected: Record<string, unknown>) {
 async function loadKnowledgeContext(
   supabase: ReturnType<typeof createClient>,
   employeeName: string,
-  userMessage: string
+  userMessage: string,
+  context?: unknown
 ) {
   const result: { playbooks: any[]; knowledge: any[] } = { playbooks: [], knowledge: [] };
 
+  const docId =
+    context && typeof context === "object" && !Array.isArray(context)
+      ? (context as any).doc_id
+      : undefined;
+  const normalizedDocId = typeof docId === "string" && docId.length > 10 ? docId : undefined;
+
   // Best-effort. If the tables aren't created yet, don't fail the whole agent call.
   try {
-    const { data: playbooks, error } = await supabase
+    let q = supabase
       .from("playbooks")
       .select("title, summary, rules, checklist, templates, doc_id")
       .order("created_at", { ascending: false })
       .limit(2);
 
+    if (normalizedDocId) q = q.eq("doc_id", normalizedDocId);
+
+    const { data: playbooks, error } = await q;
     if (!error) result.playbooks = playbooks || [];
   } catch {
     // ignore
   }
 
   try {
-    const q = String(userMessage || "")
-      .split(/\s+/)
-      .slice(0, 6)
-      .join(" ")
-      .trim();
-
-    if (q) {
+    // If doc_id is provided, pull that specific transcript. Otherwise, do a quick text search.
+    if (normalizedDocId) {
       const { data: docs, error } = await supabase
         .from("knowledge_docs")
-        .select("title, source_url, content")
-        .textSearch("content", q, { type: "plain" })
-        .order("created_at", { ascending: false })
-        .limit(2);
+        .select("id, title, source_url, content")
+        .eq("id", normalizedDocId)
+        .limit(1);
 
       if (!error) {
         result.knowledge = (docs || []).map((d: any) => ({
           title: d.title,
           source_url: d.source_url,
-          snippet: String(d.content || "").slice(0, 1200),
+          snippet: String(d.content || "").slice(0, 1400),
+          doc_id: d.id,
           employee_hint: employeeName,
         }));
+      }
+    } else {
+      const q = String(userMessage || "")
+        .split(/\s+/)
+        .slice(0, 6)
+        .join(" ")
+        .trim();
+
+      if (q) {
+        const { data: docs, error } = await supabase
+          .from("knowledge_docs")
+          .select("id, title, source_url, content")
+          .textSearch("content", q, { type: "plain" })
+          .order("created_at", { ascending: false })
+          .limit(2);
+
+        if (!error) {
+          result.knowledge = (docs || []).map((d: any) => ({
+            title: d.title,
+            source_url: d.source_url,
+            snippet: String(d.content || "").slice(0, 1200),
+            doc_id: d.id,
+            employee_hint: employeeName,
+          }));
+        }
       }
     }
   } catch {

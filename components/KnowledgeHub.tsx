@@ -78,6 +78,9 @@ const KnowledgeHub: React.FC = () => {
   const [scenarioPackTitle, setScenarioPackTitle] = useState('');
   const [scenariosJson, setScenariosJson] = useState('[]');
 
+  // One-paste distiller import
+  const [distillerJson, setDistillerJson] = useState('');
+
   // UI
   const [status, setStatus] = useState<string>('');
   const [busy, setBusy] = useState(false);
@@ -274,6 +277,48 @@ const KnowledgeHub: React.FC = () => {
     }
   };
 
+  const importDistiller = async () => {
+    if (!distillerJson.trim()) {
+      setStatus('Missing IMPORT_JSON. Paste only the JSON object.');
+      return;
+    }
+
+    setBusy(true);
+    setStatus('Importing distiller output...');
+    try {
+      let payload: any;
+      try {
+        payload = JSON.parse(distillerJson);
+      } catch {
+        setStatus('Invalid JSON. Paste only the IMPORT_JSON object (no code fences).');
+        return;
+      }
+
+      if (docId && !payload.doc_id) payload.doc_id = docId;
+
+      const res = await fetch('/.netlify/functions/import_distiller', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStatus(`Import failed: ${data?.error || 'Unknown error'}`);
+        return;
+      }
+
+      setStatus(
+        `Imported. PB=${data.playbook_id || '—'} Applied=${data.patches_applied} Skipped=${data.patches_skipped} Failed=${data.patches_failed}`
+      );
+      setRefreshTick((x) => x + 1);
+    } catch (e: any) {
+      setStatus(`Import failed: ${e?.message || e}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-24">
       <div className="bg-slate-950 p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden border border-white/10">
@@ -418,11 +463,47 @@ const KnowledgeHub: React.FC = () => {
             </div>
           </div>
 
+          {/* 1.5) One paste import */}
+          <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl">
+            <div className="flex items-center justify-between gap-6 flex-wrap">
+              <div>
+                <h2 className="text-white text-2xl font-black uppercase tracking-tight">2) Import Distiller Output (One Paste)</h2>
+                <p className="text-slate-400 text-sm mt-2">
+                  Paste only the final <span className="font-mono">IMPORT_JSON</span> object. This saves playbook + scenarios + patches and auto-applies patches with dedupe.
+                </p>
+              </div>
+              <button
+                onClick={importDistiller}
+                disabled={busy}
+                className="px-6 py-3 rounded-2xl bg-[#66FCF1] text-slate-950 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
+              >
+                {busy ? <RefreshCw size={16} className="animate-spin" /> : <Rocket size={16} />}
+                Import + Auto-Apply
+              </button>
+            </div>
+
+            <div className="mt-8">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">
+                IMPORT_JSON
+              </label>
+              <textarea
+                value={distillerJson}
+                onChange={(e) => setDistillerJson(e.target.value)}
+                rows={14}
+                className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 text-white font-mono text-xs"
+                placeholder="Paste ONLY the IMPORT_JSON object here"
+              />
+              <div className="mt-3 text-slate-500 text-xs">
+                Tip: If you ingested first, your current <span className="font-mono">doc_id</span> will be injected automatically if missing.
+              </div>
+            </div>
+          </div>
+
           {/* 2) Playbook */}
           <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div>
-                <h2 className="text-white text-2xl font-black uppercase tracking-tight">2) Save Distilled Playbook</h2>
+                <h2 className="text-white text-2xl font-black uppercase tracking-tight">3) Save Distilled Playbook</h2>
                 <p className="text-slate-400 text-sm mt-2">Paste the Distiller output (rules/checklist/templates) and save to `playbooks`.</p>
               </div>
               <button
@@ -494,7 +575,7 @@ const KnowledgeHub: React.FC = () => {
           <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div>
-                <h2 className="text-white text-2xl font-black uppercase tracking-tight">3) Save Prompt Patch</h2>
+                <h2 className="text-white text-2xl font-black uppercase tracking-tight">4) Save Prompt Patch</h2>
                 <p className="text-slate-400 text-sm mt-2">Save into `prompt_patches`, then apply server-side to `agents.system_prompt`.</p>
               </div>
               <button
@@ -574,7 +655,7 @@ const KnowledgeHub: React.FC = () => {
           <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div>
-                <h2 className="text-white text-2xl font-black uppercase tracking-tight">4) Save Scenario Pack</h2>
+                <h2 className="text-white text-2xl font-black uppercase tracking-tight">5) Save Scenario Pack</h2>
                 <p className="text-slate-400 text-sm mt-2">Paste SCENARIO PACK JSON array and save to `scenario_packs`.</p>
               </div>
               <button
