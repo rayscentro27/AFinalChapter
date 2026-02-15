@@ -40,4 +40,8 @@ In Netlify site settings, set:
 - `OPENAI_API_KEY` (required for `/agent`)
 - Optional `OPENAI_MODEL` (used by `/agent`)
 
+Knowledge Vault (Option 2):
+- Run `docs/supabase/knowledge_vault.sql` in Supabase SQL Editor
+- Use the Distiller prompt starter in `docs/DISTILLER_PROMPT_STARTER.md`
+
 Security note: `SUPABASE_SERVICE_ROLE_KEY` must never be exposed to the browser (Vite `VITE_*` env vars).
