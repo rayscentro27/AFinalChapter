@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Netlify local state/env
+.netlify/state.json
+.netlify/.env
