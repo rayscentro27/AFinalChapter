@@ -26,3 +26,7 @@ dist-ssr
 # Netlify local state/env
 .netlify/state.json
 .netlify/.env
+
+# Netlify Functions build artifacts
+netlify/functions/*.zip
+netlify/functions/manifest.json
