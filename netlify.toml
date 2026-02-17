@@ -6,6 +6,12 @@
 [functions]
   node_bundler = "esbuild"
 
+[dev]
+  command = "npm run dev"
+  targetPort = 3000
+  port = 8888
+  functions = "netlify/functions"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

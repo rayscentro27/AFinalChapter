@@ -4,6 +4,7 @@ import { z } from "zod";
 import crypto from "crypto";
 
 const ImportSchema = z.object({
+  auto_apply: z.boolean().optional().default(true),
   doc_id: z.string().uuid().optional(),
   title: z.string().min(1),
 
@@ -117,8 +118,8 @@ export const handler: Handler = async (event) => {
       if (sErr) throw sErr;
     }
 
-    // 4) auto-apply patches (dedupe by PATCH_HASH markers)
-    const applyResults = await applyPatchesToAgents(supabase, body.prompt_patches);
+    // 4) optional auto-apply patches (dedupe by PATCH_HASH markers)
+    const applyResults = body.auto_apply ? await applyPatchesToAgents(supabase, body.prompt_patches) : { applied: [], skipped: [], failed: [] };
 
     return json(200, {
       ok: true,
@@ -150,6 +151,19 @@ async function safeInsertImportRun(supabase: ReturnType<typeof createClient>, bo
   }
 }
 
+
+async function ensureHistory(supabase: ReturnType<typeof createClient>, agentId: string, promptVersion: number, systemPrompt: string) {
+  try {
+    await supabase.from('agent_prompt_history').insert({
+      agent_id: agentId,
+      prompt_version: promptVersion,
+      system_prompt: systemPrompt,
+    });
+  } catch {
+    // ignore (duplicates / missing table)
+  }
+}
+
 async function applyPatchesToAgents(supabase: ReturnType<typeof createClient>, patches: PatchIn[]) {
   const applied: Array<{ agent_name: string; patch_title: string; new_version: number }> = [];
   const skipped: Array<{ agent_name: string; patch_title: string; reason: string }> = [];
@@ -172,6 +186,8 @@ async function applyPatchesToAgents(supabase: ReturnType<typeof createClient>, p
         .single();
 
       if (agentErr || !agent) throw new Error(`Agent not found: ${agent_name}`);
+
+      await ensureHistory(supabase, agent.id, agent.version ?? 1, String(agent.system_prompt || ''));
 
       const base = String(agent.system_prompt || "").trim();
       const blocksToAppend: Array<{ patch_title: string; block: string }> = [];
@@ -208,6 +224,8 @@ async function applyPatchesToAgents(supabase: ReturnType<typeof createClient>, p
         .eq("id", agent.id);
 
       if (upErr) throw upErr;
+
+      await ensureHistory(supabase, agent.id, newVersion, newPrompt);
 
       for (const b of blocksToAppend) {
         applied.push({ agent_name, patch_title: b.patch_title, new_version: newVersion });

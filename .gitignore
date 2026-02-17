@@ -33,3 +33,9 @@ dist-ssr
 # Netlify Functions build artifacts
 netlify/functions/*.zip
 netlify/functions/manifest.json
+
+# Local backups
+.env.bad
+
+# dotenv
+.env

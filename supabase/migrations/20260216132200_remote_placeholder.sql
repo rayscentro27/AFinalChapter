@@ -1,0 +1,8 @@
+-- Placeholder migration.
+--
+-- This project has a remote migration version 20260216132200 recorded in
+-- supabase_migrations.schema_migrations, but the SQL file was not present in
+-- this repo at the time of sync.
+--
+-- Keeping this file (even empty) allows the Supabase CLI to reconcile local vs
+-- remote migration history.
