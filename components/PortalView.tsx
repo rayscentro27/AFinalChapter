@@ -6,7 +6,7 @@ import {
     Upload, RefreshCw, LayoutDashboard, 
     Layers, ArrowRight, ShieldCheck, Activity, BrainCircuit, AlertTriangle, Star,
     // Added Sparkles and Users to imports
-    Mic, UserCheck, Zap, Search, Trophy, Hammer, Building2, LogOut, Sparkles, Users
+    Mic, UserCheck, Zap, Search, Trophy, Hammer, Building2, LogOut, Sparkles, Users, DollarSign, Receipt
 } from 'lucide-react';
 import { Contact, AgencyBranding, Course } from '../types';
 import DocumentVault from './DocumentVault';
@@ -18,6 +18,8 @@ import Tier2Strategy from './Tier2Strategy';
 import InvestmentLab from './InvestmentLab';
 import ReferralHub from './ReferralHub';
 import NexusPulse from './NexusPulse';
+import FundabilityDashboard from './FundabilityDashboard';
+import CapitalAllocationSimulator from './CapitalAllocationSimulator';
 import VoiceConcierge from './VoiceConcierge';
 import IdentityVerification from './IdentityVerification';
 import CreditRepairAI from './CreditRepairAI';
@@ -35,7 +37,7 @@ interface PortalViewProps {
 }
 
 const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, branding, onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'messages' | 'pulse' | 'repair' | 'profile' | 'roadmap' | 'vault' | 'offers' | 'cards' | 'subscription' | 'settlement' | 'invest' | 'partner' | 'kyc'>('pulse');
+  const [activeTab, setActiveTab] = useState<'messages' | 'pulse' | 'fundability' | 'simulator' | 'repair' | 'profile' | 'roadmap' | 'vault' | 'offers' | 'cards' | 'subscription' | 'settlement' | 'invest' | 'partner' | 'kyc'>('pulse');
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   
   const isFunded = contact.status === 'Closed' || (contact.fundedDeals && contact.fundedDeals.length > 0);
@@ -51,6 +53,8 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
   const sortedTabs = useMemo(() => {
     return [
         { id: 'pulse', label: 'Briefing', icon: <LayoutDashboard size={18}/> },
+        { id: 'fundability', label: 'Fundability', icon: <Target size={18}/> },
+        { id: 'simulator', label: 'Simulator', icon: <WalletIcon size={18}/> },
         { id: 'roadmap', label: 'Roadmap', icon: <Zap size={18}/> },
         { id: 'messages', label: 'Concierge', icon: <MessageSquare size={18}/> },
         { id: 'subscription', label: 'Plan', icon: <Layers size={18}/> },
@@ -117,6 +121,8 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
        <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 pt-10 pb-20 overflow-x-hidden relative">
           {activeTab === 'messages' && <div className="h-[80vh]"><MessageCenter contact={contact} onUpdateContact={onUpdateContact} currentUserRole="client" /></div>}
           {activeTab === 'pulse' && <NexusPulse contact={contact} onOpenVoice={() => setIsVoiceOpen(true)} onUpdateContact={onUpdateContact} />}
+          {activeTab === 'fundability' && <FundabilityDashboard contact={contact} />}
+          {activeTab === 'simulator' && <CapitalAllocationSimulator contact={contact} />}
           {activeTab === 'roadmap' && (
               <div className="max-w-4xl mx-auto space-y-12 animate-fade-in py-10">
                   <div className="text-center">
@@ -155,14 +161,5 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
   );
 };
 
-const DollarSign = (props: any) => <DollarSignIcon {...props} />;
-const Receipt = (props: any) => <ReceiptIcon {...props} />;
-
-function DollarSignIcon(props: any) {
-  return <DollarSign {...props} />;
-}
-function ReceiptIcon(props: any) {
-  return <Receipt {...props} />;
-}
 
 export default PortalView;
