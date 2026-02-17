@@ -26,6 +26,9 @@ dist-ssr
 # Netlify local state/env
 .netlify/state.json
 .netlify/.env
+# Netlify CLI local artifacts (keep .netlify/.env.example tracked)
+.netlify/*
+!.netlify/.env.example
 
 # Netlify Functions build artifacts
 netlify/functions/*.zip
