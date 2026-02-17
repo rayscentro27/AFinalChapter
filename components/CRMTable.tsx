@@ -13,6 +13,8 @@ import ActivityTimeline from './ActivityTimeline';
 import MessageCenter from './MessageCenter';
 import DocumentVault from './DocumentVault';
 import SalesBattleCard from './SalesBattleCard';
+import FundabilityDashboard from './FundabilityDashboard';
+import CapitalAllocationSimulator from './CapitalAllocationSimulator';
 
 interface CRMTableProps {
   contacts: Contact[];
@@ -22,7 +24,7 @@ interface CRMTableProps {
 
 const CRMTable: React.FC<CRMTableProps> = ({ contacts = [], onUpdateContact, onAddContact }) => {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'relations' | 'roadmap' | 'messages' | 'documents'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'fundability' | 'simulator' | 'relations' | 'roadmap' | 'messages' | 'documents'>('overview');
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'ready'>('all');
@@ -202,6 +204,8 @@ const CRMTable: React.FC<CRMTableProps> = ({ contacts = [], onUpdateContact, onA
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-10 bg-slate-50/30 custom-scrollbar">
+                        {activeTab === 'fundability' && <FundabilityDashboard contact={selectedContact} />}
+                        {activeTab === 'simulator' && <CapitalAllocationSimulator contact={selectedContact} />}
                         {activeTab === 'overview' && (
                             <div className="grid grid-cols-1 xl:grid-cols-12 gap-10 animate-fade-in">
                                 <div className="xl:col-span-4 space-y-8">
