@@ -64,6 +64,19 @@ const KnowledgeHub: React.FC = () => {
   const [docId, setDocId] = useState<string>('');
   const [bulkUrls, setBulkUrls] = useState('');
 
+
+  // Social ingest (optional media upload to Storage + knowledge_docs insert)
+  const [socialPlatform, setSocialPlatform] = useState<'instagram' | 'messenger' | 'facebook'>('instagram');
+  const [socialUrl, setSocialUrl] = useState('');
+  const [socialTitle, setSocialTitle] = useState('');
+  const [socialTags, setSocialTags] = useState('sales,funding');
+  const [socialCaption, setSocialCaption] = useState('');
+  const [socialTranscript, setSocialTranscript] = useState('');
+  const [socialFile, setSocialFile] = useState<File | null>(null);
+  const [socialMediaPath, setSocialMediaPath] = useState('');
+  const [socialMediaMime, setSocialMediaMime] = useState('');
+  const [socialDocId, setSocialDocId] = useState<string>('');
+
   // Distilled assets
   const [playbookTitle, setPlaybookTitle] = useState('');
   const [summary, setSummary] = useState('');
@@ -219,6 +232,129 @@ const KnowledgeHub: React.FC = () => {
       setBusy(false);
     }
   };
+
+  const createSignedUploadToken = async (filename: string) => {
+    const res = await fetch('/.netlify/functions/create_upload_url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(String((data as any)?.error || 'Failed to create signed upload URL'));
+    return data as { ok: true; path: string; token: string };
+  };
+
+  const uploadSocialMedia = async (file: File) => {
+    const safeName = (file.name || 'upload').replace(/[^\w.\-]/g, '_');
+    const { path, token } = await createSignedUploadToken(safeName);
+    const mime = file.type || 'application/octet-stream';
+
+    const { error } = await supabase.storage
+      .from('training_media')
+      .uploadToSignedUrl(path, token, file, { contentType: mime });
+
+    if (error) throw error;
+
+    setSocialMediaPath(path);
+    setSocialMediaMime(mime);
+
+    return { path, mime };
+  };
+
+  const ingestSocial = async () => {
+    if (!canUseDb) {
+      setStatus('Supabase not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+      return;
+    }
+
+    const content = [socialCaption, socialTranscript].filter(Boolean).join('\n\n---\n\n');
+    if (!content.trim() && !socialFile) {
+      setStatus('Provide caption/transcript text or attach a video.');
+      return;
+    }
+
+    setBusy(true);
+    setSocialDocId('');
+
+    try {
+      setStatus('Uploading video (if selected)...');
+
+      let media_path: string | undefined;
+      let media_mime: string | undefined;
+
+      if (socialFile) {
+        const up = await uploadSocialMedia(socialFile);
+        media_path = up.path;
+        media_mime = up.mime;
+      }
+
+      setStatus('Saving knowledge doc...');
+
+      const tagsArr = socialTags
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
+
+      const res = await fetch('/.netlify/functions/ingest_social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_platform: socialPlatform,
+          source_url: socialUrl || undefined,
+          title: socialTitle || `Social Training (${socialPlatform})`,
+          caption: socialCaption || undefined,
+          transcript: socialTranscript || undefined,
+          tags: tagsArr,
+          media_path,
+          media_mime,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStatus('Social ingest failed: ' + String((data as any)?.error || 'Unknown error'));
+        return;
+      }
+
+      setSocialDocId(String((data as any)?.doc_id || ''));
+      setStatus('Social ingest complete. doc_id=' + String((data as any)?.doc_id || ''));
+      setRefreshTick((x) => x + 1);
+    } catch (e: any) {
+      setStatus('Social ingest failed: ' + String(e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openSocialMedia = async () => {
+    if (!socialMediaPath) {
+      setStatus('No media_path yet. Upload a video first.');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const res = await fetch('/.netlify/functions/get_media_url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ media_path: socialMediaPath }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String((data as any)?.error || 'Failed to get signed URL'));
+
+      const signed = String((data as any)?.signed_url || '');
+      if (!signed) throw new Error('Missing signed_url');
+      window.open(signed, '_blank', 'noopener,noreferrer');
+      setStatus('Opened media in a new tab.');
+    } catch (e: any) {
+      setStatus('Open media failed: ' + String(e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
 
   const savePlaybook = async () => {
     if (!canUseDb) return setStatus('Supabase not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
@@ -552,6 +688,149 @@ const KnowledgeHub: React.FC = () => {
               />
               <div className="mt-3 text-slate-500 text-xs">
                 Uses current Tags + Lang fields from the single ingest section.
+              </div>
+            </div>
+          </div>
+
+
+          {/* 1.25) Ingest Social */}
+          <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl">
+            <div className="flex items-center justify-between gap-6 flex-wrap">
+              <div>
+                <h2 className="text-white text-2xl font-black uppercase tracking-tight">1b) Ingest Social Training</h2>
+                <p className="text-slate-400 text-sm mt-2">
+                  Optional private video upload to Storage bucket <span className="font-mono">training_media</span>, then inserts into <span className="font-mono">knowledge_docs</span> via
+                  <span className="font-mono"> /.netlify/functions/ingest_social</span>.
+                </p>
+              </div>
+              <button
+                onClick={ingestSocial}
+                disabled={busy}
+                className="px-6 py-3 rounded-2xl bg-[#66FCF1] text-slate-950 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
+              >
+                {busy ? <RefreshCw size={16} className="animate-spin" /> : <Upload size={16} />}
+                Ingest Social
+              </button>
+            </div>
+
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Platform</label>
+                <select
+                  value={socialPlatform}
+                  onChange={(e) => setSocialPlatform(e.target.value as any)}
+                  className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white"
+                >
+                  <option value="instagram">Instagram</option>
+                  <option value="messenger">Messenger</option>
+                  <option value="facebook">Facebook</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Source URL (optional)</label>
+                <input
+                  value={socialUrl}
+                  onChange={(e) => setSocialUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Title</label>
+                <input
+                  value={socialTitle}
+                  onChange={(e) => setSocialTitle(e.target.value)}
+                  placeholder="Social training title"
+                  className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tags (comma)</label>
+                <input
+                  value={socialTags}
+                  onChange={(e) => setSocialTags(e.target.value)}
+                  placeholder="sales,funding"
+                  className="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Caption (optional)</label>
+                <textarea
+                  value={socialCaption}
+                  onChange={(e) => setSocialCaption(e.target.value)}
+                  rows={4}
+                  className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 text-white font-mono text-xs"
+                  placeholder="Paste caption text"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Transcript (optional)</label>
+                <textarea
+                  value={socialTranscript}
+                  onChange={(e) => setSocialTranscript(e.target.value)}
+                  rows={6}
+                  className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 text-white font-mono text-xs"
+                  placeholder="Paste transcript text"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Optional Video</label>
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setSocialFile(e.target.files?.[0] || null)}
+                  className="block w-full text-slate-300 text-sm"
+                />
+
+                {(socialMediaPath || socialDocId) && (
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-black/30 border border-white/10 px-4 py-3">
+                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">media_path</div>
+                      <div className="mt-2 font-mono text-xs text-slate-200 break-all">{socialMediaPath || '-'}</div>
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          onClick={openSocialMedia}
+                          disabled={!socialMediaPath || busy}
+                          className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                        >
+                          Open
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (await copyToClipboard(socialMediaPath)) setStatus('Copied media_path');
+                          }}
+                          disabled={!socialMediaPath}
+                          className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
+                        >
+                          <Copy size={14} /> Copy
+                        </button>
+                      </div>
+                      <div className="mt-2 text-[10px] text-slate-500">mime: {socialMediaMime || '-'}</div>
+                    </div>
+
+                    <div className="rounded-2xl bg-black/30 border border-white/10 px-4 py-3">
+                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">doc_id</div>
+                      <div className="mt-2 font-mono text-xs text-slate-200 break-all">{socialDocId || '-'}</div>
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          onClick={async () => {
+                            if (await copyToClipboard(socialDocId)) setStatus('Copied doc_id');
+                          }}
+                          disabled={!socialDocId}
+                          className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
+                        >
+                          <Copy size={14} /> Copy
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

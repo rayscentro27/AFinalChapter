@@ -16,7 +16,41 @@ const getApiKey = () => {
 
 const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
 
+
+const GEMINI_FN = '/.netlify/functions/gemini_generate';
+
+type GeminiFnResponse = { text: string; cached?: boolean; candidates?: any };
+
+const generateContentViaNetlify = async (args: any): Promise<GeminiFnResponse | null> => {
+  try {
+    if (!args?.model) return null;
+
+    const res = await fetch(GEMINI_FN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: args.model,
+        contents: args.contents,
+        config: args.config,
+        cache_namespace: args.cache_namespace || 'geminiService',
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return null;
+    if (!data || typeof (data as any).text !== 'string') return null;
+
+    return data as GeminiFnResponse;
+  } catch {
+    return null;
+  }
+};
+
 const generateContentShim = async (args: any) => {
+  // Prefer server-side function (keeps API keys off the client + enables Supabase cache).
+  const viaFn = await generateContentViaNetlify(args);
+  if (viaFn) return { text: viaFn.text };
+
   const expectJson = args?.config?.responseMimeType === 'application/json';
   const semantic = typeof args?.contents === 'string' && !args?.config?.tools;
   const text = await generateContentWithPolicy(args, {
