@@ -5,6 +5,46 @@ import { Contact, ChatMessage, Activity } from '../types';
 import * as geminiService from '../services/geminiService';
 import { sanitizeAIHtml } from '../utils/security';
 
+type AgentFnResponse = {
+  employee: string;
+  version: number;
+  tool_requests: Array<{ name: string; args: Record<string, unknown>; reason: string }>;
+  final_answer: string;
+  cached?: boolean;
+  drift?: { severity: 'none' | 'yellow' | 'orange' | 'red'; category: string; message: string };
+  supervisor?: { approved: boolean; risk_level: 'low' | 'moderate' | 'high' | 'critical' };
+};
+
+const compactContactsForContext = (contacts: Contact[]) =>
+  contacts.map((c) => ({
+    id: c.id,
+    company: c.company,
+    name: c.name,
+    status: c.status,
+    value: c.value,
+    revenue: c.revenue,
+    aiScore: c.aiScore,
+    automationMetadata: c.automationMetadata,
+  }));
+
+async function runArbitratedAgentPipeline(user_message: string, contacts: Contact[]): Promise<AgentFnResponse> {
+  const res = await fetch('/.netlify/functions/agent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      employees: ['Forensic Bot', 'Lex Ledger', 'Nexus Analyst', 'Ghost Hunter'],
+      arbitrate: true,
+      approval_mode: true,
+      mode: 'live',
+      user_message,
+      context: { contacts: compactContactsForContext(contacts) },
+    }),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 interface AICommandCenterProps {
   contacts: Contact[];
   onUpdateContact: (contact: Contact) => void;
@@ -104,12 +144,30 @@ const AICommandCenter: React.FC<AICommandCenterProps> = ({ contacts, onUpdateCon
     setIsLoading(true);
 
     try {
-      const response = await geminiService.chatWithCRM(input, contacts);
-      const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: response.text };
+      // Primary: server-side multi-employee pipeline with drift gating + arbitration + supervisor checks.
+      const response = await runArbitratedAgentPipeline(userMsg.content, contacts);
+      const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: response.final_answer };
       setMessages(prev => [...prev, aiMsg]);
-      if (response.actions) await executeToolCalls(response.actions);
+
+      if (Array.isArray(response.tool_requests) && response.tool_requests.length > 0) {
+        await executeToolCalls(
+          response.tool_requests.map((t) => ({
+            name: t.name,
+            args: t.args,
+          }))
+        );
+      }
     } catch (error) {
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: "Neural handshake failed. Please try again." }]);
+      // Fallback: legacy Gemini CRM chat (client-side). This avoids breaking the UI if OPENAI_API_KEY
+      // isn't set in Netlify yet.
+      try {
+        const response = await geminiService.chatWithCRM(userMsg.content, contacts);
+        const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: response.text };
+        setMessages(prev => [...prev, aiMsg]);
+        if (response.actions) await executeToolCalls(response.actions);
+      } catch {
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: "Neural handshake failed. Please try again." }]);
+      }
     } finally {
       setIsLoading(false);
     }
