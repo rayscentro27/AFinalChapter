@@ -13,6 +13,7 @@ import {
     Clock, CheckCircle, Smartphone, UserCheck
 } from 'lucide-react';
 import TaskSuggester from './TaskSuggester';
+import TaskList from './TaskList';
 
 interface NexusPulseProps {
   contact: Contact;
@@ -89,6 +90,8 @@ const NexusPulse: React.FC<NexusPulseProps> = ({ contact, onOpenVoice, onUpdateC
               </div>
           </div>
       </div>
+
+      <TaskList contact={contact} onUpdateContact={onUpdateContact} />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* NEW: Capital Readiness HUD (Radar Chart) */}

@@ -9,6 +9,13 @@ export type ClientTaskRow = {
   status: 'pending' | 'completed';
   due_date: string; // YYYY-MM-DD
   type: ClientTask['type'];
+
+  // Optional richer fields (added in 20260218212000)
+  signal?: 'red' | 'yellow' | 'green';
+  assigned_employee?: string | null;
+  group_key?: string | null;
+  template_key?: string | null;
+
   link: string | null;
   meeting_time: string | null;
   linked_to_goal: boolean | null;
@@ -24,6 +31,12 @@ export function rowToClientTask(r: ClientTaskRow): ClientTask {
     status: r.status,
     date: String(r.due_date),
     type: r.type,
+
+    signal: (r.signal as any) ?? undefined,
+    assignedEmployee: r.assigned_employee ?? undefined,
+    groupKey: r.group_key ?? undefined,
+    templateKey: r.template_key ?? undefined,
+
     link: r.link ?? undefined,
     meetingTime: r.meeting_time ?? undefined,
     linkedToGoal: r.linked_to_goal ?? undefined,
@@ -50,6 +63,12 @@ export function clientTaskToRow(tenantId: string, t: ClientTask): Omit<ClientTas
     status: t.status,
     due_date: t.date,
     type: t.type,
+
+    signal: t.signal,
+    assigned_employee: t.assignedEmployee ?? null,
+    group_key: t.groupKey ?? null,
+    template_key: t.templateKey ?? null,
+
     link: t.link ?? null,
     meeting_time: meetingIso,
     linked_to_goal: t.linkedToGoal ?? null,
@@ -64,7 +83,7 @@ export async function fetchTasksForTenants(tenantIds: string[]) {
     .from('client_tasks')
     .select('*')
     .in('tenant_id', tenantIds)
-    .order('updated_at', { ascending: false });
+    .order('due_date', { ascending: true });
 
   if (error) {
     console.error('Supabase error fetching client_tasks:', error);

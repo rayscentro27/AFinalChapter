@@ -112,6 +112,10 @@ export interface ClientTask {
   status: 'pending' | 'completed';
   date: string;
   type: 'upload' | 'action' | 'education' | 'review' | 'meeting' | 'legal';
+  signal?: 'red' | 'yellow' | 'green';
+  assignedEmployee?: string;
+  groupKey?: string;
+  templateKey?: string;
   link?: string;
   meetingTime?: string;
   linkedToGoal?: boolean;

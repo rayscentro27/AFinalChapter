@@ -63,11 +63,46 @@ const OnboardingQuestionnaire: React.FC<OnboardingQuestionnaireProps> = ({ conta
 
       if (aError) throw aError;
 
+      // Generate baseline tasks for this tenant (idempotent).
+      try {
+        await supabase.rpc('generate_tasks_for_tenant', { p_tenant_id: membership.tenant_id });
+      } catch {
+        // ignore
+      }
+
+      let clientTasks: any[] = [];
+      try {
+        const { data: rows } = await supabase
+          .from('client_tasks')
+          .select('*')
+          .eq('tenant_id', membership.tenant_id)
+          .order('due_date', { ascending: true });
+
+        clientTasks = (rows || []).map((r: any) => ({
+          id: String(r.task_id),
+          title: String(r.title),
+          description: r.description || undefined,
+          status: r.status || 'pending',
+          date: String(r.due_date),
+          type: r.type || 'action',
+          signal: r.signal || undefined,
+          assignedEmployee: r.assigned_employee || undefined,
+          groupKey: r.group_key || undefined,
+          templateKey: r.template_key || undefined,
+          link: r.link || undefined,
+          meetingTime: r.meeting_time || undefined,
+          linkedToGoal: r.linked_to_goal || undefined,
+        }));
+      } catch {
+        // ignore
+      }
+
       onComplete({
         ...contact,
         company: formData.companyName,
         revenue: Number(formData.revenue),
-        onboardingComplete: true
+        onboardingComplete: true,
+        clientTasks
       });
 
       window.location.hash = 'dashboard';

@@ -37,7 +37,7 @@ const TaskSuggester: React.FC<TaskSuggesterProps> = ({ contact, onUpdateContact 
       title: task.title || 'AI Recommendation',
       description: task.description,
       status: 'pending',
-      date: new Date().toLocaleDateString(),
+      date: new Date().toISOString().slice(0, 10),
       type: task.type || 'action'
     };
 

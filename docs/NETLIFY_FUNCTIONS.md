@@ -16,6 +16,7 @@ npm install
 - Fill in:
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
+  - `SUPABASE_ANON_KEY` (required for task/notification functions)
   - `ADMIN_IMPORT_TOKEN` (required for `/import_training_bundle`)
   - `OPENAI_API_KEY`
   - Optional `OPENAI_MODEL`
@@ -34,6 +35,11 @@ Function endpoints:
 - `POST http://localhost:8888/.netlify/functions/apply_patch`
 - `POST http://localhost:8888/.netlify/functions/import_distiller`
 - `POST http://localhost:8888/.netlify/functions/import_training_bundle`
+- `POST http://localhost:8888/.netlify/functions/client_intake_save_and_generate_tasks`
+- `GET http://localhost:8888/.netlify/functions/list_client_tasks`
+- `POST http://localhost:8888/.netlify/functions/update_task_status`
+- `GET http://localhost:8888/.netlify/functions/list_notifications`
+- `POST http://localhost:8888/.netlify/functions/mark_notification_read`
 - `POST http://localhost:8888/.netlify/functions/run_scenario_pack`
 
 ## Production env vars
@@ -42,6 +48,7 @@ In Netlify site settings, set:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_ANON_KEY` (required for task/notification functions)
 - `OPENAI_API_KEY` (required for `/agent`)
 - Optional `OPENAI_MODEL` (used by `/agent`)
 
@@ -89,3 +96,6 @@ select title from playbooks order by created_at desc limit 10;
 select title, agent_name from scenario_packs order by created_at desc limit 20;
 select key from nexus_config;
 ```
+
+
+Task/notification functions require an authenticated user session (send `Authorization: Bearer <supabase_jwt>`).
