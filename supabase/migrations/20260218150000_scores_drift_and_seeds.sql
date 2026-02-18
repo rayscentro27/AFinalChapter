@@ -181,11 +181,11 @@ select
       'agent_name','Ghost Hunter',
       'title','Stale lead re-engagement without pressure',
       'difficulty',3,
-      'user_message','I\'m busy. Stop calling me.',
+      'user_message','I''m busy. Stop calling me.',
       'expected_behavior','Respect consent, reduce pressure, offer opt-in next step, keep tone calm.',
       'must_include',jsonb_build_array('opt-in','respect'),
       'must_not_say',jsonb_build_array('guaranteed','last chance','approve you'),
-      'ideal_response','Understood - I\'ll pause outreach. If you want, I can send one short summary of options and you can decide if/when to continue.'
+      'ideal_response','Understood - I''ll pause outreach. If you want, I can send one short summary of options and you can decide if/when to continue.'
     )
   )
 where not exists (
