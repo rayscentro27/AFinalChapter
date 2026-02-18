@@ -4,6 +4,59 @@ import { Contact, Message, TrainingPair } from '../types';
 import { Send, User, Bot, CheckCheck, Sparkles, Upload, PenTool, Smartphone, RefreshCw, MessageSquare, Shield, Gavel, X, Zap } from 'lucide-react';
 import * as geminiService from '../services/geminiService';
 
+
+type AgentFnResponse = {
+  employee: string;
+  version: number;
+  tool_requests: Array<{ name: string; args: Record<string, unknown>; reason: string }>;
+  final_answer: string;
+  cached?: boolean;
+  drift?: { severity: 'none' | 'yellow' | 'orange' | 'red'; category: string; message: string };
+  supervisor?: { approved: boolean; risk_level: 'low' | 'moderate' | 'high' | 'critical' };
+};
+
+const isUuid = (v: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v || ''));
+
+async function runConciergePipeline(args: {
+  user_message: string;
+  contact: Contact;
+  messages: Message[];
+}): Promise<AgentFnResponse> {
+  const res = await fetch('/.netlify/functions/agent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      employees: ['Forensic Bot', 'Lex Ledger', 'Nexus Analyst', 'Ghost Hunter'],
+      arbitrate: true,
+      approval_mode: true,
+      mode: 'live',
+      user_message: args.user_message,
+      client_id: isUuid(args.contact.id) ? args.contact.id : undefined,
+      context: {
+        contact: {
+          id: args.contact.id,
+          company: args.contact.company,
+          name: args.contact.name,
+          status: args.contact.status,
+          revenue: args.contact.revenue,
+          value: args.contact.value,
+          aiScore: args.contact.aiScore,
+          automationMetadata: args.contact.automationMetadata,
+          businessProfile: args.contact.businessProfile,
+          creditAnalysis: args.contact.creditAnalysis,
+          compliance: args.contact.compliance,
+          financialSpreading: args.contact.financialSpreading,
+        },
+        message_history: args.messages.slice(-20),
+      },
+    }),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 interface MessageCenterProps {
   contact: Contact;
   onUpdateContact?: (contact: Contact) => void;
@@ -43,22 +96,68 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
     if (currentUserRole === 'client') {
       setIsBotTyping(true);
       try {
-          const response = await geminiService.processAutonomousStaffResponse(updatedMessages, contact);
+          // Primary: server-side arbitration + drift gating + supervisor approval.
+          const response = await runConciergePipeline({
+              user_message: userMsg.content,
+              contact,
+              messages: updatedMessages
+          });
           const botMsg: Message = { 
               id: `msg_bot_${Date.now()}`, 
               sender: 'bot', 
               senderName: 'Nexus Concierge',
-              content: response.text, 
+              content: response.final_answer, 
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
               read: false,
-              actionRequired: response.action
+              actionRequired: {
+                  tool_requests: response.tool_requests,
+                  drift: response.drift,
+                  supervisor: response.supervisor
+              }
           };
           onUpdateContact({ ...contact, messageHistory: [...updatedMessages, botMsg] });
       } catch (e) {
-          console.error("Staff bot error", e);
+          // Fallback: legacy Gemini flow.
+          try {
+              const response = await geminiService.processAutonomousStaffResponse(updatedMessages, contact);
+              const botMsg: Message = { 
+                  id: `msg_bot_${Date.now()}`, 
+                  sender: 'bot', 
+                  senderName: 'Nexus Concierge',
+                  content: response.text, 
+                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+                  read: false,
+                  actionRequired: (response as any).action
+              };
+              onUpdateContact({ ...contact, messageHistory: [...updatedMessages, botMsg] });
+          } catch (fallbackErr) {
+              console.error("Staff bot error", e, fallbackErr);
+          }
       } finally {
           setIsBotTyping(false);
       }
+    }
+  };
+
+
+
+  const handleDraftForAdmin = async () => {
+    if (currentUserRole !== 'admin') return;
+    if (isBotTyping) return;
+    setIsBotTyping(true);
+    try {
+      const lastClientMsg = [...messages].reverse().find(m => m.sender === 'client');
+      const prompt = lastClientMsg
+        ? `Draft a compliant, calm advisor reply to the client's last message: "${lastClientMsg.content}". Keep it short and concrete.`
+        : 'Draft a compliant, calm advisor reply asking one clarifying question and proposing next steps.';
+
+      const response = await runConciergePipeline({ user_message: prompt, contact, messages });
+      setNewMessage(response.final_answer || '');
+    } catch (e) {
+      console.error('Draft reply failed', e);
+      alert('AI draft failed. Please try again.');
+    } finally {
+      setIsBotTyping(false);
     }
   };
 
@@ -169,6 +268,17 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
                className="w-full pl-6 pr-16 py-4 bg-slate-100 border-none rounded-[2rem] text-sm font-medium focus:ring-2 focus:ring-indigo-500 resize-none outline-none transition-all placeholder:text-slate-400 shadow-inner custom-scrollbar" 
                rows={1}
              />
+             {currentUserRole === 'admin' && (
+               <button
+                 type="button"
+                 onClick={handleDraftForAdmin}
+                 disabled={isBotTyping}
+                 className="absolute right-14 bottom-2.5 p-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl transition-all shadow-xl active:scale-95 disabled:opacity-60"
+                 title="Draft AI reply (does not send)"
+               >
+                 <Sparkles size={18} />
+               </button>
+             )}
              <button type="submit" disabled={!newMessage.trim() || isBotTyping} className="absolute right-3 bottom-2.5 p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all shadow-xl active:scale-95"><Send size={20} /></button>
           </div>
         </form>
