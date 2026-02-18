@@ -23,9 +23,11 @@ import CapitalAllocationSimulator from './CapitalAllocationSimulator';
 import VoiceConcierge from './VoiceConcierge';
 import IdentityVerification from './IdentityVerification';
 import CreditRepairAI from './CreditRepairAI';
-import OnboardingQuestionnaire from './OnboardingQuestionnaire';
+import OnboardingWizard from './OnboardingWizard';
 import ClientInvoices from './ClientInvoices';
 import ClientCardSuggestions from './ClientCardSuggestions';
+import NotificationBell from './NotificationBell';
+import ClientPortalDashboard from './ClientPortalDashboard';
 
 interface PortalViewProps {
   contact: Contact;
@@ -37,7 +39,7 @@ interface PortalViewProps {
 }
 
 const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, branding, onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'messages' | 'pulse' | 'fundability' | 'simulator' | 'repair' | 'profile' | 'roadmap' | 'vault' | 'offers' | 'cards' | 'subscription' | 'settlement' | 'invest' | 'partner' | 'kyc'>('pulse');
+  const [activeTab, setActiveTab] = useState<'messages' | 'pulse' | 'tasks' | 'fundability' | 'simulator' | 'repair' | 'profile' | 'roadmap' | 'vault' | 'offers' | 'cards' | 'subscription' | 'settlement' | 'invest' | 'partner' | 'kyc'>('pulse');
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   
   const isFunded = contact.status === 'Closed' || (contact.fundedDeals && contact.fundedDeals.length > 0);
@@ -53,6 +55,7 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
   const sortedTabs = useMemo(() => {
     return [
         { id: 'pulse', label: 'Briefing', icon: <LayoutDashboard size={18}/> },
+        { id: 'tasks', label: 'Tasks', icon: <CheckCircle size={18}/> },
         { id: 'fundability', label: 'Fundability', icon: <Target size={18}/> },
         { id: 'simulator', label: 'Simulator', icon: <WalletIcon size={18}/> },
         { id: 'roadmap', label: 'Roadmap', icon: <Zap size={18}/> },
@@ -71,7 +74,7 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
   }, [isFunded, pendingInvoices]);
 
   if (!contact.onboardingComplete) {
-      return <OnboardingQuestionnaire contact={contact} onComplete={onUpdateContact} />;
+      return <OnboardingWizard contact={contact} onComplete={onUpdateContact} />;
   }
 
   return (
@@ -97,6 +100,7 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
                 <button onClick={() => setIsVoiceOpen(true)} className="flex items-center gap-2 bg-[#059669]/10 text-[#059669] px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-[#059669]/20 hover:bg-[#059669]/20 transition-all active:scale-95 group/voice">
                     <Mic size={16} className="group-hover:animate-pulse" /><span className="hidden md:inline">Advisor Live</span>
                 </button>
+                <NotificationBell />
                 <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center font-black text-[#059669] shadow-xl">{contact.name[0]}</div>
                 <button onClick={onLogout} className="p-2.5 text-slate-500 hover:text-red-400 transition-colors"><LogOut size={18}/></button>
             </div>
@@ -121,6 +125,7 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
        <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 pt-10 pb-20 overflow-x-hidden relative">
           {activeTab === 'messages' && <div className="h-[80vh]"><MessageCenter contact={contact} onUpdateContact={onUpdateContact} currentUserRole="client" /></div>}
           {activeTab === 'pulse' && <NexusPulse contact={contact} onOpenVoice={() => setIsVoiceOpen(true)} onUpdateContact={onUpdateContact} />}
+          {activeTab === 'tasks' && <ClientPortalDashboard contact={contact} onUpdateContact={onUpdateContact} />}
           {activeTab === 'fundability' && <FundabilityDashboard contact={contact} />}
           {activeTab === 'simulator' && <CapitalAllocationSimulator contact={contact} />}
           {activeTab === 'roadmap' && (
