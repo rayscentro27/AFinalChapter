@@ -29,6 +29,13 @@ export default function TaskList(props: {
     });
   };
 
+  const setSignal = (taskId: string, signal: 'red' | 'yellow' | 'green') => {
+    props.onUpdateContact({
+      ...props.contact,
+      clientTasks: tasks.map((t) => (t.id === taskId ? { ...t, signal } : t)),
+    });
+  };
+
   const Item = ({ t }: { t: ClientTask }) => {
     return (
       <div className="p-4 rounded-2xl border border-white/10 bg-black/20 hover:bg-white/5 transition-all flex gap-4">
@@ -77,6 +84,31 @@ export default function TaskList(props: {
                 <UserCircle2 size={14} /> {t.assignedEmployee}
               </span>
             ) : null}
+
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSignal(t.id, 'red')}
+              className="px-3 py-2 rounded-xl bg-red-500/15 border border-red-500/20 text-red-200 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20"
+            >
+              Red
+            </button>
+            <button
+              type="button"
+              onClick={() => setSignal(t.id, 'yellow')}
+              className="px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/20 text-amber-200 text-[10px] font-black uppercase tracking-widest hover:bg-amber-500/20"
+            >
+              Yellow
+            </button>
+            <button
+              type="button"
+              onClick={() => setSignal(t.id, 'green')}
+              className="px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-200 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20"
+            >
+              Green
+            </button>
+          </div>
           </div>
         </div>
       </div>
