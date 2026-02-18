@@ -16,6 +16,7 @@ npm install
 - Fill in:
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
+  - `ADMIN_IMPORT_TOKEN` (required for `/import_training_bundle`)
   - `OPENAI_API_KEY`
   - Optional `OPENAI_MODEL`
 
@@ -32,6 +33,7 @@ Function endpoints:
 - `POST http://localhost:8888/.netlify/functions/ingest_bulk`
 - `POST http://localhost:8888/.netlify/functions/apply_patch`
 - `POST http://localhost:8888/.netlify/functions/import_distiller`
+- `POST http://localhost:8888/.netlify/functions/import_training_bundle`
 - `POST http://localhost:8888/.netlify/functions/run_scenario_pack`
 
 ## Production env vars
@@ -54,3 +56,33 @@ Security note: `SUPABASE_SERVICE_ROLE_KEY` must never be exposed to the browser 
 
 Agent caching:
 - Set `AGENT_CACHE_TTL_HOURS` (optional, default 72)
+
+## Training bundle importer
+
+This repo includes a safe, idempotent importer:
+
+- `POST http://localhost:8888/.netlify/functions/import_training_bundle`
+
+Required env vars:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `ADMIN_IMPORT_TOKEN` (required for importer auth)
+
+Local call example:
+
+```bash
+curl -s http://localhost:8888/.netlify/functions/import_training_bundle \
+  -H 'content-type: application/json' \
+  -H 'x-admin-import-token: <token>' \
+  --data-binary @data/training/initial_training_bundle.json | cat
+```
+
+Verification queries:
+
+```sql
+select name, version from agents order by name;
+select title from playbooks order by created_at desc limit 10;
+select title, agent_name from scenario_packs order by created_at desc limit 20;
+select key from nexus_config;
+```
