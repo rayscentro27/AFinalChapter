@@ -59,7 +59,10 @@ Agent caching:
 
 ## Training bundle importer
 
-This repo includes a safe, idempotent importer:
+This repo includes a safe, idempotent importer. It supports:
+
+- `employees` (7 core employees)
+- optional `system_agents` (system-level engines/supervisors)
 
 - `POST http://localhost:8888/.netlify/functions/import_training_bundle`
 

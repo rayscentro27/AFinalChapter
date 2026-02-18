@@ -30,12 +30,24 @@ const ScenarioPackSchema = z
   })
   .passthrough();
 
+const SystemAgentSchema = z
+  .object({
+    name: z.string().min(1),
+    division: z.string().min(1).default('nexus'),
+    role: z.string().min(1).default('engine'),
+    status: z.enum(['active','testing','disabled']).default('active'),
+    base_prompt: z.string().optional().default(''),
+    system_prompt: z.string().optional().default(''),
+  })
+  .passthrough();
+
 const BundleSchema = z
   .object({
     bundle_version: z.string().min(1),
     generated_at: z.string().optional(),
     global: z.unknown(),
     employees: z.array(EmployeeSchema),
+    system_agents: z.array(SystemAgentSchema).optional().default([]),
     playbooks: z.array(PlaybookSchema),
     scenario_packs: z.array(ScenarioPackSchema),
     scoring_models: z.unknown(),
@@ -167,7 +179,9 @@ async function upsertConfig(supabase: ReturnType<typeof createClient>, bundle: B
 }
 
 async function upsertAgents(supabase: ReturnType<typeof createClient>, bundle: Bundle) {
-  const names = bundle.employees.map((e) => e.agent_name);
+  const employeeNames = bundle.employees.map((e) => e.agent_name);
+  const systemNames = (bundle.system_agents || []).map((a) => a.name);
+  const names = Array.from(new Set([...employeeNames, ...systemNames]));
 
   const { data: existing, error } = await supabase
     .from('agents')
@@ -179,10 +193,15 @@ async function upsertAgents(supabase: ReturnType<typeof createClient>, bundle: B
   const byName = new Map<string, AgentRow>();
   for (const a of (existing || []) as any[]) byName.set(String(a.name), a as AgentRow);
 
-  let inserted = 0;
-  let updated = 0;
-  let unchanged = 0;
+  let inserted_employees = 0;
+  let updated_employees = 0;
+  let unchanged_employees = 0;
 
+  let inserted_system_agents = 0;
+  let updated_system_agents = 0;
+  let unchanged_system_agents = 0;
+
+  // Employees: only touch prompt fields (+ version bump on prompt change).
   for (const emp of bundle.employees) {
     const name = emp.agent_name;
     const base_prompt = String(emp.base_prompt || '').trim();
@@ -200,7 +219,7 @@ async function upsertAgents(supabase: ReturnType<typeof createClient>, bundle: B
       } as any);
 
       if (insErr) throw new Error(`Failed to insert agent ${name}: ${insErr.message}`);
-      inserted++;
+      inserted_employees++;
       continue;
     }
 
@@ -208,7 +227,7 @@ async function upsertAgents(supabase: ReturnType<typeof createClient>, bundle: B
     const curSys = String(cur.system_prompt || '').trim();
 
     if (curBase === base_prompt && curSys === system_prompt) {
-      unchanged++;
+      unchanged_employees++;
       continue;
     }
 
@@ -225,10 +244,74 @@ async function upsertAgents(supabase: ReturnType<typeof createClient>, bundle: B
       .eq('id', cur.id);
 
     if (upErr) throw new Error(`Failed to update agent ${name}: ${upErr.message}`);
-    updated++;
+    updated_employees++;
   }
 
-  return { inserted, updated, unchanged };
+  // System agents: keep profile fields in sync; version bumps only on prompt change.
+  for (const a of bundle.system_agents || []) {
+    const name = a.name;
+    const division = String(a.division || 'nexus');
+    const role = String(a.role || 'engine');
+    const status = String(a.status || 'active');
+    const base_prompt = String(a.base_prompt || '').trim();
+    const system_prompt = String(a.system_prompt || '').trim();
+
+    const cur = byName.get(name);
+    if (!cur) {
+      const { error: insErr } = await supabase.from('agents').insert({
+        name,
+        division,
+        role,
+        status,
+        base_prompt,
+        system_prompt,
+        version: 1,
+      } as any);
+
+      if (insErr) throw new Error(`Failed to insert system agent ${name}: ${insErr.message}`);
+      inserted_system_agents++;
+      continue;
+    }
+
+    const curBase = String(cur.base_prompt || '').trim();
+    const curSys = String(cur.system_prompt || '').trim();
+    const promptChanged = !(curBase === base_prompt && curSys === system_prompt);
+
+    const updatePayload: any = {
+      division,
+      role,
+      status,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (promptChanged) {
+      updatePayload.base_prompt = base_prompt;
+      updatePayload.system_prompt = system_prompt;
+      updatePayload.version = Number(cur.version || 1) + 1;
+    }
+
+    const { error: upErr } = await supabase.from('agents').update(updatePayload).eq('id', cur.id);
+    if (upErr) throw new Error(`Failed to update system agent ${name}: ${upErr.message}`);
+
+    if (promptChanged) updated_system_agents++;
+    else unchanged_system_agents++;
+  }
+
+  const inserted = inserted_employees + inserted_system_agents;
+  const updated = updated_employees + updated_system_agents;
+  const unchanged = unchanged_employees + unchanged_system_agents;
+
+  return {
+    inserted,
+    updated,
+    unchanged,
+    inserted_employees,
+    updated_employees,
+    unchanged_employees,
+    inserted_system_agents,
+    updated_system_agents,
+    unchanged_system_agents,
+  };
 }
 
 function slugify(s: string) {
