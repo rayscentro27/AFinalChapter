@@ -63,9 +63,17 @@ const OnboardingQuestionnaire: React.FC<OnboardingQuestionnaireProps> = ({ conta
 
       if (aError) throw aError;
 
-      // Generate baseline tasks for this tenant (idempotent).
+      // Generate baseline tasks for this tenant (idempotent) via Netlify function.
       try {
-        await supabase.rpc('generate_tasks_for_tenant', { p_tenant_id: membership.tenant_id });
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          await fetch('/.netlify/functions/client_intake_save_and_generate_tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ tenant_id: membership.tenant_id }),
+          });
+        }
       } catch {
         // ignore
       }
