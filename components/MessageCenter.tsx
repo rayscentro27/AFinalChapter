@@ -72,9 +72,73 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messages = contact.messageHistory || [];
 
+
+  const getEscalationFromMessage = (msg: Message): { severity: 'orange' | 'red'; reason: string } | null => {
+    const ar: any = (msg as any)?.actionRequired;
+    const drift = ar?.drift;
+    const supervisor = ar?.supervisor;
+
+    const sev = String(drift?.severity || '').toLowerCase();
+    if (sev === 'red' || sev === 'orange') {
+      return {
+        severity: sev as any,
+        reason: String(drift?.message || drift?.category || 'Escalation required.'),
+      };
+    }
+
+    if (supervisor && supervisor.approved === false) {
+      const risk = String(supervisor?.risk_level || '').toLowerCase();
+      return {
+        severity: risk === 'critical' ? 'red' : 'orange',
+        reason: `Supervisor rejected output (risk_level=${risk || 'unknown'}).`,
+      };
+    }
+
+    return null;
+  };
+
+  const ensureHumanReviewTask = (c: Contact, args: { source_id: string; reason: string }) => {
+    const id = `HUMAN_REVIEW_REQUIRED:${args.source_id}`;
+    const existing = (c.clientTasks || []).some((t) => t.id === id);
+    if (existing) return c;
+
+    const task = {
+      id,
+      title: 'HUMAN_REVIEW_REQUIRED',
+      description: args.reason,
+      status: 'pending' as const,
+      date: new Date().toISOString().slice(0, 10),
+      type: 'review' as const,
+    };
+
+    return { ...c, clientTasks: [task, ...(c.clientTasks || [])] };
+  };
+
   useEffect(() => { 
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); 
   }, [messages, isBotTyping]);
+
+
+  useEffect(() => {
+    if (currentUserRole !== 'admin') return;
+    if (!onUpdateContact) return;
+    if (!messages.length) return;
+
+    // Backfill tasks from existing conversation audit metadata.
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      const esc = getEscalationFromMessage(msg);
+      if (!esc) continue;
+
+      const updated = ensureHumanReviewTask(contact, {
+        source_id: msg.id || `msg_${i}`,
+        reason: esc.reason,
+      });
+
+      if (updated !== contact) onUpdateContact(updated);
+      break;
+    }
+  }, [currentUserRole, onUpdateContact, contact, messages.length]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +179,11 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
                   supervisor: response.supervisor
               }
           };
-          onUpdateContact({ ...contact, messageHistory: [...updatedMessages, botMsg] });
+          let nextContact: Contact = { ...contact, messageHistory: [...updatedMessages, botMsg] };
+          const esc = getEscalationFromMessage(botMsg);
+          if (esc) nextContact = ensureHumanReviewTask(nextContact, { source_id: botMsg.id, reason: esc.reason });
+
+          onUpdateContact(nextContact);
       } catch (e) {
           // Fallback: legacy Gemini flow.
           try {
@@ -129,7 +197,11 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
                   read: false,
                   actionRequired: (response as any).action
               };
-              onUpdateContact({ ...contact, messageHistory: [...updatedMessages, botMsg] });
+              let nextContact: Contact = { ...contact, messageHistory: [...updatedMessages, botMsg] };
+              const esc = getEscalationFromMessage(botMsg);
+              if (esc) nextContact = ensureHumanReviewTask(nextContact, { source_id: botMsg.id, reason: esc.reason });
+
+              onUpdateContact(nextContact);
           } catch (fallbackErr) {
               console.error("Staff bot error", e, fallbackErr);
           }
@@ -153,6 +225,20 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
 
       const response = await runConciergePipeline({ user_message: prompt, contact, messages });
       setNewMessage(response.final_answer || '');
+
+      // If the draft itself triggers escalation, create a review task for staff.
+      if (
+        onUpdateContact &&
+        (response.drift?.severity === 'red' || response.drift?.severity === 'orange' || response.supervisor?.approved === false)
+      ) {
+        const reason =
+          response.drift?.message ||
+          (response.supervisor?.approved === false
+            ? `Supervisor rejected draft (risk_level=${response.supervisor?.risk_level}).`
+            : 'Escalation required.');
+        const updated = ensureHumanReviewTask(contact, { source_id: `draft_${Date.now()}`, reason });
+        if (updated !== contact) onUpdateContact(updated);
+      }
     } catch (e) {
       console.error('Draft reply failed', e);
       alert('AI draft failed. Please try again.');
