@@ -15,6 +15,25 @@ CONSTRAINT STAMP (mandatory):
 - No deception or bypassing underwriting/compliance.
 `;
 
+const CEO_LIGHTSTREAM_POLICY = `
+CEO/BUSINESS-OWNER EXPECTATION MANAGEMENT (LightStream reality protocol):
+- Trigger when user context indicates business owner, founder, self-employed, or CEO and asks about instant approval/no-doc outcomes.
+- Do NOT present instant no-document approval as likely for CEOs/business owners.
+- Use realistic educational framing: document review is common for business-owner files; timelines are typically longer than W-2 instant paths.
+- Explicitly prohibit misrepresentation: never suggest hiding CEO/business-owner status or altering documentation.
+
+When triggered, include all of the following:
+1) Reality check: expectation reset and why documentation is requested.
+2) Pre-application checklist of documents to gather now.
+3) Fast-track options: FAST TRACK (recommended), STANDARD, WAIT (not recommended).
+4) Instant-upload plan: if docs are already in portal, submit immediately after lender request; otherwise issue urgent upload action.
+
+Required compliance framing:
+- No guarantees of approval/funding/timelines.
+- Use probabilistic language and educational framing.
+- Recommend professional review where regulated advice is requested.
+`;
+
 const BodySchema = z.object({
   // Back-compat: single employee call.
   employee: z.string().min(1).optional(),
@@ -229,6 +248,87 @@ function safeHumanReviewAnswer(reason: string) {
   );
 }
 
+type CeoRealitySignal = {
+  active: boolean;
+  reasons: string[];
+};
+
+function detectCeoLightstreamRealitySignal(userMessage: string, context?: unknown): CeoRealitySignal {
+  const source = `${String(userMessage || '')}\n${stableStringify(context || {})}`.toLowerCase();
+
+  const isBusinessOwnerLike = /\b(ceo|business owner|founder|self[- ]?employed|own business|owner-operator)\b/.test(source);
+  const isLightstreamLike = /\blightstream\b/.test(source);
+  const isInstantNoDocPressure =
+    /\b(instant approval|no[- ]?doc|no documents|same[- ]second|same day approval|approved immediately)\b/.test(source) ||
+    /\b(approval timeline|fast approval|24 hours|48 hours|funded same day)\b/.test(source);
+
+  const active = isBusinessOwnerLike && (isLightstreamLike || isInstantNoDocPressure);
+  const reasons: string[] = [];
+  if (isBusinessOwnerLike) reasons.push('business_owner_or_ceo_detected');
+  if (isLightstreamLike) reasons.push('lightstream_context_detected');
+  if (isInstantNoDocPressure) reasons.push('instant_approval_pressure_detected');
+
+  return { active, reasons };
+}
+
+function ceoRealityCheckBlock(): string {
+  return `## CEO Instant-Approval Reality Check
+
+⚠️ **Important:** As a business owner/CEO, instant no-document approvals are uncommon. Document requests are normal and do not automatically indicate a problem.
+
+### Why documents are commonly requested
+- Income verification for business-owner compensation structures
+- Business financial health review
+- Lender/regulatory underwriting controls
+
+### Timeline expectations (educational)
+- **W-2 path (typical):** faster chance of instant automation
+- **Business-owner/CEO path (typical):** application + document review + decision
+- **Fast realistic path with prep:** approximately 24-48 hours in many cases
+- **Without prep:** delays can extend to multiple days
+
+### Fast Track (Recommended)
+1) Pre-upload documents now
+2) Apply when checklist is complete
+3) Auto-submit requested documents immediately
+4) Monitor decision updates
+
+### Standard Path
+1) Apply first
+2) Wait for document request
+3) Gather and upload after request
+
+### Wait for Instant No-Doc
+- Not recommended for CEO/business-owner profiles
+
+### Pre-Application Document Checklist
+- Personal 1040 tax returns (last 2 years) with schedules
+- Business tax returns (1120/1120-S/1065, last 2 years)
+- Recent pay stubs from your company (if applicable)
+- Last 3 months bank statements for the linked account
+- Current-year YTD Profit & Loss statement
+- Formation/ownership proof (e.g., articles/incorporation docs)
+
+### Instant Upload Trigger
+- If required docs are already in your portal: submit immediately when requested
+- If not pre-uploaded: issue urgent upload request and mark as client action required
+
+**Bottom line:** do not hide CEO/business-owner status or alter documents. Misrepresentation can trigger denial/compliance actions.`;
+}
+
+function ensureCeoRealityCoverage(finalAnswer: string): string {
+  const base = String(finalAnswer || '').trim();
+  const lower = base.toLowerCase();
+
+  const hasReality = lower.includes('reality check') || lower.includes('business-owner/ceo path');
+  const hasChecklist = lower.includes('document checklist') || lower.includes('tax returns');
+  const hasFastTrack = lower.includes('fast track') && lower.includes('standard path');
+
+  if (hasReality && hasChecklist && hasFastTrack) return base;
+  if (!base) return ceoRealityCheckBlock();
+  return `${base}\n\n${ceoRealityCheckBlock()}`;
+}
+
 export const handler: Handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
@@ -245,6 +345,7 @@ export const handler: Handler = async (event) => {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const driftUser = classifyDrift(body.user_message);
+    const ceoPolicy = detectCeoLightstreamRealitySignal(body.user_message, body.context);
 
     if (body.client_id && driftUser.severity !== 'none') {
       await persistDrift(supabase, body.client_id, driftUser.severity, driftUser.category, driftUser.message);
@@ -301,7 +402,26 @@ export const handler: Handler = async (event) => {
     }
 
     const knowledgeContext = await loadKnowledgeContext(supabase, targetEmployees[0], body.user_message, body.context);
-    const mergedContext = mergeContext(body.context, { ...knowledgeContext, ...injectedContext, drift: driftUser });
+    const mergedContext = mergeContext(body.context, {
+      ...knowledgeContext,
+      ...injectedContext,
+      drift: driftUser,
+      ...(ceoPolicy.active
+        ? {
+            ceo_instant_approval_policy: {
+              active: true,
+              reasons: ceoPolicy.reasons,
+              lender_context: 'LightStream-style business-owner expectation management',
+              required_output_sections: [
+                'reality_check',
+                'document_checklist',
+                'fast_track_options',
+                'instant_upload_trigger',
+              ],
+            },
+          }
+        : {}),
+    });
 
     const msgNorm = norm(body.user_message || '');
     const contextHash = sha256(stableStringify(mergedContext));
@@ -316,6 +436,7 @@ export const handler: Handler = async (event) => {
         msg: msgNorm,
         approval_mode: body.approval_mode,
         drift: driftUser.severity,
+        ceo_policy: ceoPolicy.active,
       })
     );
 
@@ -334,7 +455,7 @@ export const handler: Handler = async (event) => {
           const out = await callOpenAIWithSchema<AgentJson>({
             apiKey: openaiApiKey,
             model,
-            instructions: buildInstructions(agent.system_prompt || '', body.mode, driftUser.severity),
+            instructions: buildInstructions(agent.system_prompt || '', body.mode, driftUser.severity, ceoPolicy.active ? CEO_LIGHTSTREAM_POLICY : ''),
             userText: buildUserContent(body.user_message, mergedContext),
             schema: AgentJsonSchema,
           });
@@ -361,7 +482,7 @@ export const handler: Handler = async (event) => {
       const arbiterOut = await callOpenAIWithSchema<AgentJson>({
         apiKey: openaiApiKey,
         model,
-        instructions: buildInstructions(arbiterPrompt, body.mode, driftUser.severity),
+        instructions: buildInstructions(arbiterPrompt, body.mode, driftUser.severity, ceoPolicy.active ? CEO_LIGHTSTREAM_POLICY : ''),
         userText: buildUserContent(body.user_message, arbiterContext),
         schema: AgentJsonSchema,
       });
@@ -384,7 +505,7 @@ export const handler: Handler = async (event) => {
       const out = await callOpenAIWithSchema<AgentJson>({
         apiKey: openaiApiKey,
         model,
-        instructions: buildInstructions(agent.system_prompt || '', body.mode, driftUser.severity),
+        instructions: buildInstructions(agent.system_prompt || '', body.mode, driftUser.severity, ceoPolicy.active ? CEO_LIGHTSTREAM_POLICY : ''),
         userText: buildUserContent(body.user_message, mergedContext),
         schema: AgentJsonSchema,
       });
@@ -397,6 +518,10 @@ export const handler: Handler = async (event) => {
         final_answer: parsed.success ? parsed.data.final_answer : safeHumanReviewAnswer('Agent output failed validation.'),
         drift: driftUser,
       };
+    }
+
+    if (ceoPolicy.active) {
+      responsePayload.final_answer = ensureCeoRealityCoverage(String(responsePayload.final_answer || ''));
     }
 
     const driftOut = classifyDrift(String(responsePayload.final_answer || ''));
@@ -465,12 +590,21 @@ function json(statusCode: number, body: any) {
   };
 }
 
-function buildInstructions(systemPrompt: string, mode: 'simulated' | 'live', driftSeverity: DriftSeverity) {
+function buildInstructions(
+  systemPrompt: string,
+  mode: 'simulated' | 'live',
+  driftSeverity: DriftSeverity,
+  extraPolicyDirective = ''
+) {
   const caution =
     driftSeverity === 'yellow'
       ? '\n\nCAUTION: User is pressuring for guarantees/timelines. Use educational framing and avoid promises.'
       : '';
-  return `${String(systemPrompt || '')}\n\n${GLOBAL_GUARDRAILS}\n\nCURRENT_MODE: ${mode}${caution}`;
+
+  const policy = String(extraPolicyDirective || '').trim();
+  const policyText = policy ? `\n\n${policy}` : '';
+
+  return `${String(systemPrompt || '')}\n\n${GLOBAL_GUARDRAILS}${policyText}\n\nCURRENT_MODE: ${mode}${caution}`;
 }
 
 async function callOpenAIWithSchema<T>(args: {
