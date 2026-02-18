@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
     CheckCircle, Clock, FileText, MessageSquare, ExternalLink, 
     Target, Wallet as WalletIcon, X, CreditCard, 
@@ -26,6 +26,7 @@ import CreditRepairAI from './CreditRepairAI';
 import OnboardingWizard from './OnboardingWizard';
 import ClientInvoices from './ClientInvoices';
 import ClientCardSuggestions from './ClientCardSuggestions';
+import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
 import ClientPortalDashboard from './ClientPortalDashboard';
 
@@ -73,9 +74,59 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
     ].filter(t => t.visible !== false);
   }, [isFunded, pendingInvoices]);
 
-  if (!contact.onboardingComplete) {
-      return <OnboardingWizard contact={contact} onComplete={onUpdateContact} />;
+  const [profileState, setProfileState] = useState<'unknown' | 'has_profile' | 'missing_profile'>('unknown');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const check = async () => {
+      try {
+        // Admin preview should not be blocked by client onboarding gates.
+        if (isAdminPreview) {
+          if (!cancelled) setProfileState('has_profile');
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('tenant_profiles')
+          .select('tenant_id')
+          .eq('tenant_id', contact.id)
+          .maybeSingle();
+
+        if (cancelled) return;
+
+        if (error) {
+          // If RLS blocks or query fails, fail open to avoid hard-locking the portal.
+          setProfileState('has_profile');
+          return;
+        }
+
+        setProfileState(data?.tenant_id ? 'has_profile' : 'missing_profile');
+      } catch {
+        if (!cancelled) setProfileState('has_profile');
+      }
+    };
+
+    check();
+    return () => {
+      cancelled = true;
+    };
+  }, [contact.id, isAdminPreview]);
+
+  if (profileState === 'unknown') {
+    return (
+      <div className="min-h-screen bg-[#0B0C10] flex items-center justify-center">
+        <div className="text-slate-400 text-xs font-black uppercase tracking-widest flex items-center gap-3">
+          <RefreshCw className="animate-spin" size={16} /> Loading portal...
+        </div>
+      </div>
+    );
   }
+
+  if (profileState === 'missing_profile') {
+    return <OnboardingWizard contact={contact} onComplete={onUpdateContact} />;
+  }
+
 
   return (
     <div className="min-h-screen bg-[#0B0C10] flex flex-col pb-24 md:pb-10 font-sans text-slate-100 overflow-x-hidden">
