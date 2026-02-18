@@ -20,6 +20,8 @@ npm install
   - `ADMIN_IMPORT_TOKEN` (required for `/import_training_bundle`)
   - `OPENAI_API_KEY`
   - Optional `OPENAI_MODEL`
+  - Optional `INTEL_INGEST_TOKEN` (for token-auth ingestion jobs)
+  - Optional `CRON_SHARED_TOKEN` (for manual/externally-triggered overdue checks)
 
 3. Run:
 
@@ -41,6 +43,12 @@ Function endpoints:
 - `GET http://localhost:8888/.netlify/functions/list_notifications`
 - `POST http://localhost:8888/.netlify/functions/mark_notification_read`
 - `POST http://localhost:8888/.netlify/functions/run_scenario_pack`
+- `POST http://localhost:8888/.netlify/functions/ingest_approval_intel`
+- `GET|POST http://localhost:8888/.netlify/functions/run_approval_intel_matching`
+- `GET http://localhost:8888/.netlify/functions/staff_list_all_client_tasks`
+- `GET http://localhost:8888/.netlify/functions/staff_list_approval_intel_matches`
+- `POST http://localhost:8888/.netlify/functions/credit_report_uploaded_hook`
+- `GET|POST http://localhost:8888/.netlify/functions/check_overdue_tasks`
 
 ## Production env vars
 
@@ -51,6 +59,8 @@ In Netlify site settings, set:
 - `SUPABASE_ANON_KEY` (required for task/notification functions)
 - `OPENAI_API_KEY` (required for `/agent`)
 - Optional `OPENAI_MODEL` (used by `/agent`)
+- Optional `INTEL_INGEST_TOKEN` (for non-user ingestion jobs to `/ingest_approval_intel`)
+- Optional `CRON_SHARED_TOKEN` (for non-scheduled/manual calls to `/check_overdue_tasks`)
 
 Knowledge Vault (Option 2):
 - Run `docs/supabase/knowledge_vault.sql` in Supabase SQL Editor
@@ -99,3 +109,62 @@ select key from nexus_config;
 
 
 Task/notification functions require an authenticated user session (send `Authorization: Bearer <supabase_jwt>`).
+
+
+## Approval Intel Pipeline
+
+Compliant ingestion + matching (no login-bypass scraping):
+
+1. Ingest verified approval data (manual/partner feed):
+
+```bash
+curl -s http://localhost:8888/.netlify/functions/ingest_approval_intel \
+  -H 'content-type: application/json' \
+  -H 'x-intel-ingest-token: <token>' \
+  -d '{
+    "source": "partner_feed",
+    "run_match": true,
+    "posts": [{
+      "card_name": "Chase Ink Business Preferred",
+      "source_url": "https://example.com/post/123",
+      "source_post_id": "post-123",
+      "fico_score": 703,
+      "inquiries_6_12": 4,
+      "inquiries_12_24": 8,
+      "annual_income": 118000,
+      "business_age_days": 14,
+      "instant_approval": true,
+      "credit_limit": 28000,
+      "screenshot_verified": true
+    }]
+  }'
+```
+
+2. Manual/interactive match run (staff bearer auth):
+
+```bash
+curl -s "http://localhost:8888/.netlify/functions/run_approval_intel_matching?hours=48" \
+  -H 'authorization: Bearer <supabase_jwt>'
+```
+
+3. Scheduled overdue notifier runs every 4 hours via Netlify schedule.
+
+Useful SQL checks:
+
+```sql
+select source, card_name, fico_score, instant_approval, screenshot_verified, captured_at
+from public.approval_intel_posts
+order by captured_at desc
+limit 20;
+
+select tenant_id, match_score, confidence, recommended_action, matched_at
+from public.approval_intel_matches
+order by matched_at desc
+limit 20;
+
+select tenant_id, type, severity, title, created_at
+from public.tenant_notifications
+where type in ('approval_intel_match', 'task_overdue')
+order by created_at desc
+limit 20;
+```

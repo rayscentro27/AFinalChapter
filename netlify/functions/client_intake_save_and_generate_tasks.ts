@@ -18,6 +18,16 @@ const BodySchema = z.object({
   wants_grants: z.boolean().optional(),
   wants_sba: z.boolean().optional(),
   wants_tier1: z.boolean().optional(),
+
+  fico_score: z.number().int().min(300).max(900).optional(),
+  inquiries_6_12: z.number().int().min(0).optional(),
+  inquiries_12_24: z.number().int().min(0).optional(),
+  oldest_account_age_months: z.number().int().min(0).optional(),
+  total_income_annual: z.number().int().min(0).optional(),
+  business_age_days: z.number().int().min(0).optional(),
+  prequal_stage: z.enum(['Ready to Apply', 'Pre-Qual Check', 'Not Ready']).optional(),
+
+  match_hours: z.number().int().min(1).max(168).optional().default(48),
 });
 
 export const handler: Handler = async (event) => {
@@ -41,17 +51,44 @@ export const handler: Handler = async (event) => {
       wants_grants: body.wants_grants,
       wants_sba: body.wants_sba,
       wants_tier1: body.wants_tier1,
+
+      fico_score: body.fico_score ?? body.credit_score_est,
+      inquiries_6_12: body.inquiries_6_12,
+      inquiries_12_24: body.inquiries_12_24,
+      oldest_account_age_months: body.oldest_account_age_months,
+      total_income_annual: body.total_income_annual,
+      business_age_days: body.business_age_days,
+      prequal_stage: body.prequal_stage,
     };
 
     const { error: upErr } = await supabase.from('tenant_profiles').upsert(profileRow as any, { onConflict: 'tenant_id' });
     if (upErr) throw new Error(`Failed to upsert tenant_profiles: ${upErr.message}`);
 
-    const { data, error: rpcErr } = await supabase.rpc('generate_tasks_for_tenant', {
+    const { data: generated, error: rpcErr } = await supabase.rpc('generate_tasks_for_tenant', {
       p_tenant_id: tenant_id,
     });
     if (rpcErr) throw new Error(`Failed to generate tasks: ${rpcErr.message}`);
 
-    return json(200, { ok: true, tenant_id, result: data });
+    const { data: synced, error: syncErr } = await supabase.rpc('sync_task_required_attachments', {
+      p_tenant_id: tenant_id,
+    });
+    if (syncErr) throw new Error(`Failed to sync task attachments: ${syncErr.message}`);
+
+    let matchResult: any = null;
+    const shouldTryMatch =
+      (body.prequal_stage === 'Ready to Apply' || body.prequal_stage === 'Pre-Qual Check') &&
+      (body.credit_report_uploaded === true || body.docs_ready === true);
+
+    if (shouldTryMatch) {
+      const { data, error } = await supabase.rpc('match_approval_intel_for_tenant', {
+        p_tenant_id: tenant_id,
+        p_hours: body.match_hours,
+      });
+
+      if (!error) matchResult = data;
+    }
+
+    return json(200, { ok: true, tenant_id, generated, attachments_synced: synced, match_result: matchResult });
   } catch (e: any) {
     const statusCode = Number(e?.statusCode) || 400;
     return json(statusCode, { error: e?.message || 'Bad Request' });

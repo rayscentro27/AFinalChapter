@@ -62,6 +62,11 @@ export default function TaskList(props: {
               {t.description ? (
                 <div className="mt-2 text-xs text-slate-400 leading-relaxed">{t.description}</div>
               ) : null}
+              {Array.isArray(t.requiredAttachments) && t.requiredAttachments.length > 0 ? (
+                <div className="mt-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                  Required: {t.requiredAttachments.join(' • ')}
+                </div>
+              ) : null}
             </div>
 
             <div className="flex items-center gap-2 shrink-0">

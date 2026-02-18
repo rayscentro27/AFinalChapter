@@ -116,6 +116,7 @@ export interface ClientTask {
   assignedEmployee?: string;
   groupKey?: string;
   templateKey?: string;
+  requiredAttachments?: string[];
   link?: string;
   meetingTime?: string;
   linkedToGoal?: boolean;

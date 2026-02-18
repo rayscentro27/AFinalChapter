@@ -39,7 +39,7 @@ interface PortalViewProps {
   availableCourses?: Course[];
 }
 
-const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, branding, onLogout }) => {
+const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, branding, onLogout, isAdminPreview = false }) => {
   const [activeTab, setActiveTab] = useState<'messages' | 'pulse' | 'tasks' | 'fundability' | 'simulator' | 'repair' | 'profile' | 'roadmap' | 'vault' | 'offers' | 'cards' | 'subscription' | 'settlement' | 'invest' | 'partner' | 'kyc'>('pulse');
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   

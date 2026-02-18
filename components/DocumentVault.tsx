@@ -39,6 +39,9 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ contact, readOnly = false
     setUploading(true);
     setAnalyzing(true);
 
+    const lowerName = (file.name || '').toLowerCase();
+    const isCreditLike = /credit|experian|equifax|transunion/.test(lowerName);
+
     try {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -58,7 +61,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ contact, readOnly = false
         const newDoc: ClientDocument = {
             id: `doc_${Date.now()}`,
             name: file.name,
-            type: financials ? 'Financial' : 'Legal', 
+            type: isCreditLike ? 'Credit' : financials ? 'Financial' : 'Legal', 
             status: forensic.trustScore > 80 ? 'Verified' : 'Rejected',
             uploadDate: new Date().toLocaleDateString(),
             fileUrl: '#',
@@ -73,6 +76,30 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ contact, readOnly = false
         }
 
         onUpdateContact(updatedContact);
+
+        // Event hook: credit report uploads should immediately update profile + regenerate tasks.
+        if (isCreditLike) {
+          try {
+            const { data } = await supabase.auth.getSession();
+            const token = data?.session?.access_token;
+            if (token && contact.id) {
+              await fetch('/.netlify/functions/credit_report_uploaded_hook', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  tenant_id: contact.id,
+                  docs_ready: true
+                })
+              });
+            }
+          } catch {
+            // best-effort hook
+          }
+        }
+
         setUploading(false);
         setAnalyzing(false);
       };

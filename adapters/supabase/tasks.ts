@@ -24,6 +24,10 @@ export type ClientTaskRow = {
 };
 
 export function rowToClientTask(r: ClientTaskRow): ClientTask {
+  const requiredAttachments = Array.isArray(r.meta?.required_attachments)
+    ? r.meta.required_attachments.map((x: any) => String(x)).filter(Boolean)
+    : [];
+
   return {
     id: String(r.task_id),
     title: String(r.title),
@@ -36,6 +40,7 @@ export function rowToClientTask(r: ClientTaskRow): ClientTask {
     assignedEmployee: r.assigned_employee ?? undefined,
     groupKey: r.group_key ?? undefined,
     templateKey: r.template_key ?? undefined,
+    requiredAttachments: requiredAttachments.length ? requiredAttachments : undefined,
 
     link: r.link ?? undefined,
     meetingTime: r.meeting_time ?? undefined,
@@ -54,6 +59,9 @@ export function clientTaskToRow(tenantId: string, t: ClientTask): Omit<ClientTas
   const meetingIso = toIsoOrNull(t.meetingTime);
   const meta: any = {};
   if (t.meetingTime && !meetingIso) meta.meetingTime = t.meetingTime;
+  if (Array.isArray(t.requiredAttachments) && t.requiredAttachments.length > 0) {
+    meta.required_attachments = t.requiredAttachments.map((x) => String(x));
+  }
 
   return {
     tenant_id: tenantId,
