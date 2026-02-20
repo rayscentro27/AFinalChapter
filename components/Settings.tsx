@@ -17,6 +17,7 @@ import { BACKEND_CONFIG } from '../adapters/config';
 import * as geminiService from '../services/geminiService';
 import { createClient } from '@supabase/supabase-js';
 import { useAuth } from '../contexts/AuthContext';
+import AccountIntegrationsPanel from './AccountIntegrationsPanel';
 
 interface SettingsProps {
   branding: AgencyBranding;
@@ -233,9 +234,10 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
                             </p>
                         </div>
                     </div>
+
+                    <AccountIntegrationsPanel />
                 </div>
             )}
-
             {activeTab === 'marketing_nodes' && (
                 <div className="p-10 space-y-10 animate-fade-in">
                     <div className="bg-[#0B0C10] p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">
@@ -255,14 +257,10 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#66FCF1] transition-all shadow-sm">
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-1">MailerLite API Key</label>
-                            <input 
-                                type="password" 
-                                value={localBranding.mailerLite?.apiKey || ''}
-                                onChange={e => setLocalBranding({ ...localBranding, mailerLite: { ...localBranding.mailerLite, apiKey: e.target.value, autoSync: localBranding.mailerLite?.autoSync || false } })}
-                                placeholder="Enter MailerLite v2 API Key"
-                                className="w-full p-4 bg-white border border-slate-200 rounded-xl font-mono text-xs focus:ring-2 focus:ring-[#66FCF1] outline-none"
-                            />
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-1">MailerLite API Key (Server)</label>
+                            <div className="w-full p-4 bg-white border border-slate-200 rounded-xl text-xs text-slate-600 leading-relaxed">
+                                Set <span className="font-mono">MAILERLITE_API_KEY</span> in Netlify environment variables. This key stays server-side and is never stored in browser settings.
+                            </div>
                         </div>
                         <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#66FCF1] transition-all shadow-sm">
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-1">MailerLite Group ID</label>
