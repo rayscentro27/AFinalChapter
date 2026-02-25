@@ -22,9 +22,12 @@ import {
   tryAcquireTenantOutboxLock,
   releaseTenantOutboxLock,
 } from '../util/outbox-lock.js';
+import { resolveBestIdentityForSend } from '../util/send-route-selector.js';
+import { recordSendFailure, recordSendSuccess } from '../lib/health/channelHealth.js';
 
 const SUPPORTED_PROVIDERS = new Set(['twilio', 'whatsapp', 'meta']);
 const BACKOFF_MINUTES = [1, 5, 15, 60, 360];
+const NO_HEALTHY_ROUTE_BACKOFF_MINUTES = 5;
 
 function requireApiKey(req, reply) {
   const key = req.headers['x-api-key'];
@@ -211,7 +214,11 @@ async function sendViaProvider(outbox) {
 
   if (outbox.provider === 'twilio') {
     if (!bodyText) throw new Error('Missing outbound body_text for Twilio');
-    return twilioSendSMS({ to: outbox.to_address, body: bodyText });
+    return twilioSendSMS({
+      to: outbox.to_address,
+      body: bodyText,
+      from: asText(outbox.from_address) || asText(ENV.TWILIO_FROM_NUMBER),
+    });
   }
 
   if (outbox.provider === 'whatsapp') {
@@ -246,21 +253,75 @@ async function attemptSendOnce(outbox) {
   if (claimError) throw new Error(`outbox claim failed: ${claimError.message}`);
   if (!claimed) return { outbox, skipped: true };
 
+  const route = await resolveBestIdentityForSend({
+    supabaseAdmin,
+    outbox: claimed,
+  });
+
+  if (!route?.ok) {
+    const { data: failedNoRoute, error: failNoRouteError } = await supabaseAdmin
+      .from('outbox_messages')
+      .update({
+        status: 'failed',
+        last_error: 'no_healthy_route',
+        next_attempt_at: new Date(Date.now() + NO_HEALTHY_ROUTE_BACKOFF_MINUTES * 60000).toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', claimed.id)
+      .select('*')
+      .single();
+
+    if (failNoRouteError) throw new Error(`outbox no-route update failed: ${failNoRouteError.message}`);
+
+    return {
+      outbox: failedNoRoute,
+      sent: false,
+      error: 'no_healthy_route',
+      skipped_route: true,
+    };
+  }
+
+  let claimedWithRoute = {
+    ...claimed,
+    channel_account_id: route.channel_account_id || claimed.channel_account_id,
+    from_address: route.from_address || claimed.from_address,
+  };
+
+  if (claimedWithRoute.channel_account_id !== claimed.channel_account_id
+    || claimedWithRoute.from_address !== claimed.from_address) {
+    const { data: rerouted, error: rerouteError } = await supabaseAdmin
+      .from('outbox_messages')
+      .update({
+        channel_account_id: claimedWithRoute.channel_account_id,
+        from_address: claimedWithRoute.from_address,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', claimed.id)
+      .eq('status', 'sending')
+      .select('*')
+      .maybeSingle();
+
+    if (rerouteError) throw new Error(`outbox route update failed: ${rerouteError.message}`);
+    if (rerouted) claimedWithRoute = rerouted;
+  }
+
   try {
-    const providerSend = await sendViaProvider(claimed);
+    const providerSend = await sendViaProvider(claimedWithRoute);
     const providerMessageId = asText(providerSend?.provider_message_id) || `missing:${randomUUID()}`;
-    const attempts = Number(claimed.attempts || 0) + 1;
+    const attempts = Number(claimedWithRoute.attempts || 0) + 1;
 
     const { data: sentRow, error: sentError } = await supabaseAdmin
       .from('outbox_messages')
       .update({
         status: 'sent',
         provider_message_id: providerMessageId,
+        channel_account_id: claimedWithRoute.channel_account_id || null,
+        from_address: claimedWithRoute.from_address || null,
         last_error: null,
         attempts,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', claimed.id)
+      .eq('id', claimedWithRoute.id)
       .select('*')
       .single();
 
@@ -271,7 +332,13 @@ async function attemptSendOnce(outbox) {
       provider: sentRow.provider,
       provider_message_id: providerMessageId,
       status: 'sent',
-      payload: { provider_response: providerSend?.raw || null },
+      payload: {
+        provider_response: providerSend?.raw || null,
+        route: {
+          channel_account_id: claimedWithRoute.channel_account_id || null,
+          health_status: route.health_status || null,
+        },
+      },
     });
 
     const content = asObject(sentRow.content);
@@ -294,6 +361,23 @@ async function attemptSendOnce(outbox) {
       received_at: new Date().toISOString(),
     });
 
+    if (claimedWithRoute.channel_account_id) {
+      try {
+        await recordSendSuccess({
+          supabaseAdmin,
+          tenant_id: sentRow.tenant_id,
+          channel_account_id: claimedWithRoute.channel_account_id,
+          provider: sentRow.provider,
+          context: {
+            outbox_id: sentRow.id,
+            provider_message_id: providerMessageId,
+          },
+        });
+      } catch {
+        // Health telemetry should never break send completion.
+      }
+    }
+
     return {
       outbox: sentRow,
       message_id: messageId || null,
@@ -303,23 +387,43 @@ async function attemptSendOnce(outbox) {
       sent: true,
     };
   } catch (error) {
-    const attempts = Number(claimed.attempts || 0) + 1;
+    const attempts = Number(claimedWithRoute.attempts || 0) + 1;
     const nextRetryMinutes = computeBackoffMinutes(attempts);
+    const redactedError = redactText(String(error?.message || error)).slice(0, 5000);
 
     const { data: failedRow, error: failError } = await supabaseAdmin
       .from('outbox_messages')
       .update({
         status: 'failed',
         attempts,
-        last_error: redactText(String(error?.message || error)).slice(0, 5000),
+        last_error: redactedError,
         next_attempt_at: new Date(Date.now() + nextRetryMinutes * 60000).toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq('id', claimed.id)
+      .eq('id', claimedWithRoute.id)
       .select('*')
       .single();
 
     if (failError) throw new Error(`outbox failed update failed: ${failError.message}`);
+
+    if (claimedWithRoute.channel_account_id) {
+      try {
+        await recordSendFailure({
+          supabaseAdmin,
+          tenant_id: claimedWithRoute.tenant_id,
+          channel_account_id: claimedWithRoute.channel_account_id,
+          provider: claimedWithRoute.provider,
+          error: redactedError,
+          context: {
+            outbox_id: claimedWithRoute.id,
+            attempts,
+            route_health_status: route.health_status || null,
+          },
+        });
+      } catch {
+        // Health telemetry should never break retry pipeline.
+      }
+    }
 
     return {
       outbox: failedRow,
@@ -328,6 +432,7 @@ async function attemptSendOnce(outbox) {
     };
   }
 }
+
 
 async function buildOutboxInput(body) {
   const tenantId = String(body.tenant_id);
@@ -371,7 +476,7 @@ async function buildOutboxInput(body) {
 
   let fromAddress = asText(body.from_address);
   if (!fromAddress) {
-    if (provider === 'twilio') fromAddress = ENV.TWILIO_FROM_NUMBER;
+    if (provider === 'twilio') fromAddress = asText(channel.external_account_id) || asText(ENV.TWILIO_FROM_NUMBER);
     if (provider === 'whatsapp') fromAddress = asText(channel.external_account_id);
     if (provider === 'meta') fromAddress = asText(channel.external_account_id);
   }
