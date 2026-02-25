@@ -60,6 +60,15 @@ import YouTubeVideoAnalyzer from './components/YouTubeVideoAnalyzer';
 import AffiliateMarketplace from './components/AffiliateMarketplace';
 import ForensicHub from './components/ForensicHub';
 import MessagingBridge from './components/MessagingBridge';
+import AdminChannelMapper from './src/pages/AdminChannelMapper';
+import AdminContactsMerge from './src/pages/AdminContactsMerge';
+import AdminMergeJobs from './src/pages/AdminMergeJobs';
+import AdminTeamMembers from './src/pages/AdminTeamMembers';
+import AdminOnCall from './src/pages/AdminOnCall';
+import AdminChannelPools from './src/pages/AdminChannelPools';
+import AdminDeadLetters from './src/pages/AdminDeadLetters';
+import AdminOutbox from './src/pages/AdminOutbox';
+import AdminHealth from './src/pages/AdminHealth';
 import SupervisorTriage from './components/SupervisorTriage';
 import AgenticHUD from './components/AgenticHUD';
 import NeuralStrategySandbox from './components/NeuralStrategySandbox';
@@ -74,6 +83,19 @@ import { processAutomations } from './services/automationEngine';
 import { runBackgroundProtocols } from './services/neuralEscalator';
 import * as geminiService from './services/geminiService';
 import * as costService from './services/costService';
+
+const PATH_TO_VIEW: Record<string, ViewMode> = {
+  '/admin/contacts/merge': ViewMode.CONTACT_MERGE,
+  '/admin/merge-jobs': ViewMode.MERGE_JOBS,
+  '/admin/health': ViewMode.ADMIN_HEALTH,
+  '/admin/outbox': ViewMode.OUTBOX,
+};
+
+function normalizePathname(pathname: string): string {
+  const raw = String(pathname || '/').trim().toLowerCase();
+  if (raw === '/') return '/';
+  return raw.replace(/\/+$/, '');
+}
 
 export const App = () => {
   const { user, loading, signOut } = useAuth();
@@ -141,6 +163,13 @@ export const App = () => {
   useEffect(() => {
     if (loading) return;
     const handleRouting = () => {
+      const normalizedPath = normalizePathname(window.location.pathname);
+      const mappedView = PATH_TO_VIEW[normalizedPath];
+      if (!window.location.hash && mappedView) {
+        window.location.hash = mappedView.toLowerCase();
+        return;
+      }
+
       const hash = window.location.hash.replace('#', '').toUpperCase() as ViewMode;
       const isValidView = Object.values(ViewMode).includes(hash);
 
@@ -248,6 +277,15 @@ export const App = () => {
                     case ViewMode.FORENSIC_HUB: return <ForensicHub contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.SUPERVISOR_TRIAGE: return <SupervisorTriage contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.STRATEGY_SANDBOX: return <NeuralStrategySandbox contacts={contacts} />;
+                    case ViewMode.CHANNEL_MAPPER: return <AdminChannelMapper />;
+                    case ViewMode.CONTACT_MERGE: return <AdminContactsMerge />;
+                    case ViewMode.MERGE_JOBS: return <AdminMergeJobs />;
+                    case ViewMode.TEAM_MEMBERS: return <AdminTeamMembers />;
+                    case ViewMode.ON_CALL: return <AdminOnCall />;
+                    case ViewMode.CHANNEL_POOLS: return <AdminChannelPools />;
+                    case ViewMode.DEAD_LETTERS: return <AdminDeadLetters />;
+                    case ViewMode.ADMIN_HEALTH: return <AdminHealth />;
+                    case ViewMode.OUTBOX: return <AdminOutbox />;
                     default: return <Dashboard contacts={contacts} />;
                 }
             })()}
