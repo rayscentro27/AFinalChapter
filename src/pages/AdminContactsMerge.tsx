@@ -38,6 +38,34 @@ type MergeSuggestion = {
   strength: 'strong' | 'medium';
 };
 
+type MergePreviewIdentity = {
+  id?: number | string;
+  provider: string;
+  identity_type: string;
+  identity_value: string;
+  channel_account_id?: string | null;
+  verified?: boolean;
+  confidence?: number;
+  is_primary?: boolean;
+};
+
+type MergePreviewData = {
+  ok: true;
+  conflicts: { block: boolean; reasons: string[] };
+  summary: {
+    from: { identity_count: number; conversation_count: number };
+    into: { identity_count: number; conversation_count: number };
+    move: { identities_to_move: number; conversations_to_move: number };
+  } | null;
+  identity_overlap: {
+    exact_matches: MergePreviewIdentity[];
+    from_only: MergePreviewIdentity[];
+    into_only: MergePreviewIdentity[];
+  };
+};
+
+type MergePreviewState = MergePreviewData | { ok: false; error?: string } | null;
+
 function contactLabel(row: ContactRow): string {
   const name = String(row.display_name || '').trim();
   const email = String(row.primary_email || row.email || '').trim();
@@ -72,6 +100,8 @@ export default function AdminContactsMerge() {
   const [targetId, setTargetId] = useState('');
   const [reason, setReason] = useState('same verified identity');
   const [search, setSearch] = useState('');
+  const [preview, setPreview] = useState<MergePreviewState>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
 
   const identityMap = useMemo(() => {
     const map = new Map<string, IdentityRow[]>();
@@ -107,6 +137,9 @@ export default function AdminContactsMerge() {
   const sourceContact = useMemo(() => contacts.find((c) => c.id === sourceId) || null, [contacts, sourceId]);
   const targetContact = useMemo(() => contacts.find((c) => c.id === targetId) || null, [contacts, targetId]);
   const isOwner = tenantRole === 'owner';
+  const previewBlocks = preview?.ok === true && Boolean(preview.conflicts?.block);
+  const previewReasons = preview?.ok === true ? (preview.conflicts?.reasons || []) : [];
+  const canMerge = Boolean(tenantId && sourceId && targetId && sourceId !== targetId && !previewBlocks && !previewBusy);
 
   function suggestionStrengthPillClass(strength: MergeSuggestion['strength']): string {
     if (strength === 'strong') {
@@ -239,6 +272,10 @@ export default function AdminContactsMerge() {
     void Promise.all([refresh(tenantId), loadTenantRole(tenantId)]);
   }, [tenantId]);
 
+  useEffect(() => {
+    void loadMergePreview(sourceId, targetId, tenantId);
+  }, [sourceId, targetId, tenantId]);
+
   async function loadTenantRole(currentTenantId = tenantId) {
     const { data: authData, error: authErr } = await supabase.auth.getUser();
     if (authErr || !authData?.user?.id) {
@@ -286,6 +323,7 @@ export default function AdminContactsMerge() {
       setIdentities([]);
       setSourceId('');
       setTargetId('');
+      setPreview(null);
       return;
     }
 
@@ -310,8 +348,54 @@ export default function AdminContactsMerge() {
     }
   }
 
+  async function loadMergePreview(fromId = sourceId, intoId = targetId, currentTenantId = tenantId) {
+    if (!currentTenantId || !fromId || !intoId || fromId === intoId) {
+      setPreview(null);
+      return;
+    }
+
+    setPreviewBusy(true);
+
+    try {
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) throw sessionErr;
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error('Missing auth session token');
+
+      const res = await fetch('/.netlify/functions/admin-merge-preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          tenant_id: currentTenantId,
+          from_contact_id: fromId,
+          into_contact_id: intoId,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.ok === false) {
+        throw new Error(String(json?.error || `Preview failed (${res.status})`));
+      }
+
+      setPreview(json as MergePreviewData);
+    } catch (e: any) {
+      setPreview({ ok: false, error: String(e?.message || e) });
+    } finally {
+      setPreviewBusy(false);
+    }
+  }
+
   async function merge() {
-    if (!tenantId || !sourceId || !targetId || sourceId === targetId) return;
+    if (!canMerge) {
+      if (previewBlocks) {
+        const reasonText = previewReasons.length ? previewReasons.join(', ') : 'safety rails';
+        setError(`Merge blocked: ${reasonText}`);
+      }
+      return;
+    }
 
     setSaving(true);
     setError('');
@@ -339,10 +423,15 @@ export default function AdminContactsMerge() {
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.ok === false) {
+        if (res.status === 409 || json?.error === 'merge_blocked') {
+          const reasons = Array.isArray(json?.reasons) ? json.reasons.map((x: any) => String(x)).join(', ') : '';
+          throw new Error(reasons ? `Merge blocked: ${reasons}` : 'Merge blocked by safety rails');
+        }
         throw new Error(String(json?.error || `Merge failed (${res.status})`));
       }
 
       setSuccess('Contacts merged successfully.');
+      setPreview(null);
       await refresh();
     } catch (e: any) {
       setError(String(e?.message || e));
@@ -524,8 +613,9 @@ export default function AdminContactsMerge() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={merge}
-            disabled={saving || !tenantId || !sourceId || !targetId || sourceId === targetId}
+            disabled={saving || !canMerge}
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-black uppercase tracking-widest"
+            title={previewBlocks ? `Blocked: ${previewReasons.join(', ')}` : 'Merge contacts'}
           >
             {saving ? 'Merging...' : 'Merge Contacts'}
           </button>
@@ -536,6 +626,71 @@ export default function AdminContactsMerge() {
           >
             Refresh
           </button>
+
+          {previewBlocks ? (
+            <div className="text-xs text-red-300">
+              Blocked: {previewReasons.join(', ')}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs font-black uppercase tracking-widest text-slate-300">Merge Preview</div>
+            <div className="text-xs text-slate-500">{previewBusy ? 'Loading…' : ''}</div>
+          </div>
+
+          {!sourceId || !targetId || sourceId === targetId ? (
+            <div className="text-sm text-slate-400">Select source + target to preview merge.</div>
+          ) : !preview ? (
+            <div className="text-sm text-slate-400">Waiting for preview…</div>
+          ) : preview.ok === false ? (
+            <div className="text-sm text-red-300">{preview.error || 'Preview failed'}</div>
+          ) : (
+            <>
+              {preview.conflicts?.block ? (
+                <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3">
+                  <div className="text-sm font-black uppercase tracking-wider text-red-200">Merge blocked</div>
+                  <ul className="mt-2 list-disc pl-5 text-sm text-red-100">
+                    {(preview.conflicts.reasons || []).map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+                  No blocking conflicts detected.
+                </div>
+              )}
+
+              {preview.summary ? (
+                <div className="space-y-1 text-sm text-slate-300">
+                  <div>
+                    <span className="font-semibold">Will move:</span> {preview.summary.move.identities_to_move} identities, {preview.summary.move.conversations_to_move} conversations
+                  </div>
+                  <div>
+                    <span className="font-semibold">Overlap:</span> {preview.identity_overlap.exact_matches.length} identities already exist on target
+                  </div>
+                </div>
+              ) : null}
+
+              <details className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-200">Identity diff</summary>
+                <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <MergePreviewIdentityList
+                    title="From-only (will move)"
+                    rows={preview.identity_overlap.from_only}
+                    emptyText="No from-only identities."
+                  />
+                  <MergePreviewIdentityList
+                    title="Exact matches (already on target)"
+                    rows={preview.identity_overlap.exact_matches}
+                    emptyText="No exact identity matches."
+                  />
+                </div>
+              </details>
+            </>
+          )}
         </div>
       </div>
 
@@ -644,6 +799,42 @@ export default function AdminContactsMerge() {
           identities={identityMap.get(targetId) || []}
         />
       </div>
+    </div>
+  );
+}
+
+function MergePreviewIdentityList({
+  title,
+  rows,
+  emptyText,
+}: {
+  title: string;
+  rows: MergePreviewIdentity[];
+  emptyText: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-black uppercase tracking-widest text-slate-400">{title}</div>
+      {rows.length === 0 ? (
+        <div className="text-xs text-slate-500">{emptyText}</div>
+      ) : (
+        <div className="space-y-2 max-h-56 overflow-auto pr-1">
+          {rows.map((row, index) => (
+            <div
+              key={`${row.provider}:${row.identity_type}:${row.identity_value}:${row.channel_account_id || 'null'}:${index}`}
+              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2"
+            >
+              <div className="font-mono text-[11px] text-slate-200">
+                {row.provider}:{row.identity_type}
+              </div>
+              <div className="font-mono text-[11px] text-slate-300 break-all">{row.identity_value}</div>
+              <div className="mt-1 text-[10px] text-slate-500">
+                confidence {Number.isFinite(Number(row.confidence)) ? Number(row.confidence) : 0} | verified {row.verified ? 'true' : 'false'} | primary {row.is_primary ? 'true' : 'false'}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

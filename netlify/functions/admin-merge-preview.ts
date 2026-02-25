@@ -7,7 +7,6 @@ const BodySchema = z.object({
   tenant_id: z.string().uuid().optional(),
   from_contact_id: z.string().uuid(),
   into_contact_id: z.string().uuid(),
-  reason: z.string().max(500).optional(),
 });
 
 const ADMIN_ROLES = new Set(['owner', 'admin']);
@@ -33,14 +32,12 @@ export const handler: Handler = async (event) => {
     }
 
     const proxyResponse = await proxyToOracle({
-      path: '/admin/contacts/merge',
+      path: '/admin/contacts/merge/preview',
       method: 'POST',
       body: {
         tenant_id: tenantId,
         from_contact_id: body.from_contact_id,
         into_contact_id: body.into_contact_id,
-        reason: body.reason || null,
-        merged_by: authData.user.id,
       },
     });
 
@@ -48,15 +45,13 @@ export const handler: Handler = async (event) => {
     if (!proxyResponse.ok) {
       return json(proxyResponse.status, {
         ok: false,
-        error: String(responseJson?.error || `Oracle contact merge failed (${proxyResponse.status})`),
-        reasons: Array.isArray(responseJson?.reasons) ? responseJson.reasons : undefined,
+        error: String(responseJson?.error || `Oracle merge preview failed (${proxyResponse.status})`),
       });
     }
 
     return json(200, {
       ok: true,
-      tenant_id: tenantId,
-      result: responseJson?.result || null,
+      ...responseJson,
     });
   } catch (e: any) {
     const statusCode = Number(e?.statusCode) || 400;
