@@ -60,6 +60,81 @@ function computeConflicts({ fromIdentities, intoIdentities }) {
   };
 }
 
+const UNDO_WINDOW_HOURS = 24;
+
+function isDuplicateError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('duplicate') || message.includes('unique') || message.includes('conflict');
+}
+
+async function getTenantRole({ tenant_id, user_id }) {
+  const result = await supabaseAdmin
+    .from('tenant_memberships')
+    .select('role')
+    .eq('tenant_id', tenant_id)
+    .eq('user_id', user_id)
+    .maybeSingle();
+
+  if (result.error) {
+    throw new Error(`tenant role lookup failed: ${result.error.message}`);
+  }
+
+  return asText(result.data?.role)?.toLowerCase() || null;
+}
+
+function isValidUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
+
+async function restoreIdentityFromSnapshot({ tenant_id, fromContactId, snapshot }) {
+  const provider = asText(snapshot?.provider);
+  const identityType = asText(snapshot?.identity_type);
+  const identityValue = asText(snapshot?.identity_value);
+
+  if (!provider || !identityType || !identityValue) return;
+
+  let existsQuery = supabaseAdmin
+    .from('contact_identities')
+    .select('id')
+    .eq('tenant_id', tenant_id)
+    .eq('provider', provider)
+    .eq('identity_type', identityType)
+    .eq('identity_value', identityValue);
+
+  if (snapshot?.channel_account_id) {
+    existsQuery = existsQuery.eq('channel_account_id', String(snapshot.channel_account_id));
+  } else {
+    existsQuery = existsQuery.is('channel_account_id', null);
+  }
+
+  const existing = await existsQuery.maybeSingle();
+  if (existing.error) {
+    throw new Error(`identity existence lookup failed: ${existing.error.message}`);
+  }
+  if (existing.data?.id) return;
+
+  const payload = {
+    tenant_id,
+    contact_id: fromContactId,
+    provider,
+    identity_type: identityType,
+    identity_value: identityValue,
+    channel_account_id: snapshot?.channel_account_id ? String(snapshot.channel_account_id) : null,
+    verified: Boolean(snapshot?.verified),
+    confidence: Number.isFinite(Number(snapshot?.confidence)) ? Number(snapshot.confidence) : 50,
+    is_primary: Boolean(snapshot?.is_primary),
+    metadata: snapshot?.metadata || null,
+  };
+
+  const insert = await supabaseAdmin
+    .from('contact_identities')
+    .insert(payload);
+
+  if (insert.error && !isDuplicateError(insert.error)) {
+    throw new Error(`identity restore insert failed: ${insert.error.message}`);
+  }
+}
+
 async function buildMergePreview({ tenant_id, from_contact_id, into_contact_id }) {
   if (from_contact_id === into_contact_id) {
     return {
@@ -274,6 +349,183 @@ export async function adminContactRoutes(fastify) {
       return reply.code(200).send({ ok: true, result });
     } catch (error) {
       req.log.error({ err: error, tenant_id, from_contact_id, into_contact_id }, 'Contact merge failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/contacts/merge/undo', async (req, reply) => {
+    if (!requireApiKey(req, reply)) return;
+
+    const body = req.body || {};
+    const tenant_id = asText(body.tenant_id);
+    const requester_user_id = asText(body.requester_user_id || body.requesterUserId);
+    const reason = asText(body.reason);
+    const jobIdNum = Number(body.job_id);
+
+    if (!tenant_id || !requester_user_id || !Number.isInteger(jobIdNum) || jobIdNum <= 0) {
+      return reply.code(400).send({ ok: false, error: 'missing_required_fields' });
+    }
+
+    try {
+      const jobResult = await supabaseAdmin
+        .from('contact_merge_jobs')
+        .select('id,tenant_id,from_contact_id,into_contact_id,created_at,undone_at,undone_by')
+        .eq('tenant_id', tenant_id)
+        .eq('id', jobIdNum)
+        .maybeSingle();
+
+      if (jobResult.error) {
+        throw new Error(`merge job lookup failed: ${jobResult.error.message}`);
+      }
+
+      const job = jobResult.data;
+      if (!job) {
+        return reply.code(404).send({ ok: false, error: 'job_not_found' });
+      }
+
+      if (job.undone_at) {
+        return reply.code(409).send({ ok: false, error: 'already_undone' });
+      }
+
+      const role = await getTenantRole({ tenant_id, user_id: requester_user_id });
+      if (!role) {
+        return reply.code(403).send({ ok: false, error: 'not_in_tenant' });
+      }
+
+      if (role !== 'owner') {
+        if (role !== 'admin' && role !== 'agent') {
+          return reply.code(403).send({ ok: false, error: 'insufficient_role', details: { role } });
+        }
+
+        const createdMs = new Date(job.created_at).getTime();
+        const nowMs = Date.now();
+        const ageHours = (nowMs - createdMs) / (1000 * 60 * 60);
+
+        if (!Number.isFinite(ageHours) || ageHours > UNDO_WINDOW_HOURS) {
+          return reply.code(403).send({
+            ok: false,
+            error: 'undo_window_expired',
+            details: {
+              role,
+              window_hours: UNDO_WINDOW_HOURS,
+              job_created_at: job.created_at,
+            },
+          });
+        }
+      }
+
+      const itemsResult = await supabaseAdmin
+        .from('contact_merge_job_items')
+        .select('item_type,item_id,snapshot')
+        .eq('tenant_id', tenant_id)
+        .eq('job_id', jobIdNum);
+
+      if (itemsResult.error) {
+        throw new Error(`merge job items lookup failed: ${itemsResult.error.message}`);
+      }
+
+      const allItems = itemsResult.data || [];
+      const identityItems = allItems.filter((item) => item.item_type === 'identity');
+      const conversationItems = allItems.filter((item) => item.item_type === 'conversation');
+
+      const conversationIds = conversationItems
+        .map((item) => asText(item.item_id))
+        .filter((id) => isValidUuid(id));
+
+      if (conversationIds.length > 0) {
+        const restoreConversations = await supabaseAdmin
+          .from('conversations')
+          .update({
+            contact_id: job.from_contact_id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('tenant_id', tenant_id)
+          .eq('contact_id', job.into_contact_id)
+          .in('id', conversationIds);
+
+        if (restoreConversations.error) {
+          throw new Error(`conversation restore failed: ${restoreConversations.error.message}`);
+        }
+      }
+
+      for (const item of identityItems) {
+        const idNum = Number(item.item_id);
+        if (!Number.isInteger(idNum) || idNum <= 0) continue;
+
+        const restoreIdentity = await supabaseAdmin
+          .from('contact_identities')
+          .update({ contact_id: job.from_contact_id })
+          .eq('tenant_id', tenant_id)
+          .eq('id', idNum);
+
+        if (restoreIdentity.error && !isDuplicateError(restoreIdentity.error)) {
+          throw new Error(`identity restore update failed: ${restoreIdentity.error.message}`);
+        }
+      }
+
+      for (const item of identityItems) {
+        const idNum = Number(item.item_id);
+        if (!Number.isInteger(idNum) || idNum <= 0) continue;
+
+        const exists = await supabaseAdmin
+          .from('contact_identities')
+          .select('id')
+          .eq('tenant_id', tenant_id)
+          .eq('id', idNum)
+          .maybeSingle();
+
+        if (exists.error) {
+          throw new Error(`identity restore existence check failed: ${exists.error.message}`);
+        }
+        if (exists.data?.id) continue;
+
+        if (item.snapshot) {
+          await restoreIdentityFromSnapshot({
+            tenant_id,
+            fromContactId: job.from_contact_id,
+            snapshot: item.snapshot,
+          });
+        }
+      }
+
+      const restoreFromContact = await supabaseAdmin
+        .from('contacts')
+        .update({
+          merged_into_contact_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tenant_id', tenant_id)
+        .eq('id', job.from_contact_id);
+
+      if (restoreFromContact.error) {
+        throw new Error(`source contact unmerge failed: ${restoreFromContact.error.message}`);
+      }
+
+      const markUndone = await supabaseAdmin
+        .from('contact_merge_jobs')
+        .update({
+          undone_at: new Date().toISOString(),
+          undone_by: requester_user_id,
+          undo_reason: reason,
+        })
+        .eq('tenant_id', tenant_id)
+        .eq('id', jobIdNum);
+
+      if (markUndone.error) {
+        throw new Error(`merge job undo marker failed: ${markUndone.error.message}`);
+      }
+
+      return reply.code(200).send({
+        ok: true,
+        result: {
+          job_id: jobIdNum,
+          from_contact_id: job.from_contact_id,
+          into_contact_id: job.into_contact_id,
+          undone_by: requester_user_id,
+        },
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id, job_id: jobIdNum, requester_user_id }, 'Contact merge undo failed');
       return reply.code(500).send({ ok: false, error: String(error?.message || error) });
     }
   });
