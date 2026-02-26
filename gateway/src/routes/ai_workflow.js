@@ -13,6 +13,15 @@ import {
 const LEGAL_TAX_DISCLAIMER = 'Guidance is educational and operational only; not legal or tax advice.';
 const INVESTMENT_DISCLAIMER = 'Investment content is educational only and is not investment advice.';
 
+const FUNDING_ACTION_TYPES = new Set([
+  'checklist_prepared',
+  'client_submitted',
+  'advisor_reviewed',
+  'submitted_confirmation_captured',
+]);
+
+const SUBMITTED_BY_TYPES = new Set(['client', 'advisor']);
+
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
   return String(value || '').trim();
@@ -37,6 +46,12 @@ function asInt(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return null;
   return Math.trunc(parsed);
+}
+
+function clampInt(value, fallback = 50, min = 1, max = 500) {
+  const parsed = asInt(value);
+  if (parsed === null) return fallback;
+  return Math.max(min, Math.min(max, parsed));
 }
 
 function isUuid(value) {
@@ -786,6 +801,214 @@ export async function aiWorkflowRoutes(fastify) {
       });
     } catch (error) {
       req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai task list failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/ai/compliance/consent', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.body?.contact_id);
+    const consentType = asText(req.body?.consent_type);
+    const consentVersion = asText(req.body?.consent_version);
+    const capturedVia = asText(req.body?.captured_via || 'portal').toLowerCase();
+    const granted = asBool(req.body?.granted, false);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+    if (!consentType) return reply.code(400).send({ ok: false, error: 'missing_consent_type' });
+    if (!consentVersion) return reply.code(400).send({ ok: false, error: 'missing_consent_version' });
+
+    try {
+      const evidence = (req.body?.evidence && typeof req.body.evidence === 'object') ? req.body.evidence : null;
+
+      const insertRes = await supabaseAdmin
+        .from('consent_logs')
+        .insert({
+          tenant_id: tenantId,
+          contact_id: contactId,
+          consent_type: consentType,
+          consent_version: consentVersion,
+          granted,
+          captured_via: capturedVia || 'portal',
+          captured_by: req.user?.id || null,
+          evidence,
+        })
+        .select('id,tenant_id,contact_id,consent_type,consent_version,granted,captured_via,captured_by,captured_at,evidence')
+        .single();
+
+      if (insertRes.error) {
+        throw new Error(`consent log insert failed: ${insertRes.error.message}`);
+      }
+
+      return reply.send({
+        ok: true,
+        consent: insertRes.data,
+        disclaimers: normalizedDisclaimers(),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai consent capture failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.get('/admin/ai/compliance/consents', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.query?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.query?.contact_id);
+    const consentType = asText(req.query?.consent_type);
+    const limit = clampInt(req.query?.limit, 100, 1, 500);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (contactId && !isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+
+    try {
+      let query = supabaseAdmin
+        .from('consent_logs')
+        .select('id,tenant_id,contact_id,consent_type,consent_version,granted,captured_via,captured_by,captured_at,evidence')
+        .eq('tenant_id', tenantId)
+        .order('captured_at', { ascending: false })
+        .limit(limit);
+
+      if (contactId) query = query.eq('contact_id', contactId);
+      if (consentType) query = query.eq('consent_type', consentType);
+
+      const res = await query;
+      if (res.error) throw new Error(`consent log list failed: ${res.error.message}`);
+
+      return reply.send({ ok: true, items: res.data || [] });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai consent list failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/ai/funding/submission-event', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.body?.contact_id);
+    const lenderName = asText(req.body?.lender_name);
+    const actionType = asText(req.body?.action_type).toLowerCase();
+    const submittedBy = asText(req.body?.submitted_by || 'client').toLowerCase();
+    const notes = asText(req.body?.notes) || null;
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+    if (!lenderName) return reply.code(400).send({ ok: false, error: 'missing_lender_name' });
+
+    if (!FUNDING_ACTION_TYPES.has(actionType)) {
+      return reply.code(400).send({
+        ok: false,
+        error: 'invalid_action_type',
+        details: { allowed_action_types: Array.from(FUNDING_ACTION_TYPES) },
+      });
+    }
+
+    if (!SUBMITTED_BY_TYPES.has(submittedBy)) {
+      return reply.code(400).send({
+        ok: false,
+        error: 'invalid_submitted_by',
+        details: { allowed_values: Array.from(SUBMITTED_BY_TYPES) },
+      });
+    }
+
+    if (submittedBy === 'advisor' && !asBool(req.body?.client_device_confirmed, false)) {
+      return reply.code(400).send({
+        ok: false,
+        error: 'client_device_confirmation_required',
+        details: {
+          message: 'Advisor-assisted submissions require explicit client-device confirmation.',
+        },
+      });
+    }
+
+    try {
+      const profile = await getProfile({ tenantId, contactId });
+      if (!profile) {
+        return reply.code(404).send({ ok: false, error: 'client_profile_not_found' });
+      }
+
+      const tier = normalizeTier(profile.membership_tier);
+      if (tier !== 'tier3') {
+        return reply.code(403).send({ ok: false, error: 'tier_not_allowed', details: { required_tier: 'tier3' } });
+      }
+
+      const insertRes = await supabaseAdmin
+        .from('funding_application_events')
+        .insert({
+          tenant_id: tenantId,
+          contact_id: contactId,
+          lender_name: lenderName,
+          action_type: actionType,
+          submitted_by: submittedBy,
+          notes,
+        })
+        .select('id,tenant_id,contact_id,lender_name,action_type,submitted_by,notes,created_at')
+        .single();
+
+      if (insertRes.error) {
+        throw new Error(`funding application event insert failed: ${insertRes.error.message}`);
+      }
+
+      return reply.send({
+        ok: true,
+        event: insertRes.data,
+        disclaimers: normalizedDisclaimers(),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai funding event capture failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.get('/admin/ai/funding/submission-events', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.query?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.query?.contact_id);
+    const actionType = asText(req.query?.action_type).toLowerCase();
+    const limit = clampInt(req.query?.limit, 100, 1, 500);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (contactId && !isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+    if (actionType && !FUNDING_ACTION_TYPES.has(actionType)) {
+      return reply.code(400).send({
+        ok: false,
+        error: 'invalid_action_type',
+        details: { allowed_action_types: Array.from(FUNDING_ACTION_TYPES) },
+      });
+    }
+
+    try {
+      let query = supabaseAdmin
+        .from('funding_application_events')
+        .select('id,tenant_id,contact_id,lender_name,action_type,submitted_by,notes,created_at')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (contactId) query = query.eq('contact_id', contactId);
+      if (actionType) query = query.eq('action_type', actionType);
+
+      const res = await query;
+      if (res.error) {
+        throw new Error(`funding application event list failed: ${res.error.message}`);
+      }
+
+      return reply.send({
+        ok: true,
+        items: res.data || [],
+        disclaimers: normalizedDisclaimers(),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai funding event list failed');
       return reply.code(500).send({ ok: false, error: String(error?.message || error) });
     }
   });
