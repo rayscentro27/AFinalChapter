@@ -56,7 +56,7 @@ function sanitizeAlertDetails(details) {
 
 function alertThresholds() {
   return {
-    outboxFailed: Math.max(1, asInt(ENV.ALERT_OUTBOX_FAILED_THRESHOLD, 10)),
+    outboxFailed: Math.max(0, asInt(ENV.ALERT_OUTBOX_FAILED_THRESHOLD, 10)),
     outboxOldestDueMinutes: Math.max(1, asInt(ENV.ALERT_OUTBOX_OLDEST_DUE_MINUTES_THRESHOLD, 15)),
     webhookFailed24h: Math.max(1, asInt(ENV.ALERT_WEBHOOK_FAILED_24H_THRESHOLD, 10)),
     deliveryFailed: Math.max(1, asInt(ENV.ALERT_DELIVERY_FAILED_THRESHOLD, 10)),
