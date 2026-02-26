@@ -1,0 +1,792 @@
+import { supabaseAdmin } from '../supabase.js';
+import { ENV } from '../env.js';
+import { requireTenantRole } from '../lib/auth/requireTenantRole.js';
+import { ADMIN_RATE_LIMIT } from '../util/rate-limit.js';
+import {
+  AI_ROLE_KEYS,
+  allowedPhasesForTier,
+  decideNextRole,
+  normalizeTier,
+  roleAllowedForTier,
+} from '../lib/ai/roleRouter.js';
+
+const LEGAL_TAX_DISCLAIMER = 'Guidance is educational and operational only; not legal or tax advice.';
+const INVESTMENT_DISCLAIMER = 'Investment content is educational only and is not investment advice.';
+
+function asText(value) {
+  if (Array.isArray(value)) return String(value[0] || '').trim();
+  return String(value || '').trim();
+}
+
+function asBool(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
+  return fallback;
+}
+
+function asNumber(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
+}
+
+function asInt(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.trunc(parsed);
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
+
+function parseSsnLast4(input) {
+  const digits = String(input || '').replace(/\D/g, '');
+  if (!digits) return null;
+  return digits.slice(-4);
+}
+
+function normalizedDisclaimers({ includeInvestment = false } = {}) {
+  const out = [LEGAL_TAX_DISCLAIMER];
+  if (includeInvestment) out.push(INVESTMENT_DISCLAIMER);
+  return out;
+}
+
+function roleDisplayName(roleKey) {
+  const map = {
+    [AI_ROLE_KEYS.INTAKE_SPECIALIST]: 'Intake Specialist',
+    [AI_ROLE_KEYS.CREDIT_ANALYST]: 'Credit Analyst',
+    [AI_ROLE_KEYS.BUSINESS_ADVISOR]: 'Business Advisor',
+    [AI_ROLE_KEYS.FUNDING_SPECIALIST]: 'Funding Specialist',
+    [AI_ROLE_KEYS.GRANT_WRITER]: 'Grant Writer',
+    [AI_ROLE_KEYS.INVESTMENT_ADVISOR]: 'Investment Advisor',
+    [AI_ROLE_KEYS.SUCCESS_MANAGER]: 'Success Manager',
+  };
+
+  return map[roleKey] || roleKey;
+}
+
+function scrubProfile(profile) {
+  if (!profile) return null;
+  const ssnLast4 = parseSsnLast4(profile.ssn_last4);
+
+  return {
+    id: profile.id,
+    tenant_id: profile.tenant_id,
+    contact_id: profile.contact_id,
+    membership_tier: profile.membership_tier,
+    ssn_last4: ssnLast4,
+    dob: profile.dob,
+    employment_status: profile.employment_status,
+    annual_income: profile.annual_income,
+    business_exists: Boolean(profile.business_exists),
+    intake_status: profile.intake_status,
+    created_at: profile.created_at,
+    updated_at: profile.updated_at,
+  };
+}
+
+function normalizeProfileInput({ tenantId, contactId, membershipTier, profile }) {
+  const src = (profile && typeof profile === 'object') ? profile : {};
+
+  return {
+    tenant_id: tenantId,
+    contact_id: contactId,
+    membership_tier: normalizeTier(membershipTier),
+    ssn_last4: parseSsnLast4(src.ssn_last4 || src.ssn),
+    dob: asText(src.dob) || null,
+    employment_status: asText(src.employment_status) || null,
+    annual_income: asNumber(src.annual_income),
+    business_exists: asBool(src.business_exists, false),
+    intake_status: asText(src.intake_status) || 'in_progress',
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function normalizeGoalsInput(goals) {
+  const src = (goals && typeof goals === 'object') ? goals : {};
+
+  return {
+    target_funding_amount: asNumber(src.target_funding_amount),
+    target_timeline_months: asInt(src.target_timeline_months),
+    funding_purpose: asText(src.funding_purpose) || null,
+    notes: asText(src.notes) || null,
+  };
+}
+
+function hasGoalData(goals) {
+  if (!goals) return false;
+  return (
+    goals.target_funding_amount !== null
+    || goals.target_timeline_months !== null
+    || Boolean(goals.funding_purpose)
+    || Boolean(goals.notes)
+  );
+}
+
+function phaseTaskTemplates({ phase, reason }) {
+  const reasonText = asText(reason);
+
+  const templates = {
+    intake: [
+      {
+        role_key: AI_ROLE_KEYS.INTAKE_SPECIALIST,
+        title: 'Complete intake questionnaire',
+        description: 'Collect tier selection, profile fields, business status, and funding goals.',
+        priority: 'high',
+      },
+      {
+        role_key: AI_ROLE_KEYS.SUCCESS_MANAGER,
+        title: 'Schedule intake follow-up',
+        description: 'Confirm the next milestone and communication cadence.',
+        priority: 'normal',
+      },
+    ],
+    credit: [
+      {
+        role_key: AI_ROLE_KEYS.CREDIT_ANALYST,
+        title: 'Run 5-factor fundability assessment',
+        description: 'Assess negative items, utilization, age, limits, and account depth.',
+        priority: 'high',
+      },
+      {
+        role_key: AI_ROLE_KEYS.CREDIT_ANALYST,
+        title: 'Prepare dispute workflow and recommendations',
+        description: 'Generate next actions and optional dispute templates.',
+        priority: 'normal',
+      },
+    ],
+    business: [
+      {
+        role_key: AI_ROLE_KEYS.BUSINESS_ADVISOR,
+        title: 'Build business formation checklist',
+        description: 'Confirm entity setup, EIN, NAICS, and business banking readiness.',
+        priority: 'high',
+      },
+    ],
+    funding: [
+      {
+        role_key: AI_ROLE_KEYS.FUNDING_SPECIALIST,
+        title: 'Prepare lender short-list and submission checklist',
+        description: 'Provide compliant assisted-submission flow and reserve planning.',
+        priority: 'high',
+      },
+    ],
+    grants: [
+      {
+        role_key: AI_ROLE_KEYS.GRANT_WRITER,
+        title: 'Generate grant match pack',
+        description: 'Match opportunities and prepare the required submission artifacts.',
+        priority: 'normal',
+      },
+    ],
+    investments: [
+      {
+        role_key: AI_ROLE_KEYS.INVESTMENT_ADVISOR,
+        title: 'Publish educational opportunity brief',
+        description: 'Share educational-only options with risk notes and no advice language.',
+        priority: 'normal',
+      },
+    ],
+    success: [
+      {
+        role_key: AI_ROLE_KEYS.SUCCESS_MANAGER,
+        title: 'Update milestones and stakeholder updates',
+        description: 'Track progress, blockers, and next best actions across roles.',
+        priority: 'high',
+      },
+    ],
+  };
+
+  return (templates[phase] || []).map((task) => ({
+    ...task,
+    metadata: reasonText ? { advance_reason: reasonText } : {},
+  }));
+}
+
+async function requireApiKey(req, reply) {
+  const key = asText(req.headers['x-api-key']);
+  if (!key || key !== ENV.INTERNAL_API_KEY) {
+    reply.code(401).send({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  return undefined;
+}
+
+async function getProfile({ tenantId, contactId }) {
+  const res = await supabaseAdmin
+    .from('client_profiles')
+    .select('id,tenant_id,contact_id,membership_tier,ssn_last4,dob,employment_status,annual_income,business_exists,intake_status,created_at,updated_at')
+    .eq('tenant_id', tenantId)
+    .eq('contact_id', contactId)
+    .maybeSingle();
+
+  if (res.error) {
+    throw new Error(`client profile lookup failed: ${res.error.message}`);
+  }
+
+  return res.data || null;
+}
+
+async function getActiveCase({ tenantId, contactId }) {
+  const res = await supabaseAdmin
+    .from('workflow_cases')
+    .select('id,tenant_id,contact_id,current_phase,current_role_key,status,risk_level,created_at,updated_at')
+    .eq('tenant_id', tenantId)
+    .eq('contact_id', contactId)
+    .eq('status', 'active')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (res.error) {
+    throw new Error(`workflow case lookup failed: ${res.error.message}`);
+  }
+
+  return res.data || null;
+}
+
+async function createTasks({ tenantId, caseId, tasks }) {
+  if (!tasks.length) return [];
+
+  const payload = tasks.map((task) => ({
+    tenant_id: tenantId,
+    case_id: caseId,
+    role_key: task.role_key,
+    title: task.title,
+    description: task.description || null,
+    status: task.status || 'todo',
+    priority: task.priority || 'normal',
+    due_at: task.due_at || null,
+    assigned_to: task.assigned_to || null,
+    metadata: (task.metadata && typeof task.metadata === 'object') ? task.metadata : {},
+  }));
+
+  const res = await supabaseAdmin
+    .from('workflow_tasks')
+    .insert(payload)
+    .select('id,tenant_id,case_id,role_key,title,description,status,priority,due_at,assigned_to,metadata,created_at,completed_at');
+
+  if (res.error) {
+    throw new Error(`workflow task insert failed: ${res.error.message}`);
+  }
+
+  return res.data || [];
+}
+
+function validateTierAndPhase({ membershipTier, phase }) {
+  const tier = normalizeTier(membershipTier);
+  const allowedPhases = allowedPhasesForTier(tier);
+  if (!allowedPhases.includes(phase)) {
+    return {
+      ok: false,
+      tier,
+      allowed_phases: allowedPhases,
+    };
+  }
+
+  return {
+    ok: true,
+    tier,
+    allowed_phases: allowedPhases,
+  };
+}
+
+function validateTierRole({ membershipTier, roleKey }) {
+  return roleAllowedForTier({ tier: membershipTier, roleKey });
+}
+
+export async function aiWorkflowRoutes(fastify) {
+  const roleGuard = requireTenantRole({
+    supabaseAdmin,
+    allowedRoles: ['owner', 'admin', 'agent'],
+  });
+
+  fastify.post('/admin/ai/intake/start', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.body?.contact_id);
+    const membershipTier = normalizeTier(req.body?.membership_tier);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+
+    try {
+      const profilePayload = normalizeProfileInput({
+        tenantId,
+        contactId,
+        membershipTier,
+        profile: req.body?.profile,
+      });
+
+      const profileRes = await supabaseAdmin
+        .from('client_profiles')
+        .upsert(profilePayload, { onConflict: 'tenant_id,contact_id' })
+        .select('id,tenant_id,contact_id,membership_tier,ssn_last4,dob,employment_status,annual_income,business_exists,intake_status,created_at,updated_at')
+        .maybeSingle();
+
+      if (profileRes.error) {
+        throw new Error(`client profile upsert failed: ${profileRes.error.message}`);
+      }
+
+      const goalsPayload = normalizeGoalsInput(req.body?.goals);
+      if (hasGoalData(goalsPayload)) {
+        const goalsRes = await supabaseAdmin
+          .from('client_goals')
+          .insert({
+            tenant_id: tenantId,
+            contact_id: contactId,
+            ...goalsPayload,
+          });
+
+        if (goalsRes.error) {
+          throw new Error(`client goals insert failed: ${goalsRes.error.message}`);
+        }
+      }
+
+      const roleKey = decideNextRole({
+        tier: membershipTier,
+        phase: 'intake',
+        credit_readiness: asText(req.body?.credit_readiness),
+        business_exists: asBool(profilePayload.business_exists, false),
+      });
+
+      let activeCase = await getActiveCase({ tenantId, contactId });
+      if (!activeCase) {
+        const caseInsert = await supabaseAdmin
+          .from('workflow_cases')
+          .insert({
+            tenant_id: tenantId,
+            contact_id: contactId,
+            current_phase: 'intake',
+            current_role_key: roleKey,
+            status: 'active',
+            risk_level: 'normal',
+            updated_at: new Date().toISOString(),
+          })
+          .select('id,tenant_id,contact_id,current_phase,current_role_key,status,risk_level,created_at,updated_at')
+          .single();
+
+        if (caseInsert.error) {
+          throw new Error(`workflow case insert failed: ${caseInsert.error.message}`);
+        }
+
+        activeCase = caseInsert.data;
+      } else {
+        const caseUpdate = await supabaseAdmin
+          .from('workflow_cases')
+          .update({
+            current_phase: 'intake',
+            current_role_key: roleKey,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', activeCase.id)
+          .select('id,tenant_id,contact_id,current_phase,current_role_key,status,risk_level,created_at,updated_at')
+          .single();
+
+        if (caseUpdate.error) {
+          throw new Error(`workflow case update failed: ${caseUpdate.error.message}`);
+        }
+
+        activeCase = caseUpdate.data;
+      }
+
+      const autoTasks = phaseTaskTemplates({ phase: 'intake' })
+        .filter((task) => validateTierRole({ membershipTier, roleKey: task.role_key }));
+
+      const createdTasks = await createTasks({
+        tenantId,
+        caseId: activeCase.id,
+        tasks: autoTasks,
+      });
+
+      return reply.send({
+        ok: true,
+        case: activeCase,
+        profile: scrubProfile(profileRes.data),
+        created_tasks: createdTasks,
+        disclaimers: normalizedDisclaimers(),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai intake start failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.get('/admin/ai/case/:tenant_id/:contact_id', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.params?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.params?.contact_id);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+
+    try {
+      const [profile, activeCase] = await Promise.all([
+        getProfile({ tenantId, contactId }),
+        getActiveCase({ tenantId, contactId }),
+      ]);
+
+      if (!profile) {
+        return reply.code(404).send({ ok: false, error: 'client_profile_not_found' });
+      }
+
+      const tier = normalizeTier(profile.membership_tier);
+      const phase = asText(activeCase?.current_phase || 'intake').toLowerCase();
+      const recommendedRoleKey = decideNextRole({
+        tier,
+        phase,
+        credit_readiness: asText(req.query?.credit_readiness),
+        business_exists: Boolean(profile.business_exists),
+      });
+
+      let tasks = [];
+      if (activeCase?.id) {
+        const tasksRes = await supabaseAdmin
+          .from('workflow_tasks')
+          .select('id,tenant_id,case_id,role_key,title,description,status,priority,due_at,assigned_to,metadata,created_at,completed_at')
+          .eq('tenant_id', tenantId)
+          .eq('case_id', activeCase.id)
+          .neq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(200);
+
+        if (tasksRes.error) {
+          throw new Error(`workflow task lookup failed: ${tasksRes.error.message}`);
+        }
+
+        tasks = tasksRes.data || [];
+      }
+
+      return reply.send({
+        ok: true,
+        case: activeCase,
+        profile: scrubProfile(profile),
+        open_tasks: tasks,
+        role_recommendations: {
+          recommended_role_key: recommendedRoleKey,
+          recommended_role_name: roleDisplayName(recommendedRoleKey),
+          allowed_phases: allowedPhasesForTier(tier),
+          membership_tier: tier,
+        },
+        disclaimers: normalizedDisclaimers({ includeInvestment: phase === 'investments' || recommendedRoleKey === AI_ROLE_KEYS.INVESTMENT_ADVISOR }),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai case fetch failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/ai/case/advance', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.body?.contact_id);
+    const nextPhase = asText(req.body?.next_phase).toLowerCase();
+    const reason = asText(req.body?.reason);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+    if (!nextPhase) return reply.code(400).send({ ok: false, error: 'missing_next_phase' });
+
+    try {
+      const profile = await getProfile({ tenantId, contactId });
+      if (!profile) {
+        return reply.code(404).send({ ok: false, error: 'client_profile_not_found' });
+      }
+
+      const tierCheck = validateTierAndPhase({
+        membershipTier: profile.membership_tier,
+        phase: nextPhase,
+      });
+
+      if (!tierCheck.ok) {
+        return reply.code(403).send({
+          ok: false,
+          error: 'tier_not_allowed_phase',
+          details: {
+            membership_tier: tierCheck.tier,
+            next_phase: nextPhase,
+            allowed_phases: tierCheck.allowed_phases,
+          },
+        });
+      }
+
+      let activeCase = await getActiveCase({ tenantId, contactId });
+      if (!activeCase) {
+        const createCaseRes = await supabaseAdmin
+          .from('workflow_cases')
+          .insert({
+            tenant_id: tenantId,
+            contact_id: contactId,
+            current_phase: 'intake',
+            current_role_key: AI_ROLE_KEYS.INTAKE_SPECIALIST,
+            status: 'active',
+            risk_level: 'normal',
+            updated_at: new Date().toISOString(),
+          })
+          .select('id,tenant_id,contact_id,current_phase,current_role_key,status,risk_level,created_at,updated_at')
+          .single();
+
+        if (createCaseRes.error) {
+          throw new Error(`workflow case create failed: ${createCaseRes.error.message}`);
+        }
+
+        activeCase = createCaseRes.data;
+      }
+
+      const roleKey = decideNextRole({
+        tier: profile.membership_tier,
+        phase: nextPhase,
+        credit_readiness: asText(req.body?.credit_readiness),
+        business_exists: Boolean(profile.business_exists),
+      });
+
+      if (!validateTierRole({ membershipTier: profile.membership_tier, roleKey })) {
+        return reply.code(403).send({
+          ok: false,
+          error: 'tier_not_allowed_role',
+          details: {
+            membership_tier: normalizeTier(profile.membership_tier),
+            requested_role_key: roleKey,
+          },
+        });
+      }
+
+      const updateRes = await supabaseAdmin
+        .from('workflow_cases')
+        .update({
+          current_phase: nextPhase,
+          current_role_key: roleKey,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', activeCase.id)
+        .select('id,tenant_id,contact_id,current_phase,current_role_key,status,risk_level,created_at,updated_at')
+        .single();
+
+      if (updateRes.error) {
+        throw new Error(`workflow case advance failed: ${updateRes.error.message}`);
+      }
+
+      const generatedTasks = phaseTaskTemplates({ phase: nextPhase, reason })
+        .filter((task) => validateTierRole({ membershipTier: profile.membership_tier, roleKey: task.role_key }));
+
+      const createdTasks = await createTasks({
+        tenantId,
+        caseId: activeCase.id,
+        tasks: generatedTasks,
+      });
+
+      return reply.send({
+        ok: true,
+        case: updateRes.data,
+        created_tasks: createdTasks,
+        disclaimers: normalizedDisclaimers({ includeInvestment: nextPhase === 'investments' || roleKey === AI_ROLE_KEYS.INVESTMENT_ADVISOR }),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai case advance failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/ai/tasks/create', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const caseId = asText(req.body?.case_id);
+    const roleKey = asText(req.body?.role_key).toLowerCase();
+    const title = asText(req.body?.title);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!isUuid(caseId)) return reply.code(400).send({ ok: false, error: 'invalid_case_id' });
+    if (!roleKey) return reply.code(400).send({ ok: false, error: 'missing_role_key' });
+    if (!title) return reply.code(400).send({ ok: false, error: 'missing_title' });
+
+    try {
+      const caseRes = await supabaseAdmin
+        .from('workflow_cases')
+        .select('id,tenant_id,contact_id,status,current_phase,current_role_key,risk_level,created_at,updated_at')
+        .eq('tenant_id', tenantId)
+        .eq('id', caseId)
+        .maybeSingle();
+
+      if (caseRes.error) {
+        throw new Error(`workflow case read failed: ${caseRes.error.message}`);
+      }
+      if (!caseRes.data) {
+        return reply.code(404).send({ ok: false, error: 'workflow_case_not_found' });
+      }
+
+      const profile = await getProfile({ tenantId, contactId: caseRes.data.contact_id });
+      if (!profile) {
+        return reply.code(404).send({ ok: false, error: 'client_profile_not_found' });
+      }
+
+      if (!validateTierRole({ membershipTier: profile.membership_tier, roleKey })) {
+        return reply.code(403).send({
+          ok: false,
+          error: 'tier_not_allowed_role',
+          details: {
+            membership_tier: normalizeTier(profile.membership_tier),
+            role_key: roleKey,
+          },
+        });
+      }
+
+      const metadata = (req.body?.metadata && typeof req.body.metadata === 'object') ? req.body.metadata : {};
+
+      const insertRes = await supabaseAdmin
+        .from('workflow_tasks')
+        .insert({
+          tenant_id: tenantId,
+          case_id: caseId,
+          role_key: roleKey,
+          title,
+          description: asText(req.body?.description) || null,
+          status: asText(req.body?.status) || 'todo',
+          priority: asText(req.body?.priority) || 'normal',
+          due_at: asText(req.body?.due_at) || null,
+          assigned_to: asText(req.body?.assigned_to) || null,
+          metadata,
+        })
+        .select('id,tenant_id,case_id,role_key,title,description,status,priority,due_at,assigned_to,metadata,created_at,completed_at')
+        .single();
+
+      if (insertRes.error) {
+        throw new Error(`workflow task create failed: ${insertRes.error.message}`);
+      }
+
+      return reply.send({
+        ok: true,
+        task: insertRes.data,
+        disclaimers: normalizedDisclaimers({ includeInvestment: roleKey === AI_ROLE_KEYS.INVESTMENT_ADVISOR }),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, case_id: caseId }, 'ai task create failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/ai/tasks/complete', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const taskId = asText(req.body?.task_id);
+    const completionNote = asText(req.body?.completion_note);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!isUuid(taskId)) return reply.code(400).send({ ok: false, error: 'invalid_task_id' });
+
+    try {
+      const taskRes = await supabaseAdmin
+        .from('workflow_tasks')
+        .select('id,tenant_id,case_id,role_key,title,description,status,priority,due_at,assigned_to,metadata,created_at,completed_at')
+        .eq('tenant_id', tenantId)
+        .eq('id', taskId)
+        .maybeSingle();
+
+      if (taskRes.error) {
+        throw new Error(`workflow task read failed: ${taskRes.error.message}`);
+      }
+      if (!taskRes.data) {
+        return reply.code(404).send({ ok: false, error: 'workflow_task_not_found' });
+      }
+
+      const metadata = {
+        ...(taskRes.data.metadata && typeof taskRes.data.metadata === 'object' ? taskRes.data.metadata : {}),
+      };
+      if (completionNote) metadata.completion_note = completionNote;
+
+      const updateRes = await supabaseAdmin
+        .from('workflow_tasks')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          metadata,
+        })
+        .eq('tenant_id', tenantId)
+        .eq('id', taskId)
+        .select('id,tenant_id,case_id,role_key,title,description,status,priority,due_at,assigned_to,metadata,created_at,completed_at')
+        .single();
+
+      if (updateRes.error) {
+        throw new Error(`workflow task complete failed: ${updateRes.error.message}`);
+      }
+
+      return reply.send({
+        ok: true,
+        task: updateRes.data,
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, task_id: taskId }, 'ai task complete failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.get('/admin/ai/tasks/list', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.query?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.query?.contact_id);
+    const status = asText(req.query?.status).toLowerCase();
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (contactId && !isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+
+    try {
+      let caseIds = null;
+      if (contactId) {
+        const caseRes = await supabaseAdmin
+          .from('workflow_cases')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .eq('contact_id', contactId)
+          .limit(500);
+
+        if (caseRes.error) {
+          throw new Error(`workflow case list failed: ${caseRes.error.message}`);
+        }
+
+        caseIds = (caseRes.data || []).map((row) => row.id).filter(Boolean);
+        if (!caseIds.length) {
+          return reply.send({ ok: true, items: [] });
+        }
+      }
+
+      let query = supabaseAdmin
+        .from('workflow_tasks')
+        .select('id,tenant_id,case_id,role_key,title,description,status,priority,due_at,assigned_to,metadata,created_at,completed_at')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (caseIds) query = query.in('case_id', caseIds);
+      if (status) query = query.eq('status', status);
+
+      const res = await query;
+
+      if (res.error) {
+        throw new Error(`workflow task list failed: ${res.error.message}`);
+      }
+
+      return reply.send({
+        ok: true,
+        items: res.data || [],
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai task list failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+}

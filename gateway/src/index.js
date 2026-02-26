@@ -20,6 +20,7 @@ import { adminMonitoringRoutes } from './routes/admin_monitoring.js';
 import { adminMonitoringV2Routes } from './routes/admin_monitoring_v2.js';
 import { attachmentsRoutes } from './routes/attachments.js';
 import { assignmentRoutes } from './routes/assignment.js';
+import { aiWorkflowRoutes } from './routes/ai_workflow.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -127,6 +128,7 @@ await fastify.register(adminMonitoringRoutes);
 await fastify.register(adminMonitoringV2Routes);
 await fastify.register(attachmentsRoutes);
 await fastify.register(assignmentRoutes);
+await fastify.register(aiWorkflowRoutes);
 
 fastify.setErrorHandler((error, req, reply) => {
   req.log.error({
