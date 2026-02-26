@@ -314,6 +314,97 @@ function validateTierRole({ membershipTier, roleKey }) {
   return roleAllowedForTier({ tier: membershipTier, roleKey });
 }
 
+function isMissingColumnError(error, columnName) {
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('column') && msg.includes(String(columnName || '').toLowerCase()) && msg.includes('does not exist');
+}
+
+function isLegacyFundingEventSchemaError(error) {
+  return (
+    isMissingColumnError(error, 'client_device_confirmed')
+    || isMissingColumnError(error, 'confirmation_method')
+    || isMissingColumnError(error, 'confirmation_metadata')
+    || isMissingColumnError(error, 'captured_by')
+  );
+}
+
+async function insertFundingEvent(eventPayload) {
+  const selectFields = "id,tenant_id,contact_id,lender_name,action_type,submitted_by,notes,created_at";
+
+  const first = await supabaseAdmin
+    .from("funding_application_events")
+    .insert(eventPayload)
+    .select(selectFields)
+    .single();
+
+  if (!first.error) return first.data;
+
+  if (!isLegacyFundingEventSchemaError(first.error)) {
+    throw new Error("funding application event insert failed: " + String(first.error?.message || "unknown_error"));
+  }
+
+  const {
+    client_device_confirmed: _clientDeviceConfirmed,
+    confirmation_method: _confirmationMethod,
+    confirmation_metadata: _confirmationMetadata,
+    captured_by: _capturedBy,
+    ...legacyPayload
+  } = eventPayload || {};
+
+  const fallback = await supabaseAdmin
+    .from("funding_application_events")
+    .insert(legacyPayload)
+    .select(selectFields)
+    .single();
+
+  if (fallback.error) {
+    throw new Error("funding application event insert failed: " + String(fallback.error?.message || "unknown_error"));
+  }
+
+  return fallback.data;
+}
+
+function buildSubmissionNote({ notes, confirmationMethod, metadata }) {
+  const base = asText(notes);
+  const method = asText(confirmationMethod);
+  const md = (metadata && typeof metadata === "object") ? metadata : null;
+  const safeMeta = md ? JSON.stringify(md).slice(0, 320) : "";
+
+  const parts = [base];
+  if (method) parts.push("confirmation_method=" + method);
+  if (safeMeta) parts.push("confirmation_metadata=" + safeMeta);
+
+  return parts.filter(Boolean).join(" | ").slice(0, 2000) || null;
+}
+
+async function ensureActiveCaseForContact({ tenantId, contactId, phase = "funding", roleKey = AI_ROLE_KEYS.FUNDING_SPECIALIST }) {
+  let activeCase = await getActiveCase({ tenantId, contactId });
+
+  if (!activeCase) {
+    const createCaseRes = await supabaseAdmin
+      .from("workflow_cases")
+      .insert({
+        tenant_id: tenantId,
+        contact_id: contactId,
+        current_phase: phase,
+        current_role_key: roleKey,
+        status: "active",
+        risk_level: "normal",
+        updated_at: new Date().toISOString(),
+      })
+      .select("id,tenant_id,contact_id,current_phase,current_role_key,status,risk_level,created_at,updated_at")
+      .single();
+
+    if (createCaseRes.error) {
+      throw new Error("workflow case create failed: " + String(createCaseRes.error.message || "unknown_error"));
+    }
+
+    activeCase = createCaseRes.data;
+  }
+
+  return activeCase;
+}
+
 export async function aiWorkflowRoutes(fastify) {
   const roleGuard = requireTenantRole({
     supabaseAdmin,
@@ -944,26 +1035,27 @@ export async function aiWorkflowRoutes(fastify) {
         return reply.code(403).send({ ok: false, error: 'tier_not_allowed', details: { required_tier: 'tier3' } });
       }
 
-      const insertRes = await supabaseAdmin
-        .from('funding_application_events')
-        .insert({
-          tenant_id: tenantId,
-          contact_id: contactId,
-          lender_name: lenderName,
-          action_type: actionType,
-          submitted_by: submittedBy,
-          notes,
-        })
-        .select('id,tenant_id,contact_id,lender_name,action_type,submitted_by,notes,created_at')
-        .single();
+      const confirmationMethod = asText(req.body?.confirmation_method).toLowerCase() || null;
+      const confirmationMetadata = (req.body?.confirmation_metadata && typeof req.body.confirmation_metadata === 'object')
+        ? req.body.confirmation_metadata
+        : null;
 
-      if (insertRes.error) {
-        throw new Error(`funding application event insert failed: ${insertRes.error.message}`);
-      }
+      const event = await insertFundingEvent({
+        tenant_id: tenantId,
+        contact_id: contactId,
+        lender_name: lenderName,
+        action_type: actionType,
+        submitted_by: submittedBy,
+        notes: buildSubmissionNote({ notes, confirmationMethod, metadata: confirmationMetadata }),
+        client_device_confirmed: asBool(req.body?.client_device_confirmed, submittedBy === 'client'),
+        confirmation_method: confirmationMethod,
+        confirmation_metadata: confirmationMetadata,
+        captured_by: req.user?.id || null,
+      });
 
       return reply.send({
         ok: true,
-        event: insertRes.data,
+        event,
         disclaimers: normalizedDisclaimers(),
       });
     } catch (error) {
@@ -1200,6 +1292,221 @@ export async function aiWorkflowRoutes(fastify) {
       });
     } catch (error) {
       req.log.error({ err: error, tenant_id: tenantId, role_key: roleKey, title }, 'ai playbook upsert failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/ai/funding/checklist-prepare', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.body?.contact_id);
+    const lenderName = asText(req.body?.lender_name);
+    const notes = asText(req.body?.notes) || null;
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+    if (!lenderName) return reply.code(400).send({ ok: false, error: 'missing_lender_name' });
+
+    try {
+      const profile = await getProfile({ tenantId, contactId });
+      if (!profile) {
+        return reply.code(404).send({ ok: false, error: 'client_profile_not_found' });
+      }
+
+      const tier = normalizeTier(profile.membership_tier);
+      if (tier !== 'tier3') {
+        return reply.code(403).send({ ok: false, error: 'tier_not_allowed', details: { required_tier: 'tier3' } });
+      }
+
+      const checklistItems = Array.isArray(req.body?.checklist_items)
+        ? req.body.checklist_items.map((value) => asText(value)).filter(Boolean)
+        : [];
+
+      const activeCase = await ensureActiveCaseForContact({
+        tenantId,
+        contactId,
+        phase: 'funding',
+        roleKey: AI_ROLE_KEYS.FUNDING_SPECIALIST,
+      });
+
+      const taskTitle = `Funding checklist for ${lenderName}`;
+      const taskDescription = checklistItems.length > 0
+        ? checklistItems.map((item, index) => `${index + 1}. ${item}`).join('\n')
+        : 'Prepare lender submission checklist and verify client-device submission readiness.';
+
+      const tasks = await createTasks({
+        tenantId,
+        caseId: activeCase.id,
+        tasks: [
+          {
+            role_key: AI_ROLE_KEYS.FUNDING_SPECIALIST,
+            title: taskTitle,
+            description: taskDescription,
+            priority: 'high',
+            metadata: {
+              lender_name: lenderName,
+              checklist_items: checklistItems,
+            },
+          },
+        ],
+      });
+
+      const event = await insertFundingEvent({
+        tenant_id: tenantId,
+        contact_id: contactId,
+        lender_name: lenderName,
+        action_type: 'checklist_prepared',
+        submitted_by: 'advisor',
+        notes: buildSubmissionNote({
+          notes,
+          confirmationMethod: null,
+          metadata: {
+            checklist_count: checklistItems.length,
+            task_id: tasks[0]?.id || null,
+          },
+        }),
+        client_device_confirmed: false,
+        captured_by: req.user?.id || null,
+      });
+
+      return reply.send({
+        ok: true,
+        case: activeCase,
+        task: tasks[0] || null,
+        event,
+        disclaimers: normalizedDisclaimers(),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai funding checklist prepare failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/ai/funding/submission-capture', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.body?.contact_id);
+    const lenderName = asText(req.body?.lender_name);
+    const confirmationMethod = asText(req.body?.confirmation_method).toLowerCase() || 'client_device';
+    const notes = asText(req.body?.notes) || null;
+    const clientDeviceConfirmed = asBool(req.body?.client_device_confirmed, false);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+    if (!lenderName) return reply.code(400).send({ ok: false, error: 'missing_lender_name' });
+
+    if (!clientDeviceConfirmed) {
+      return reply.code(400).send({
+        ok: false,
+        error: 'client_device_confirmation_required',
+        details: {
+          message: 'Submission capture requires client_device_confirmed=true to prevent fraud-risk workflows.',
+        },
+      });
+    }
+
+    try {
+      const profile = await getProfile({ tenantId, contactId });
+      if (!profile) {
+        return reply.code(404).send({ ok: false, error: 'client_profile_not_found' });
+      }
+
+      const tier = normalizeTier(profile.membership_tier);
+      if (tier !== 'tier3') {
+        return reply.code(403).send({ ok: false, error: 'tier_not_allowed', details: { required_tier: 'tier3' } });
+      }
+
+      const confirmationMetadata = (req.body?.confirmation_metadata && typeof req.body.confirmation_metadata === 'object')
+        ? req.body.confirmation_metadata
+        : {};
+
+      const event = await insertFundingEvent({
+        tenant_id: tenantId,
+        contact_id: contactId,
+        lender_name: lenderName,
+        action_type: 'submitted_confirmation_captured',
+        submitted_by: 'client',
+        notes: buildSubmissionNote({ notes, confirmationMethod, metadata: confirmationMetadata }),
+        client_device_confirmed: true,
+        confirmation_method: confirmationMethod,
+        confirmation_metadata: confirmationMetadata,
+        captured_by: req.user?.id || null,
+      });
+
+      return reply.send({
+        ok: true,
+        event,
+        disclaimers: normalizedDisclaimers(),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai funding submission capture failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.get('/admin/ai/funding/compliance-summary', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.query?.tenant_id || req.tenant?.id);
+    const contactId = asText(req.query?.contact_id);
+    const lenderName = asText(req.query?.lender_name);
+    const limit = clampInt(req.query?.limit, 200, 1, 500);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (contactId && !isUuid(contactId)) return reply.code(400).send({ ok: false, error: 'invalid_contact_id' });
+
+    try {
+      let query = supabaseAdmin
+        .from('funding_application_events')
+        .select('id,tenant_id,contact_id,lender_name,action_type,submitted_by,notes,created_at')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (contactId) query = query.eq('contact_id', contactId);
+      if (lenderName) query = query.eq('lender_name', lenderName);
+
+      const eventsRes = await query;
+      if (eventsRes.error) {
+        throw new Error(`funding compliance summary query failed: ${eventsRes.error.message}`);
+      }
+
+      const events = eventsRes.data || [];
+      const byAction = events.reduce((acc, item) => {
+        const key = asText(item?.action_type) || 'unknown';
+        acc[key] = Number(acc[key] || 0) + 1;
+        return acc;
+      }, {});
+
+      const byLender = events.reduce((acc, item) => {
+        const key = asText(item?.lender_name) || 'unknown';
+        acc[key] = Number(acc[key] || 0) + 1;
+        return acc;
+      }, {});
+
+      const recentConfirmations = events
+        .filter((item) => asText(item?.action_type) === 'submitted_confirmation_captured')
+        .slice(0, 20);
+
+      return reply.send({
+        ok: true,
+        summary: {
+          total_events: events.length,
+          by_action: byAction,
+          by_lender: byLender,
+          recent_confirmation_count: recentConfirmations.length,
+          latest_confirmation_at: recentConfirmations[0]?.created_at || null,
+        },
+        recent_events: events.slice(0, 50),
+        disclaimers: normalizedDisclaimers(),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai funding compliance summary failed');
       return reply.code(500).send({ ok: false, error: String(error?.message || error) });
     }
   });
