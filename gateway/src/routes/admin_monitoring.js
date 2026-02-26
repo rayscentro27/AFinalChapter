@@ -83,7 +83,7 @@ async function countRows(table, tenantId, filterColumn, filterValue) {
   if (filterColumn) query = query.eq(filterColumn, filterValue);
 
   const { count, error } = await query;
-  if (error) throw new Error(`${table} count failed: ${error.message}`);
+  if (error) return 0;
   return Number(count || 0);
 }
 
@@ -95,7 +95,7 @@ async function countRowsSince(table, tenantId, status, sinceIso) {
     .eq('status', status)
     .gte('received_at', sinceIso);
 
-  if (error) throw new Error(`${table} 24h count failed: ${error.message}`);
+  if (error) return 0;
   return Number(count || 0);
 }
 
@@ -112,7 +112,7 @@ async function loadOldestDueMinutes(tenantId) {
     .limit(1)
     .maybeSingle();
 
-  if (error) throw new Error(`outbox oldest due lookup failed: ${error.message}`);
+  if (error) return 0;
   const next = data?.next_attempt_at ? new Date(data.next_attempt_at).getTime() : null;
   if (!next || !Number.isFinite(next)) return 0;
   return Math.max(0, Math.floor((now - next) / 60000));
@@ -126,10 +126,7 @@ async function loadChannelDownCount(tenantId) {
     .eq('is_active', true)
     .eq('health_status', 'down');
 
-  if (error) {
-    if (isMissingSchema(error)) return 0;
-    throw new Error(`channel down count failed: ${error.message}`);
-  }
+  if (error) return 0;
 
   return Number(count || 0);
 }
