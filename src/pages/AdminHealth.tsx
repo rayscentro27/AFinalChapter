@@ -49,6 +49,19 @@ type AlertItem = {
   resolved_at: string | null;
 };
 
+type AlertNotificationItem = {
+  id: number;
+  tenant_id: string;
+  alert_key: string;
+  status: string;
+  severity: string;
+  summary: string;
+  delivered: boolean;
+  response_code: number | null;
+  error: string | null;
+  created_at: string;
+};
+
 export default function AdminHealth() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -59,6 +72,7 @@ export default function AdminHealth() {
   const [tenantId, setTenantId] = useState('');
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [notifications, setNotifications] = useState<AlertNotificationItem[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -162,11 +176,35 @@ export default function AdminHealth() {
     setAlerts(Array.isArray(payload?.items) ? payload.items : []);
   }
 
+  async function fetchAlertNotifications() {
+    if (!tenantId) return;
+
+    const token = await authToken();
+    const response = await fetch(`/.netlify/functions/admin-alerts-notifications?tenant_id=${encodeURIComponent(tenantId)}&limit=50`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      error?: string;
+      items?: AlertNotificationItem[];
+    };
+
+    if (!response.ok) {
+      throw new Error(String(payload?.error || `Admin alert notifications failed (${response.status})`));
+    }
+
+    setNotifications(Array.isArray(payload?.items) ? payload.items : []);
+  }
+
   async function refreshAll() {
     try {
       setRefreshing(true);
       setError('');
-      await Promise.all([fetchHealth(), fetchAlerts()]);
+      await Promise.all([fetchHealth(), fetchAlerts(), fetchAlertNotifications()]);
     } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
@@ -297,6 +335,52 @@ export default function AdminHealth() {
                     <td className="px-6 py-4 text-slate-300">{item.occurrences}</td>
                     <td className="px-6 py-4 text-slate-300">{new Date(item.last_triggered_at).toLocaleString()}</td>
                     <td className="px-6 py-4 text-slate-300">{item.last_notified_at ? new Date(item.last_notified_at).toLocaleString() : '-'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-slate-900 border border-white/10 rounded-3xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+          <h2 className="text-sm font-black uppercase tracking-widest text-slate-300">Recent Alert Notifications</h2>
+          <span className="text-xs px-2 py-1 rounded-lg border border-white/20 bg-white/5">{notifications.length}</span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1000px] text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-widest text-slate-400">
+                <th className="px-6 py-3">Time</th>
+                <th className="px-6 py-3">Alert Key</th>
+                <th className="px-6 py-3">Severity</th>
+                <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3">Delivered</th>
+                <th className="px-6 py-3">HTTP</th>
+                <th className="px-6 py-3">Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {notifications.length === 0 ? (
+                <tr>
+                  <td className="px-6 py-8 text-slate-400" colSpan={7}>No notification attempts yet.</td>
+                </tr>
+              ) : (
+                notifications.map((item) => (
+                  <tr key={item.id} className="border-t border-white/5 align-top">
+                    <td className="px-6 py-4 text-slate-300">{new Date(item.created_at).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-slate-300 font-mono text-xs">{item.alert_key}</td>
+                    <td className="px-6 py-4 text-slate-300">{item.severity}</td>
+                    <td className="px-6 py-4 text-slate-300">{item.status}</td>
+                    <td className="px-6 py-4">
+                      <span className={`text-xs px-2 py-1 rounded-lg border ${item.delivered ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-red-500/40 bg-red-500/10 text-red-200'}`}>
+                        {item.delivered ? 'yes' : 'no'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">{item.response_code ?? '-'}</td>
+                    <td className="px-6 py-4 text-slate-300">{item.error || '-'}</td>
                   </tr>
                 ))
               )}
