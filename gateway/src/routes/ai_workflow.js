@@ -320,6 +320,11 @@ export async function aiWorkflowRoutes(fastify) {
     allowedRoles: ['owner', 'admin', 'agent'],
   });
 
+  const ownerAdminGuard = requireTenantRole({
+    supabaseAdmin,
+    allowedRoles: ['owner', 'admin'],
+  });
+
   fastify.post('/admin/ai/intake/start', {
     preHandler: [requireApiKey, roleGuard],
     config: { rateLimit: ADMIN_RATE_LIMIT },
@@ -1009,6 +1014,192 @@ export async function aiWorkflowRoutes(fastify) {
       });
     } catch (error) {
       req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai funding event list failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.get('/admin/ai/roles', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.query?.tenant_id || req.tenant?.id);
+    const membershipTier = asText(req.query?.membership_tier).toLowerCase();
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+
+    try {
+      const res = await supabaseAdmin
+        .from('ai_roles')
+        .select('id,tenant_id,key,display_name,tier_access,is_active,created_at')
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true)
+        .order('display_name', { ascending: true })
+        .limit(500);
+
+      if (res.error) throw new Error(`ai roles list failed: ${res.error.message}`);
+
+      let items = res.data || [];
+      if (membershipTier) {
+        const tier = normalizeTier(membershipTier);
+        items = items.filter((row) => {
+          const tierAccess = Array.isArray(row?.tier_access) ? row.tier_access : [];
+          if (!tierAccess.length) return true;
+          return tierAccess.map((value) => asText(value).toLowerCase()).includes(tier);
+        });
+      }
+
+      return reply.send({ ok: true, items });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId }, 'ai roles list failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/ai/roles/upsert', {
+    preHandler: [requireApiKey, ownerAdminGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const key = asText(req.body?.key).toLowerCase();
+    const displayName = asText(req.body?.display_name);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!key) return reply.code(400).send({ ok: false, error: 'missing_key' });
+    if (!/^[a-z0-9_]+$/.test(key)) return reply.code(400).send({ ok: false, error: 'invalid_key_format' });
+    if (!displayName) return reply.code(400).send({ ok: false, error: 'missing_display_name' });
+
+    try {
+      const tierAccessRaw = Array.isArray(req.body?.tier_access) ? req.body.tier_access : [];
+      const tierAccess = Array.from(new Set(
+        tierAccessRaw
+          .map((value) => asText(value).toLowerCase())
+          .filter((value) => ['tier1', 'tier2', 'tier3'].includes(value))
+      ));
+
+      const upsertRes = await supabaseAdmin
+        .from('ai_roles')
+        .upsert({
+          tenant_id: tenantId,
+          key,
+          display_name: displayName,
+          tier_access: tierAccess,
+          is_active: asBool(req.body?.is_active, true),
+        }, { onConflict: 'tenant_id,key' })
+        .select('id,tenant_id,key,display_name,tier_access,is_active,created_at')
+        .single();
+
+      if (upsertRes.error) throw new Error(`ai role upsert failed: ${upsertRes.error.message}`);
+
+      return reply.send({ ok: true, role: upsertRes.data });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, role_key: key }, 'ai role upsert failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.get('/admin/ai/playbooks', {
+    preHandler: [requireApiKey, roleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.query?.tenant_id || req.tenant?.id);
+    const roleKey = asText(req.query?.role_key).toLowerCase();
+    const membershipTier = asText(req.query?.membership_tier).toLowerCase();
+    const activeOnly = asBool(req.query?.active_only, true);
+    const limit = clampInt(req.query?.limit, 200, 1, 500);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+
+    try {
+      let query = supabaseAdmin
+        .from('ai_playbooks')
+        .select('id,tenant_id,role_key,title,version,prompt_template,compliance_flags,is_active,created_at')
+        .eq('tenant_id', tenantId)
+        .order('role_key', { ascending: true })
+        .order('version', { ascending: false })
+        .limit(limit);
+
+      if (roleKey) query = query.eq('role_key', roleKey);
+      if (activeOnly) query = query.eq('is_active', true);
+
+      const res = await query;
+      if (res.error) throw new Error(`ai playbooks list failed: ${res.error.message}`);
+
+      let items = res.data || [];
+      if (membershipTier) {
+        const tier = normalizeTier(membershipTier);
+        items = items.filter((row) => validateTierRole({ membershipTier: tier, roleKey: row.role_key }));
+      }
+
+      return reply.send({ ok: true, items });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, role_key: roleKey }, 'ai playbooks list failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/ai/playbooks/upsert', {
+    preHandler: [requireApiKey, ownerAdminGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const roleKey = asText(req.body?.role_key).toLowerCase();
+    const title = asText(req.body?.title);
+    const promptTemplate = asText(req.body?.prompt_template);
+
+    if (!isUuid(tenantId)) return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    if (!roleKey) return reply.code(400).send({ ok: false, error: 'missing_role_key' });
+    if (!title) return reply.code(400).send({ ok: false, error: 'missing_title' });
+    if (!promptTemplate) return reply.code(400).send({ ok: false, error: 'missing_prompt_template' });
+
+    try {
+      const explicitVersion = asInt(req.body?.version);
+      let version = explicitVersion;
+
+      if (version === null || version < 1) {
+        const latestRes = await supabaseAdmin
+          .from('ai_playbooks')
+          .select('version')
+          .eq('tenant_id', tenantId)
+          .eq('role_key', roleKey)
+          .eq('title', title)
+          .order('version', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestRes.error) {
+          throw new Error(`ai playbook latest version lookup failed: ${latestRes.error.message}`);
+        }
+
+        version = Math.max(1, Number(latestRes.data?.version || 0) + 1);
+      }
+
+      const complianceFlags = (req.body?.compliance_flags && typeof req.body.compliance_flags === 'object')
+        ? req.body.compliance_flags
+        : {};
+
+      const insertRes = await supabaseAdmin
+        .from('ai_playbooks')
+        .insert({
+          tenant_id: tenantId,
+          role_key: roleKey,
+          title,
+          version,
+          prompt_template: promptTemplate,
+          compliance_flags: complianceFlags,
+          is_active: asBool(req.body?.is_active, true),
+        })
+        .select('id,tenant_id,role_key,title,version,prompt_template,compliance_flags,is_active,created_at')
+        .single();
+
+      if (insertRes.error) throw new Error(`ai playbook upsert failed: ${insertRes.error.message}`);
+
+      return reply.send({
+        ok: true,
+        playbook: insertRes.data,
+        disclaimers: normalizedDisclaimers({ includeInvestment: roleKey === AI_ROLE_KEYS.INVESTMENT_ADVISOR }),
+      });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, role_key: roleKey, title }, 'ai playbook upsert failed');
       return reply.code(500).send({ ok: false, error: String(error?.message || error) });
     }
   });
