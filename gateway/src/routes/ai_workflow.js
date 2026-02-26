@@ -3,6 +3,15 @@ import { ENV } from '../env.js';
 import { requireTenantRole } from '../lib/auth/requireTenantRole.js';
 import { ADMIN_RATE_LIMIT } from '../util/rate-limit.js';
 import {
+  hasValidCronToken,
+  isLocalRequest,
+  parseAllowedTenantIds,
+} from '../util/cron-auth.js';
+import {
+  tryAcquireTenantOutboxLock,
+  releaseTenantOutboxLock,
+} from '../util/outbox-lock.js';
+import {
   AI_ROLE_KEYS,
   allowedPhasesForTier,
   decideNextRole,
@@ -405,6 +414,165 @@ async function ensureActiveCaseForContact({ tenantId, contactId, phase = "fundin
   return activeCase;
 }
 
+
+function getTenantIdFromRequest(req) {
+  return (
+    asText(req?.body?.tenant_id)
+    || asText(req?.query?.tenant_id)
+    || asText(req?.params?.tenant_id)
+    || asText(req?.tenant?.id)
+    || null
+  );
+}
+
+function olderThanMinutes(isoString, minutes) {
+  const at = Date.parse(String(isoString || ''));
+  if (!Number.isFinite(at)) return false;
+  const diffMs = Date.now() - at;
+  return diffMs >= (Math.max(0, Number(minutes || 0)) * 60 * 1000);
+}
+
+function fundingEventKey(row) {
+  return `${asText(row?.contact_id) || ''}::${asText(row?.lender_name) || ''}`;
+}
+
+function latestFundingEventsByKey(rows) {
+  const map = new Map();
+  for (const row of rows || []) {
+    const key = fundingEventKey(row);
+    if (!key || map.has(key)) continue;
+    map.set(key, row);
+  }
+  return Array.from(map.values());
+}
+
+async function hasOpenFundingFollowupTask({ tenantId, caseId, followupKey }) {
+  const taskRes = await supabaseAdmin
+    .from('workflow_tasks')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('case_id', caseId)
+    .neq('status', 'completed')
+    .contains('metadata', { followup_key: followupKey })
+    .limit(1);
+
+  if (taskRes.error) {
+    throw new Error(`workflow follow-up lookup failed: ${taskRes.error.message}`);
+  }
+
+  return (taskRes.data || []).length > 0;
+}
+
+async function runFundingComplianceBatch({ tenantId, limit = 50, staleMinutes = 30 }) {
+  const boundedLimit = Math.max(1, Math.min(500, Number(limit || 50)));
+  const boundedStaleMinutes = Math.max(1, Math.min(24 * 60, Number(staleMinutes || 30)));
+  const fetchLimit = Math.max(200, Math.min(2000, boundedLimit * 8));
+
+  const eventsRes = await supabaseAdmin
+    .from('funding_application_events')
+    .select('id,tenant_id,contact_id,lender_name,action_type,submitted_by,notes,created_at')
+    .eq('tenant_id', tenantId)
+    .in('action_type', ['client_submitted', 'advisor_reviewed', 'submitted_confirmation_captured'])
+    .order('created_at', { ascending: false })
+    .limit(fetchLimit);
+
+  if (eventsRes.error) {
+    throw new Error(`funding compliance scan failed: ${eventsRes.error.message}`);
+  }
+
+  const latestByKey = latestFundingEventsByKey(eventsRes.data || []);
+  const candidates = latestByKey
+    .filter((row) => {
+      const action = asText(row?.action_type);
+      if (action !== 'client_submitted' && action !== 'advisor_reviewed') return false;
+      return olderThanMinutes(row?.created_at, boundedStaleMinutes);
+    })
+    .slice(0, boundedLimit);
+
+  let created = 0;
+  let skipped = 0;
+  const items = [];
+
+  for (const row of candidates) {
+    const contactId = asText(row?.contact_id);
+    const lenderName = asText(row?.lender_name);
+    const actionType = asText(row?.action_type) || 'client_submitted';
+
+    if (!isUuid(contactId) || !lenderName) {
+      skipped += 1;
+      items.push({ contact_id: contactId || null, lender_name: lenderName || null, status: 'skipped', reason: 'invalid_event_shape' });
+      continue;
+    }
+
+    const profile = await getProfile({ tenantId, contactId });
+    if (!profile) {
+      skipped += 1;
+      items.push({ contact_id: contactId, lender_name: lenderName, status: 'skipped', reason: 'profile_missing' });
+      continue;
+    }
+
+    const tier = normalizeTier(profile.membership_tier);
+    if (tier !== 'tier3') {
+      skipped += 1;
+      items.push({ contact_id: contactId, lender_name: lenderName, status: 'skipped', reason: 'tier_not_allowed' });
+      continue;
+    }
+
+    const activeCase = await ensureActiveCaseForContact({
+      tenantId,
+      contactId,
+      phase: 'funding',
+      roleKey: AI_ROLE_KEYS.FUNDING_SPECIALIST,
+    });
+
+    const followupKey = `${contactId}::${lenderName}`;
+    const hasOpenTask = await hasOpenFundingFollowupTask({
+      tenantId,
+      caseId: activeCase.id,
+      followupKey,
+    });
+
+    if (hasOpenTask) {
+      skipped += 1;
+      items.push({ contact_id: contactId, lender_name: lenderName, status: 'skipped', reason: 'open_followup_exists' });
+      continue;
+    }
+
+    const tasks = await createTasks({
+      tenantId,
+      caseId: activeCase.id,
+      tasks: [{
+        role_key: AI_ROLE_KEYS.SUCCESS_MANAGER,
+        title: `Capture client-device confirmation for ${lenderName}`,
+        description: 'Follow up with client and capture verified submission evidence before assisted submission handling.',
+        priority: 'high',
+        metadata: {
+          followup_key: followupKey,
+          lender_name: lenderName,
+          last_action_type: actionType,
+          last_action_at: row?.created_at || null,
+        },
+      }],
+    });
+
+    created += 1;
+    items.push({
+      contact_id: contactId,
+      lender_name: lenderName,
+      status: 'created',
+      task_id: tasks[0]?.id || null,
+      last_action_type: actionType,
+    });
+  }
+
+  return {
+    scanned_events: (eventsRes.data || []).length,
+    candidate_pairs: candidates.length,
+    created_tasks: created,
+    skipped_pairs: skipped,
+    items,
+  };
+}
 export async function aiWorkflowRoutes(fastify) {
   const roleGuard = requireTenantRole({
     supabaseAdmin,
@@ -415,6 +583,56 @@ export async function aiWorkflowRoutes(fastify) {
     supabaseAdmin,
     allowedRoles: ['owner', 'admin'],
   });
+
+  const cronTenantAllowlist = parseAllowedTenantIds(ENV.ORACLE_TENANT_IDS);
+
+  async function requireFundingComplianceRunnerAuth(req, reply) {
+    const tenantId = getTenantIdFromRequest(req);
+    if (!tenantId) {
+      return reply.code(400).send({ ok: false, error: 'missing_tenant_id' });
+    }
+
+    if (!isUuid(tenantId)) {
+      return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    }
+
+    req.fundingComplianceTenantId = tenantId;
+
+    const hasCronHeader = Boolean(asText(req.headers['x-cron-token']));
+    if (hasCronHeader) {
+      if (!hasValidCronToken(req, ENV.ORACLE_CRON_TOKEN)) {
+        return reply.code(401).send({ ok: false, error: 'invalid_cron_token' });
+      }
+
+      if (!isLocalRequest(req)) {
+        return reply.code(403).send({ ok: false, error: 'cron_not_from_localhost' });
+      }
+
+      if (cronTenantAllowlist.size === 0) {
+        return reply.code(500).send({ ok: false, error: 'cron_tenant_allowlist_not_configured' });
+      }
+
+      if (!cronTenantAllowlist.has(tenantId)) {
+        return reply.code(403).send({ ok: false, error: 'tenant_not_allowed_for_cron' });
+      }
+
+      req.user = { id: 'system:cron', jwt: null };
+      req.tenant = { id: tenantId, role: 'system' };
+      req.auth_mode = 'cron';
+      return undefined;
+    }
+
+    await roleGuard(req, reply);
+    if (reply.sent) return undefined;
+
+    const scopedTenantId = asText(req.tenant?.id);
+    if (scopedTenantId && scopedTenantId !== tenantId) {
+      return reply.code(403).send({ ok: false, error: 'tenant_scope_mismatch' });
+    }
+
+    req.auth_mode = 'user';
+    return undefined;
+  }
 
   fastify.post('/admin/ai/intake/start', {
     preHandler: [requireApiKey, roleGuard],
@@ -1508,6 +1726,47 @@ export async function aiWorkflowRoutes(fastify) {
     } catch (error) {
       req.log.error({ err: error, tenant_id: tenantId, contact_id: contactId }, 'ai funding compliance summary failed');
       return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  });
+
+  fastify.post('/admin/ai/funding/compliance-run', {
+    preHandler: [requireApiKey, requireFundingComplianceRunnerAuth],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = req.fundingComplianceTenantId || getTenantIdFromRequest(req);
+    const limit = clampInt(req.body?.limit, 50, 1, 500);
+    const staleMinutes = clampInt(req.body?.stale_minutes, 30, 1, 24 * 60);
+
+    if (!isUuid(tenantId)) {
+      return reply.code(400).send({ ok: false, error: 'invalid_tenant_id' });
+    }
+
+    const lock = await tryAcquireTenantOutboxLock({ tenantId });
+    if (!lock.acquired) {
+      if (lock.reason === 'lock_not_acquired') {
+        return reply.send({ ok: true, skipped: true, reason: 'lock_not_acquired', tenant_id: tenantId });
+      }
+
+      return reply.code(500).send({ ok: false, error: 'lock_unavailable', reason: lock.reason || 'unknown' });
+    }
+
+    try {
+      const result = await runFundingComplianceBatch({ tenantId, limit, staleMinutes });
+      return reply.send({
+        ok: true,
+        tenant_id: tenantId,
+        auth_mode: req.auth_mode || 'unknown',
+        stale_minutes: staleMinutes,
+        ...result,
+      });
+    } catch (error) {
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    } finally {
+      try {
+        await releaseTenantOutboxLock({ tenantId });
+      } catch (releaseError) {
+        req.log.warn({ err: releaseError, tenant_id: tenantId }, 'ai funding compliance lock release failed');
+      }
     }
   });
 }

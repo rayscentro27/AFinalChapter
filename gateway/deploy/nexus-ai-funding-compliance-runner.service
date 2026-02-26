@@ -1,0 +1,15 @@
+[Unit]
+Description=Nexus AI Funding Compliance Runner (per-tenant, one-shot)
+After=network-online.target nexus-gateway.service
+Wants=nexus-gateway.service
+
+[Service]
+Type=oneshot
+User=opc
+WorkingDirectory=/home/opc/afinal_gateway
+EnvironmentFile=/home/opc/afinal_gateway/.env
+ExecStart=/usr/bin/bash /home/opc/afinal_gateway/scripts/ai_funding_compliance_cron.sh
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

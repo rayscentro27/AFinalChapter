@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Nexus AI Funding Compliance Runner every 5 minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00
+AccuracySec=1s
+RandomizedDelaySec=19s
+Persistent=true
+Unit=nexus-ai-funding-compliance-runner.service
+
+[Install]
+WantedBy=timers.target
