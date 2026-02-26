@@ -17,6 +17,7 @@ import { outboxRoutes } from './routes/outbox.js';
 import { adminContactRoutes } from './routes/admin_contacts.js';
 import { adminHardeningRoutes } from './routes/admin_hardening.js';
 import { adminMonitoringRoutes } from './routes/admin_monitoring.js';
+import { adminMonitoringV2Routes } from './routes/admin_monitoring_v2.js';
 import { attachmentsRoutes } from './routes/attachments.js';
 import { assignmentRoutes } from './routes/assignment.js';
 
@@ -123,6 +124,7 @@ await fastify.register(routingRoutes);
 await fastify.register(adminContactRoutes);
 await fastify.register(adminHardeningRoutes);
 await fastify.register(adminMonitoringRoutes);
+await fastify.register(adminMonitoringV2Routes);
 await fastify.register(attachmentsRoutes);
 await fastify.register(assignmentRoutes);
 

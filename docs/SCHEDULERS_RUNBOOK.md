@@ -1,4 +1,4 @@
-# Scheduler Runbook (Outbox + Assignment + Escalation + Alerts)
+# Scheduler Runbook (Outbox + Assignment + Escalation + Alerts + Monitoring)
 
 Quick keywords: see `docs/KEYWORD_RUNBOOKS.md`.
 
@@ -13,6 +13,7 @@ Edit `/home/opc/afinal_gateway/.env` (or your gateway env file):
 - Optional: `ASSIGNMENT_RUN_LIMIT=50`
 - Optional: `ESCALATION_RUN_LIMIT=50`
 - Optional: `ALERTS_NOTIFY=true`
+- Optional: `MONITORING_WINDOW_MINUTES=15`
 
 Restart API after env updates:
 
@@ -27,6 +28,7 @@ chmod +x /home/opc/afinal_gateway/scripts/outbox_cron.sh
 chmod +x /home/opc/afinal_gateway/scripts/assignment_cron.sh
 chmod +x /home/opc/afinal_gateway/scripts/escalation_cron.sh
 chmod +x /home/opc/afinal_gateway/scripts/alerts_cron.sh
+chmod +x /home/opc/afinal_gateway/scripts/monitoring_cron.sh
 ```
 
 ## 3) Install systemd units/timers
@@ -40,12 +42,15 @@ sudo cp /home/opc/afinal_gateway/deploy/nexus-escalation-runner.service /etc/sys
 sudo cp /home/opc/afinal_gateway/deploy/nexus-escalation-runner.timer /etc/systemd/system/
 sudo cp /home/opc/afinal_gateway/deploy/nexus-alerts-runner.service /etc/systemd/system/
 sudo cp /home/opc/afinal_gateway/deploy/nexus-alerts-runner.timer /etc/systemd/system/
+sudo cp /home/opc/afinal_gateway/deploy/nexus-monitoring-runner.service /etc/systemd/system/
+sudo cp /home/opc/afinal_gateway/deploy/nexus-monitoring-runner.timer /etc/systemd/system/
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now nexus-outbox-runner.timer
 sudo systemctl enable --now nexus-assignment-runner.timer
 sudo systemctl enable --now nexus-escalation-runner.timer
 sudo systemctl enable --now nexus-alerts-runner.timer
+sudo systemctl enable --now nexus-monitoring-runner.timer
 ```
 
 ## 4) Manual one-time tests
@@ -55,11 +60,13 @@ sudo systemctl start nexus-outbox-runner.service
 sudo systemctl start nexus-assignment-runner.service
 sudo systemctl start nexus-escalation-runner.service
 sudo systemctl start nexus-alerts-runner.service
+sudo systemctl start nexus-monitoring-runner.service
 
 sudo journalctl -u nexus-outbox-runner.service -n 50 --no-pager
 sudo journalctl -u nexus-assignment-runner.service -n 50 --no-pager
 sudo journalctl -u nexus-escalation-runner.service -n 50 --no-pager
 sudo journalctl -u nexus-alerts-runner.service -n 50 --no-pager
+sudo journalctl -u nexus-monitoring-runner.service -n 50 --no-pager
 ```
 
 Expected log lines are JSON and include:
@@ -76,11 +83,13 @@ sudo journalctl -u nexus-outbox-runner.timer -f
 sudo journalctl -u nexus-assignment-runner.timer -f
 sudo journalctl -u nexus-escalation-runner.timer -f
 sudo journalctl -u nexus-alerts-runner.timer -f
+sudo journalctl -u nexus-monitoring-runner.timer -f
 
 sudo journalctl -u nexus-outbox-runner.service -f
 sudo journalctl -u nexus-assignment-runner.service -f
 sudo journalctl -u nexus-escalation-runner.service -f
 sudo journalctl -u nexus-alerts-runner.service -f
+sudo journalctl -u nexus-monitoring-runner.service -f
 ```
 
 ## 6) Manual API smoke (without systemd)
@@ -109,6 +118,12 @@ curl -sS -X POST http://127.0.0.1:3000/admin/alerts/run \
   -H "x-api-key: $INTERNAL_API_KEY" \
   -H "x-cron-token: $ORACLE_CRON_TOKEN" \
   --data '{"tenant_id":"<tenant_uuid>","notify":true}'
+
+curl -sS -X POST http://127.0.0.1:3000/admin/monitoring/run \
+  -H "content-type: application/json" \
+  -H "x-api-key: $INTERNAL_API_KEY" \
+  -H "x-cron-token: $ORACLE_CRON_TOKEN" \
+  --data '{"tenant_id":"<tenant_uuid>","window_minutes":15}'
 ```
 
 ## 7) Security notes

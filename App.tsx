@@ -63,12 +63,14 @@ import MessagingBridge from './components/MessagingBridge';
 import AdminChannelMapper from './src/pages/AdminChannelMapper';
 import AdminContactsMerge from './src/pages/AdminContactsMerge';
 import AdminMergeJobs from './src/pages/AdminMergeJobs';
+import AdminMergeQueue from './src/pages/AdminMergeQueue';
 import AdminTeamMembers from './src/pages/AdminTeamMembers';
 import AdminOnCall from './src/pages/AdminOnCall';
 import AdminChannelPools from './src/pages/AdminChannelPools';
 import AdminDeadLetters from './src/pages/AdminDeadLetters';
 import AdminOutbox from './src/pages/AdminOutbox';
-import AdminHealth from './src/pages/AdminHealth';
+import AdminMonitoring from './src/pages/AdminMonitoring';
+import AdminChannelHealth from './src/pages/AdminChannelHealth';
 import SupervisorTriage from './components/SupervisorTriage';
 import AgenticHUD from './components/AgenticHUD';
 import NeuralStrategySandbox from './components/NeuralStrategySandbox';
@@ -87,7 +89,10 @@ import * as costService from './services/costService';
 const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/contacts/merge': ViewMode.CONTACT_MERGE,
   '/admin/merge-jobs': ViewMode.MERGE_JOBS,
+  '/admin/merge-queue': ViewMode.MERGE_QUEUE,
   '/admin/health': ViewMode.ADMIN_HEALTH,
+  '/admin/monitoring': ViewMode.ADMIN_HEALTH,
+  '/admin/channel-health': ViewMode.CHANNEL_HEALTH,
   '/admin/outbox': ViewMode.OUTBOX,
 };
 
@@ -280,11 +285,13 @@ export const App = () => {
                     case ViewMode.CHANNEL_MAPPER: return <AdminChannelMapper />;
                     case ViewMode.CONTACT_MERGE: return <AdminContactsMerge />;
                     case ViewMode.MERGE_JOBS: return <AdminMergeJobs />;
+                    case ViewMode.MERGE_QUEUE: return <AdminMergeQueue />;
                     case ViewMode.TEAM_MEMBERS: return <AdminTeamMembers />;
                     case ViewMode.ON_CALL: return <AdminOnCall />;
                     case ViewMode.CHANNEL_POOLS: return <AdminChannelPools />;
                     case ViewMode.DEAD_LETTERS: return <AdminDeadLetters />;
-                    case ViewMode.ADMIN_HEALTH: return <AdminHealth />;
+                    case ViewMode.CHANNEL_HEALTH: return <AdminChannelHealth />;
+                    case ViewMode.ADMIN_HEALTH: return <AdminMonitoring />;
                     case ViewMode.OUTBOX: return <AdminOutbox />;
                     default: return <Dashboard contacts={contacts} />;
                 }
