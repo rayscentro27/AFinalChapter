@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Nexus Alerts Runner every 2 minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/2:30
+AccuracySec=1s
+RandomizedDelaySec=9s
+Persistent=true
+Unit=nexus-alerts-runner.service
+
+[Install]
+WantedBy=timers.target

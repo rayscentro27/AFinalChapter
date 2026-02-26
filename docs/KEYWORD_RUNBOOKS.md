@@ -66,3 +66,15 @@ If infra IDs change, update these files only:
 - `scripts/oracle_quickconnect.sh`
 - `docs/playbooks/oracle_gateway_named_tunnel_runbook.md`
 - `docs/SCHEDULERS_RUNBOOK.md`
+
+## `oracle-alerts-check`
+Purpose: run alert evaluation immediately for one tenant.
+
+Command:
+```bash
+curl -sS -X POST http://127.0.0.1:3000/admin/alerts/run \
+  -H "content-type: application/json" \
+  -H "x-api-key: $INTERNAL_API_KEY" \
+  -H "x-cron-token: $ORACLE_CRON_TOKEN" \
+  --data '{"tenant_id":"<tenant_uuid>","notify":true}'
+```
