@@ -190,7 +190,7 @@ const LenderMarketplace: React.FC = () => {
                      <div className="mb-4">
                          <p className="text-xs font-bold text-red-500 mb-1 flex items-center gap-1"><AlertTriangle size={10} /> Restricted Industries</p>
                          <div className="flex flex-wrap gap-1">
-                             {lender.matchCriteria.restrictedIndustries.slice(0, 3).map((ind, i) => (
+                             {lender.matchCriteria.restrictedIndustries.slice(0, 3).map((ind: any, i: number) => (
                                  <span key={i} className="text-[10px] bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-100">{ind}</span>
                              ))}
                              {lender.matchCriteria.restrictedIndustries.length > 3 && <span className="text-[10px] text-slate-400">+{lender.matchCriteria.restrictedIndustries.length - 3} more</span>}
@@ -277,7 +277,7 @@ const LenderMarketplace: React.FC = () => {
                                   <div className="mt-3">
                                       <span className="text-emerald-700 font-bold text-xs">Restricted Industries Found:</span>
                                       <div className="flex flex-wrap gap-1 mt-1">
-                                          {extractedCriteria.matchCriteria.restrictedIndustries.map((ind, i) => (
+                                          {extractedCriteria.matchCriteria.restrictedIndustries.map((ind: any, i: number) => (
                                               <span key={i} className="text-[10px] bg-white border border-emerald-200 px-2 py-0.5 rounded text-emerald-800">{ind}</span>
                                           ))}
                                       </div>

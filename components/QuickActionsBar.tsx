@@ -81,22 +81,28 @@ export default function QuickActionsBar({ tenantId, conversation, onUpdated }: Q
         let profileRows: Array<{ user_id: string; display_name?: string | null; full_name?: string | null }> = [];
         let profileError: any = null;
 
-        ({ data: profileRows, error: profileError } = await supabase
+        const profileSelectAll = await supabase
           .from('profiles')
           .select('user_id, display_name, full_name')
-          .in('user_id', eligibleIds));
+          .in('user_id', eligibleIds);
+        profileRows = profileSelectAll.data ?? [];
+        profileError = profileSelectAll.error;
         if (profileError && String(profileError.message || '').toLowerCase().includes('display_name')) {
-          ({ data: profileRows, error: profileError } = await supabase
+          const profileSelectFullName = await supabase
             .from('profiles')
             .select('user_id, full_name')
-            .in('user_id', eligibleIds));
+            .in('user_id', eligibleIds);
+          profileRows = profileSelectFullName.data ?? [];
+          profileError = profileSelectFullName.error;
         }
 
         if (profileError && String(profileError.message || '').toLowerCase().includes('full_name')) {
-          ({ data: profileRows, error: profileError } = await supabase
+          const profileSelectDisplayName = await supabase
             .from('profiles')
             .select('user_id, display_name')
-            .in('user_id', eligibleIds));
+            .in('user_id', eligibleIds);
+          profileRows = profileSelectDisplayName.data ?? [];
+          profileError = profileSelectDisplayName.error;
         }
 
         const profileMap = new Map<string, string | null>();

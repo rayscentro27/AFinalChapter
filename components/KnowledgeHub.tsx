@@ -179,14 +179,14 @@ const KnowledgeHub: React.FC = () => {
         return;
       }
 
-      const failed = Array.isArray(data?.results) ? data.results.filter((r) => !r?.ok) : [];
+      const failed = Array.isArray(data?.results) ? data.results.filter((r: any) => !r?.ok) : [];
 
       setStatus(
         'Bulk ingest complete. success=' +
           String(data?.success ?? 0) +
           ' failed=' +
           String(data?.failed ?? 0) +
-          (failed.length ? '\nFirst failures: ' + failed.slice(0, 5).map((f) => f.url).join(' | ') : '')
+          (failed.length ? '\nFirst failures: ' + failed.slice(0, 5).map((f: any) => f.url).join(' | ') : '')
       );
 
       setRefreshTick((x) => x + 1);

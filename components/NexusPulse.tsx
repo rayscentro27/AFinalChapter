@@ -110,7 +110,7 @@ const NexusPulse: React.FC<NexusPulseProps> = ({ contact, onOpenVoice, onUpdateC
                 <ResponsiveContainer width="100%" height="100%">
                     <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                         <PolarGrid stroke="#e2e8f0" />
-                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 900, textTransform: 'uppercase' }} />
+                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 900 }} />
                         <PolarRadiusAxis angle={30} domain={[0, 100]} hide />
                         <Radar
                             name="Entity Magnitude"

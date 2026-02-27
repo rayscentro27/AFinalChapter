@@ -46,10 +46,10 @@ const generateContentViaNetlify = async (args: any): Promise<GeminiFnResponse | 
   }
 };
 
-const generateContentShim = async (args: any) => {
+const generateContentShim = async (args: any): Promise<GeminiFnResponse> => {
   // Prefer server-side function (keeps API keys off the client + enables Supabase cache).
   const viaFn = await generateContentViaNetlify(args);
-  if (viaFn) return { text: viaFn.text };
+  if (viaFn) return { text: viaFn.text, cached: viaFn.cached, candidates: viaFn.candidates };
 
   const expectJson = args?.config?.responseMimeType === 'application/json';
   const semantic = typeof args?.contents === 'string' && !args?.config?.tools;
@@ -59,7 +59,7 @@ const generateContentShim = async (args: any) => {
     router: { enabled: true, cascade: true },
     expect: { json: expectJson, minChars: expectJson ? 2 : 1 },
   });
-  return { text };
+  return { text, candidates: undefined };
 };
 
 const MASTER_BLUEPRINT = `

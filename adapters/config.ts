@@ -6,7 +6,11 @@ const getEnvVar = (key: string, fallback: string): string => {
     // Check for Vite specific env vars first
     if (typeof import.meta !== 'undefined' && import.meta.env) {
       const viteKey = key.startsWith('VITE_') ? key : `VITE_${key}`;
-      return import.meta.env[viteKey] || import.meta.env[key] || fallback;
+      const env = import.meta.env as Record<string, string | boolean | undefined>;
+      const rawValue = env[viteKey] ?? env[key];
+      if (typeof rawValue === 'string') return rawValue;
+      if (typeof rawValue === 'boolean') return String(rawValue);
+      return fallback;
     }
     
     // Fallback to process.env (handled by vite.config define)

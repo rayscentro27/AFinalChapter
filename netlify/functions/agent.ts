@@ -212,7 +212,7 @@ async function cacheStore(
 }
 
 async function persistDrift(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   clientId: string,
   severity: Exclude<DriftSeverity, 'none'>,
   category: string,
@@ -452,6 +452,7 @@ export const handler: Handler = async (event) => {
       const outputs = await Promise.all(
         targetEmployees.map(async (emp) => {
           const agent = await loadAgent(supabase, emp);
+          if (!agent) throw new Error(`Agent not found: ${emp}`);
           const out = await callOpenAIWithSchema<AgentJson>({
             apiKey: openaiApiKey,
             model,
@@ -501,6 +502,7 @@ export const handler: Handler = async (event) => {
     } else {
       const employee = targetEmployees[0];
       const agent = await loadAgent(supabase, employee);
+      if (!agent) throw new Error(`Agent not found: ${employee}`);
 
       const out = await callOpenAIWithSchema<AgentJson>({
         apiKey: openaiApiKey,
@@ -701,7 +703,7 @@ function mergeContext(original: unknown, injected: Record<string, unknown>) {
 }
 
 async function loadAgent(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   name: string,
   opts: { allowMissing?: boolean } = {}
 ): Promise<{ id: string; name: string; system_prompt: string; version: number } | null> {
@@ -720,7 +722,7 @@ async function loadAgent(
 }
 
 async function loadKnowledgeContext(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   employeeName: string,
   userMessage: string,
   context?: unknown

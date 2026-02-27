@@ -9,7 +9,7 @@ const BodySchema = z.object({
 });
 
 
-const ensureHistory = async (agentId: string, promptVersion: number, systemPrompt: string) => {
+const ensureHistory = async (supabase: any, agentId: string, promptVersion: number, systemPrompt: string) => {
   try {
     await supabase.from('agent_prompt_history').insert({
       agent_id: agentId,
@@ -55,7 +55,7 @@ export const handler: Handler = async (event) => {
 
     if (agentErr || !agent) return json(404, { error: "Agent not found" });
 
-    await ensureHistory(agent.id, agent.version ?? 1, String(agent.system_prompt || ''));
+    await ensureHistory(supabase, agent.id, agent.version ?? 1, String(agent.system_prompt || ''));
 
     const patchHash = sha256(`${patch.agent_name}||${patch.patch_title || ''}||${patch.patch_text || ''}`);
 
@@ -88,7 +88,7 @@ export const handler: Handler = async (event) => {
     if (upErr) throw upErr;
 
     const newVersion = (agent.version ?? 1) + 1;
-    await ensureHistory(agent.id, newVersion, newPrompt);
+    await ensureHistory(supabase, agent.id, newVersion, newPrompt);
 
     // Best-effort bookkeeping
     try {

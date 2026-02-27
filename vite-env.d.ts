@@ -12,6 +12,7 @@ interface ImportMetaEnv {
   readonly VITE_SHEETS_API_BASE_URL: string
   readonly VITE_SHEETS_ADMIN_TOKEN: string
   readonly DEV: boolean
+  readonly [key: string]: string | boolean | undefined
 }
 
 interface ImportMeta {

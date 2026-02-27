@@ -139,7 +139,7 @@ export const handler: Handler = async (event) => {
   }
 };
 
-async function safeInsertImportRun(supabase: ReturnType<typeof createClient>, body: any) {
+async function safeInsertImportRun(supabase: any, body: any) {
   try {
     await supabase.from("import_runs").insert({
       doc_id: body.doc_id ?? null,
@@ -152,7 +152,7 @@ async function safeInsertImportRun(supabase: ReturnType<typeof createClient>, bo
 }
 
 
-async function ensureHistory(supabase: ReturnType<typeof createClient>, agentId: string, promptVersion: number, systemPrompt: string) {
+async function ensureHistory(supabase: any, agentId: string, promptVersion: number, systemPrompt: string) {
   try {
     await supabase.from('agent_prompt_history').insert({
       agent_id: agentId,
@@ -164,7 +164,7 @@ async function ensureHistory(supabase: ReturnType<typeof createClient>, agentId:
   }
 }
 
-async function applyPatchesToAgents(supabase: ReturnType<typeof createClient>, patches: PatchIn[]) {
+async function applyPatchesToAgents(supabase: any, patches: PatchIn[]) {
   const applied: Array<{ agent_name: string; patch_title: string; new_version: number }> = [];
   const skipped: Array<{ agent_name: string; patch_title: string; reason: string }> = [];
   const failed: Array<{ agent_name: string; patch_title: string; error: string }> = [];

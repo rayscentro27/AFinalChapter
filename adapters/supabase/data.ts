@@ -78,6 +78,7 @@ export const supabaseDataAdapter: DataAdapter = {
         email: contact.email || '',
         phone: '',
         status: 'Lead',
+        lastContact: new Date().toISOString(),
         value: 0,
         source: 'Manual Entry',
         notes: '',

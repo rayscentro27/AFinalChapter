@@ -225,7 +225,7 @@ async function getAuthedUser(supabaseUrl: string, apikey: string, token: string)
   return { id: String(data.id), email: String(data.email || "") };
 }
 
-async function isAdminOrSupervisor(supabase: ReturnType<typeof createClient>, userId: string) {
+async function isAdminOrSupervisor(supabase: any, userId: string) {
   try {
     const { data, error } = await supabase
       .from("tenant_memberships")

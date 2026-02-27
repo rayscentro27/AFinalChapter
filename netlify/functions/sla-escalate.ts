@@ -275,7 +275,7 @@ async function getBreachCandidates(
   admin: ReturnType<typeof getAdminSupabaseClient>,
   tenantId: string
 ): Promise<ConversationCandidate[]> {
-  let withProvider = await admin
+  let withProvider: any = await admin
     .from('conversations')
     .select(
       'id, tenant_id, status, priority, tags, last_message_at, updated_at, assignee_type, assignee_user_id, assignee_ai_key, channel_account_id, provider'
