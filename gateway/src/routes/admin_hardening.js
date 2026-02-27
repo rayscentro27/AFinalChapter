@@ -1,6 +1,7 @@
 import { ENV } from '../env.js';
 import { supabaseAdmin } from '../supabase.js';
 import { requireTenantRole } from '../lib/auth/requireTenantRole.js';
+import { requireTenantPermission } from '../lib/auth/requireTenantPermission.js';
 import { ADMIN_RATE_LIMIT } from '../util/rate-limit.js';
 import { redactSecrets, redactText } from '../util/redact.js';
 
@@ -175,10 +176,9 @@ export async function adminHardeningRoutes(fastify) {
     supabaseAdmin,
     allowedRoles: ['owner', 'admin', 'agent'],
   });
-
-  const ownerAdminRoleGuard = requireTenantRole({
+  const channelsManageGuard = requireTenantPermission({
     supabaseAdmin,
-    allowedRoles: ['owner', 'admin'],
+    permission: 'channels.manage',
   });
 
   fastify.get('/admin/health', {
@@ -298,7 +298,7 @@ export async function adminHardeningRoutes(fastify) {
   });
 
   fastify.post('/admin/channel-health/reset', {
-    preHandler: [requireApiKey, ownerAdminRoleGuard],
+    preHandler: [requireApiKey, channelsManageGuard],
     config: { rateLimit: ADMIN_RATE_LIMIT },
   }, async (req, reply) => {
     const tenantId = asText(req.body?.tenant_id || req.tenant?.id);

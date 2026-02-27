@@ -63,8 +63,9 @@ export const handler: Handler = async (event) => {
           from_contact_id: merge.from_contact_id,
           into_contact_id: merge.into_contact_id,
           reason: merge.reason,
-          merged_by: authData.user.id,
-        },
+          },
+        forwardAuth: true,
+        event,
       });
 
       if (!proxied.ok) {
@@ -137,7 +138,7 @@ async function resolveOwnerTenantForUser(supabase: any, userId: string, requeste
     throw err;
   }
 
-  return ownerTenantIds[0];
+  return String(ownerTenantIds[0]);
 }
 
 async function buildStrongMergePlan(supabase: any, tenantId: string, maxMerges: number): Promise<MergePlan[]> {

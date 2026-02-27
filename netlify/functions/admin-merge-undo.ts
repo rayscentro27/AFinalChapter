@@ -1,115 +1,48 @@
 import type { Handler } from '@netlify/functions';
 import { z } from 'zod';
-import { getUserSupabaseClient } from './_shared/supabase_user_client';
 import { proxyToOracle } from './_shared/oracle_proxy';
 
 const BodySchema = z.object({
-  tenant_id: z.string().uuid().optional(),
+  tenant_id: z.string().uuid(),
   job_id: z.union([z.number().int().positive(), z.string().regex(/^\d+$/)]),
-  reason: z.string().max(500).optional(),
+  reason: z.string().max(500).optional().nullable(),
 });
 
-const ALLOWED_ROLES = new Set(['owner', 'admin', 'agent']);
+function getAuthHeader(event: { headers?: Record<string, string | undefined> }): string {
+  const hit = Object.entries(event.headers || {}).find(([key]) => key.toLowerCase() === 'authorization')?.[1];
+  return String(hit || '').trim();
+}
 
 export const handler: Handler = async (event) => {
   try {
-    if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
+    if (event.httpMethod !== 'POST') return json(405, { ok: false, error: 'method_not_allowed' });
 
-    const supabase = getUserSupabaseClient(event);
-    const { data: authData, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !authData?.user?.id) return json(401, { error: 'Unauthorized' });
-
-    const body = BodySchema.parse(JSON.parse(event.body || '{}'));
-
-    const tenantId = await resolveUndoTenantForUser(
-      supabase as any,
-      authData.user.id,
-      body.tenant_id
-    );
-
-    const jobId = typeof body.job_id === 'string' ? Number(body.job_id) : body.job_id;
-    if (!Number.isInteger(jobId) || jobId <= 0) {
-      return json(400, { error: 'job_id must be a positive integer' });
+    const auth = getAuthHeader(event);
+    if (!auth.toLowerCase().startsWith('bearer ')) {
+      return json(401, { ok: false, error: 'missing_authorization' });
     }
 
-    const proxyResponse = await proxyToOracle({
+    const body = BodySchema.parse(JSON.parse(event.body || '{}'));
+    const job_id = typeof body.job_id === 'string' ? Number(body.job_id) : body.job_id;
+
+    const proxied = await proxyToOracle({
       path: '/admin/contacts/merge/undo',
       method: 'POST',
       body: {
-        tenant_id: tenantId,
-        job_id: jobId,
-        requester_user_id: authData.user.id,
+        tenant_id: body.tenant_id,
+        job_id,
         reason: body.reason || null,
       },
+      forwardAuth: true,
+      event,
     });
 
-    const responseJson = proxyResponse.json || {};
-    if (!proxyResponse.ok) {
-      return json(proxyResponse.status, {
-        ok: false,
-        error: String(responseJson?.error || `Oracle contact merge undo failed (${proxyResponse.status})`),
-        details: responseJson?.details || undefined,
-      });
-    }
-
-    return json(200, {
-      ok: true,
-      tenant_id: tenantId,
-      result: responseJson?.result || null,
-    });
-  } catch (e: any) {
-    const statusCode = Number(e?.statusCode) || 400;
-    return json(statusCode, { error: e?.message || 'Bad Request' });
+    return json(proxied.status, proxied.json || {});
+  } catch (error: any) {
+    const statusCode = Number(error?.statusCode) || 400;
+    return json(statusCode, { ok: false, error: String(error?.message || 'bad_request') });
   }
 };
-
-async function resolveUndoTenantForUser(supabase: any, userId: string, requestedTenantId?: string): Promise<string> {
-  const { data, error } = await supabase
-    .from('tenant_memberships')
-    .select('tenant_id, role, created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true });
-
-  if (error) throw new Error(`Failed to resolve tenant membership: ${error.message}`);
-
-  const memberships = (data || [])
-    .map((row: any) => ({
-      tenant_id: String(row?.tenant_id || ''),
-      role: String(row?.role || '').toLowerCase(),
-    }))
-    .filter((row: any) => row.tenant_id);
-
-  const allowedTenantIds = Array.from(
-    new Set(
-      memberships
-        .filter((row: any) => ALLOWED_ROLES.has(row.role))
-        .map((row: any) => row.tenant_id)
-    )
-  );
-
-  if (!allowedTenantIds.length) {
-    const err: any = new Error('Forbidden: owner/admin/agent role required');
-    err.statusCode = 403;
-    throw err;
-  }
-
-  if (requestedTenantId) {
-    if (!allowedTenantIds.includes(requestedTenantId)) {
-      const err: any = new Error('Requested tenant_id is not accessible with owner/admin/agent role');
-      err.statusCode = 403;
-      throw err;
-    }
-    return requestedTenantId;
-  }
-
-  if (allowedTenantIds.length > 1) {
-    const err: any = new Error('Multiple accessible tenants found; provide tenant_id');
-    err.statusCode = 400;
-    throw err;
-  }
-
-  return String(allowedTenantIds[0]);
-}
 
 function json(statusCode: number, body: any) {
   return {

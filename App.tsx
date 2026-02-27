@@ -64,13 +64,20 @@ import AdminChannelMapper from './src/pages/AdminChannelMapper';
 import AdminContactsMerge from './src/pages/AdminContactsMerge';
 import AdminMergeJobs from './src/pages/AdminMergeJobs';
 import AdminMergeQueue from './src/pages/AdminMergeQueue';
+import AdminSuggestions from './src/pages/AdminSuggestions';
 import AdminTeamMembers from './src/pages/AdminTeamMembers';
 import AdminOnCall from './src/pages/AdminOnCall';
 import AdminChannelPools from './src/pages/AdminChannelPools';
 import AdminDeadLetters from './src/pages/AdminDeadLetters';
 import AdminOutbox from './src/pages/AdminOutbox';
 import AdminMonitoring from './src/pages/AdminMonitoring';
+import AdminSRE from './src/pages/AdminSRE';
 import AdminChannelHealth from './src/pages/AdminChannelHealth';
+import AdminPublicApi from './src/pages/AdminPublicApi';
+import AdminRoles from './src/pages/AdminRoles';
+import AdminMembers from './src/pages/AdminMembers';
+import AdminPolicies from './src/pages/AdminPolicies';
+import InviteAccept from './src/pages/InviteAccept';
 import SupervisorTriage from './components/SupervisorTriage';
 import AgenticHUD from './components/AgenticHUD';
 import NeuralStrategySandbox from './components/NeuralStrategySandbox';
@@ -90,10 +97,17 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/contacts/merge': ViewMode.CONTACT_MERGE,
   '/admin/merge-jobs': ViewMode.MERGE_JOBS,
   '/admin/merge-queue': ViewMode.MERGE_QUEUE,
+  '/admin/suggestions': ViewMode.SUGGESTIONS,
   '/admin/health': ViewMode.ADMIN_HEALTH,
   '/admin/monitoring': ViewMode.ADMIN_HEALTH,
+  '/admin/sre': ViewMode.SRE_DASHBOARD,
   '/admin/channel-health': ViewMode.CHANNEL_HEALTH,
   '/admin/outbox': ViewMode.OUTBOX,
+  '/admin/public-api': ViewMode.PUBLIC_API,
+  '/admin/roles': ViewMode.ADMIN_ROLES,
+  '/admin/members': ViewMode.ADMIN_MEMBERS,
+  '/admin/policies': ViewMode.ADMIN_POLICIES,
+  '/invite-accept': ViewMode.INVITE_ACCEPT,
 };
 
 function normalizePathname(pathname: string): string {
@@ -286,13 +300,20 @@ export const App = () => {
                     case ViewMode.CONTACT_MERGE: return <AdminContactsMerge />;
                     case ViewMode.MERGE_JOBS: return <AdminMergeJobs />;
                     case ViewMode.MERGE_QUEUE: return <AdminMergeQueue />;
+                    case ViewMode.SUGGESTIONS: return <AdminSuggestions />;
                     case ViewMode.TEAM_MEMBERS: return <AdminTeamMembers />;
                     case ViewMode.ON_CALL: return <AdminOnCall />;
                     case ViewMode.CHANNEL_POOLS: return <AdminChannelPools />;
                     case ViewMode.DEAD_LETTERS: return <AdminDeadLetters />;
                     case ViewMode.CHANNEL_HEALTH: return <AdminChannelHealth />;
                     case ViewMode.ADMIN_HEALTH: return <AdminMonitoring />;
+                    case ViewMode.SRE_DASHBOARD: return <AdminSRE />;
                     case ViewMode.OUTBOX: return <AdminOutbox />;
+                    case ViewMode.PUBLIC_API: return <AdminPublicApi />;
+                    case ViewMode.ADMIN_ROLES: return <AdminRoles />;
+                    case ViewMode.ADMIN_MEMBERS: return <AdminMembers />;
+                    case ViewMode.ADMIN_POLICIES: return <AdminPolicies />;
+                    case ViewMode.INVITE_ACCEPT: return <InviteAccept />;
                     default: return <Dashboard contacts={contacts} />;
                 }
             })()}

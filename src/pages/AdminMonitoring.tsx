@@ -10,6 +10,7 @@ type Tenant = {
 type MonitoringOverview = {
   ok: boolean;
   now?: string;
+  safe_mode?: boolean;
   outbox?: {
     queued: number;
     sending: number;
@@ -229,6 +230,12 @@ export default function AdminMonitoring() {
           </button>
         </div>
       </div>
+
+      {overview?.safe_mode ? (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-2xl p-4 text-sm font-medium">
+          SAFE_MODE is enabled. Outbound sending is paused.
+        </div>
+      ) : null}
 
       {error ? (
         <div className="bg-red-500/10 border border-red-500/30 text-red-200 rounded-2xl p-4 text-sm font-medium">{error}</div>

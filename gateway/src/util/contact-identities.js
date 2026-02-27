@@ -54,7 +54,7 @@ export function normalizeIdentity({ provider, identity_type, identity_value }) {
   };
 }
 
-async function resolveCanonicalContactId({ supabaseAdmin, tenant_id, contact_id }) {
+export async function resolveCanonicalContactId({ supabaseAdmin, tenant_id, contact_id }) {
   let current = text(contact_id);
   if (!tenant_id || !current) return null;
 

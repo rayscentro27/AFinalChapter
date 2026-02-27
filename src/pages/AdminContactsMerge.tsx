@@ -52,6 +52,7 @@ type MergePreviewIdentity = {
 type MergePreviewData = {
   ok: true;
   conflicts: { block: boolean; reasons: string[] };
+  warnings: string[];
   summary: {
     from: { identity_count: number; conversation_count: number };
     into: { identity_count: number; conversation_count: number };
@@ -77,6 +78,7 @@ function contactLabel(row: ContactRow): string {
 export default function AdminContactsMerge() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [undoBusy, setUndoBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -86,6 +88,7 @@ export default function AdminContactsMerge() {
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [identities, setIdentities] = useState<IdentityRow[]>([]);
   const [tenantRole, setTenantRole] = useState('');
+
   const [autoDryRunBusy, setAutoDryRunBusy] = useState(false);
   const [autoExecuteBusy, setAutoExecuteBusy] = useState(false);
   const [autoPlan, setAutoPlan] = useState<Array<{
@@ -111,7 +114,11 @@ export default function AdminContactsMerge() {
       map.set(row.contact_id, list);
     }
     for (const [, rows] of map) {
-      rows.sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || Number(b.verified) - Number(a.verified) || b.confidence - a.confidence);
+      rows.sort(
+        (a, b) => Number(b.is_primary) - Number(a.is_primary)
+          || Number(b.verified) - Number(a.verified)
+          || b.confidence - a.confidence
+      );
     }
     return map;
   }, [identities]);
@@ -119,6 +126,7 @@ export default function AdminContactsMerge() {
   const filteredContacts = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return contacts;
+
     return contacts.filter((row) => {
       const hay = [
         row.display_name,
@@ -130,30 +138,20 @@ export default function AdminContactsMerge() {
       ]
         .map((v) => String(v || '').toLowerCase())
         .join(' ');
+
       return hay.includes(q);
     });
   }, [contacts, search]);
 
   const sourceContact = useMemo(() => contacts.find((c) => c.id === sourceId) || null, [contacts, sourceId]);
   const targetContact = useMemo(() => contacts.find((c) => c.id === targetId) || null, [contacts, targetId]);
-  const isOwner = tenantRole === 'owner';
+
   const previewBlocks = preview?.ok === true && Boolean(preview.conflicts?.block);
   const previewReasons = preview?.ok === true ? (preview.conflicts?.reasons || []) : [];
+  const previewWarnings = preview?.ok === true ? (preview.warnings || []) : [];
+
   const canMerge = Boolean(tenantId && sourceId && targetId && sourceId !== targetId && !previewBlocks && !previewBusy);
-
-  function suggestionStrengthPillClass(strength: MergeSuggestion['strength']): string {
-    if (strength === 'strong') {
-      return 'inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-200';
-    }
-    return 'inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-200';
-  }
-
-  function previewButtonByStrengthClass(strength: MergeSuggestion['strength']): string {
-    if (strength === 'strong') {
-      return 'px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-black uppercase tracking-widest text-emerald-100';
-    }
-    return 'px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-xs font-black uppercase tracking-widest text-amber-100';
-  }
+  const isOwner = tenantRole === 'owner';
 
   const suggestions = useMemo<MergeSuggestion[]>(() => {
     const byIdentity = new Map<string, {
@@ -206,31 +204,6 @@ export default function AdminContactsMerge() {
     return out.slice(0, 25);
   }, [identities]);
 
-  function pickSuggestionPreview(suggestion: MergeSuggestion) {
-    const ids = suggestion.contact_ids.filter((id) => contacts.some((c) => c.id === id));
-    if (ids.length < 2) return;
-
-    let nextSource = sourceId;
-    let nextTarget = targetId;
-
-    if (!nextSource || !ids.includes(nextSource)) {
-      nextSource = ids[0];
-    }
-
-    if (!nextTarget || nextTarget === nextSource || !ids.includes(nextTarget)) {
-      nextTarget = ids.find((id) => id !== nextSource) || ids[1];
-    }
-
-    if (nextSource === nextTarget) {
-      nextTarget = ids.find((id) => id !== nextSource) || '';
-    }
-
-    setSourceId(nextSource || '');
-    setTargetId(nextTarget || '');
-    setReason(`Suggested merge: same ${suggestion.identity_type} (${suggestion.identity_value})`);
-    setSuccess('');
-  }
-
   useEffect(() => {
     let mounted = true;
 
@@ -275,6 +248,25 @@ export default function AdminContactsMerge() {
   useEffect(() => {
     void loadMergePreview(sourceId, targetId, tenantId);
   }, [sourceId, targetId, tenantId]);
+
+  function pickSuggestionPreview(suggestion: MergeSuggestion) {
+    const ids = suggestion.contact_ids.filter((id) => contacts.some((c) => c.id === id));
+    if (ids.length < 2) return;
+
+    let nextSource = sourceId;
+    let nextTarget = targetId;
+
+    if (!nextSource || !ids.includes(nextSource)) nextSource = ids[0];
+    if (!nextTarget || nextTarget === nextSource || !ids.includes(nextTarget)) {
+      nextTarget = ids.find((id) => id !== nextSource) || ids[1];
+    }
+    if (nextSource === nextTarget) nextTarget = ids.find((id) => id !== nextSource) || '';
+
+    setSourceId(nextSource || '');
+    setTargetId(nextTarget || '');
+    setReason(`Suggested merge: same ${suggestion.identity_type} (${suggestion.identity_value})`);
+    setSuccess('');
+  }
 
   async function loadTenantRole(currentTenantId = tenantId) {
     const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -430,7 +422,8 @@ export default function AdminContactsMerge() {
         throw new Error(String(json?.error || `Merge failed (${res.status})`));
       }
 
-      setSuccess('Contacts merged successfully.');
+      const jobId = Number(json?.job_id || 0);
+      setSuccess(Number.isInteger(jobId) && jobId > 0 ? `Contacts merged successfully. Job #${jobId}.` : 'Contacts merged successfully.');
       setPreview(null);
       await refresh();
     } catch (e: any) {
@@ -440,8 +433,67 @@ export default function AdminContactsMerge() {
     }
   }
 
+  async function undoLastMerge() {
+    if (!tenantId || !sourceId || !targetId) return;
+
+    setUndoBusy(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) throw sessionErr;
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error('Missing auth session token');
+
+      const jobLookup = await supabase
+        .from('contact_merge_jobs')
+        .select('id,created_at,undone_at')
+        .eq('tenant_id', tenantId)
+        .eq('from_contact_id', sourceId)
+        .eq('into_contact_id', targetId)
+        .is('undone_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (jobLookup.error) throw new Error(jobLookup.error.message);
+      const jobId = Number(jobLookup.data?.id);
+      if (!Number.isInteger(jobId) || jobId <= 0) {
+        throw new Error('No active merge job found for this source/target pair.');
+      }
+
+      const res = await fetch('/.netlify/functions/admin-merge-undo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          job_id: jobId,
+          reason: 'Undo from Contact Merge page',
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.ok === false) {
+        throw new Error(String(json?.error || `Undo failed (${res.status})`));
+      }
+
+      setSuccess(`Merge job #${jobId} undone.`);
+      await refresh();
+      await loadMergePreview(sourceId, targetId, tenantId);
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setUndoBusy(false);
+    }
+  }
+
   async function runAutoMergeDryRun() {
     if (!tenantId) return;
+
     setAutoDryRunBusy(true);
     setError('');
     setSuccess('');
@@ -482,6 +534,7 @@ export default function AdminContactsMerge() {
 
   async function executeAutoMerge() {
     if (!tenantId || !autoPlan.length) return;
+
     setAutoExecuteBusy(true);
     setError('');
     setSuccess('');
@@ -621,6 +674,15 @@ export default function AdminContactsMerge() {
           </button>
 
           <button
+            onClick={undoLastMerge}
+            disabled={undoBusy || !tenantId || !sourceId || !targetId}
+            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-black uppercase tracking-widest"
+            title="Undo latest active merge for this source/target pair"
+          >
+            {undoBusy ? 'Undoing...' : 'Undo Last Merge'}
+          </button>
+
+          <button
             onClick={() => refresh()}
             className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-black uppercase tracking-widest"
           >
@@ -628,22 +690,20 @@ export default function AdminContactsMerge() {
           </button>
 
           {previewBlocks ? (
-            <div className="text-xs text-red-300">
-              Blocked: {previewReasons.join(', ')}
-            </div>
+            <div className="text-xs text-red-300">Blocked: {previewReasons.join(', ')}</div>
           ) : null}
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs font-black uppercase tracking-widest text-slate-300">Merge Preview</div>
-            <div className="text-xs text-slate-500">{previewBusy ? 'Loading…' : ''}</div>
+            <div className="text-xs text-slate-500">{previewBusy ? 'Loading...' : ''}</div>
           </div>
 
           {!sourceId || !targetId || sourceId === targetId ? (
             <div className="text-sm text-slate-400">Select source + target to preview merge.</div>
           ) : !preview ? (
-            <div className="text-sm text-slate-400">Waiting for preview…</div>
+            <div className="text-sm text-slate-400">Waiting for preview...</div>
           ) : preview.ok === false ? (
             <div className="text-sm text-red-300">{preview.error || 'Preview failed'}</div>
           ) : (
@@ -662,6 +722,17 @@ export default function AdminContactsMerge() {
                   No blocking conflicts detected.
                 </div>
               )}
+
+              {previewWarnings.length > 0 ? (
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+                  <div className="text-sm font-black uppercase tracking-wider text-amber-200">Warnings</div>
+                  <ul className="mt-2 list-disc pl-5 text-sm text-amber-100">
+                    {previewWarnings.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               {preview.summary ? (
                 <div className="space-y-1 text-sm text-slate-300">
@@ -724,9 +795,7 @@ export default function AdminContactsMerge() {
         </div>
 
         {suggestions.length === 0 ? (
-          <div className="px-6 py-5 text-sm text-slate-400">
-            No phone/email overlap detected across unmerged contacts.
-          </div>
+          <div className="px-6 py-5 text-sm text-slate-400">No phone/email overlap detected across unmerged contacts.</div>
         ) : (
           <div className="divide-y divide-white/5">
             {suggestions.map((s) => (
@@ -737,7 +806,10 @@ export default function AdminContactsMerge() {
                   </div>
                   <div className="text-xs text-slate-400 flex flex-wrap items-center gap-2">
                     <span>{s.contact_ids.length} contacts</span>
-                    <span className={suggestionStrengthPillClass(s.strength)}>
+                    <span className={s.strength === 'strong'
+                      ? 'inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-200'
+                      : 'inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-200'}
+                    >
                       {s.strength === 'strong' ? 'Strong' : 'Medium'}
                     </span>
                   </div>
@@ -752,12 +824,9 @@ export default function AdminContactsMerge() {
 
                   <button
                     onClick={() => pickSuggestionPreview(s)}
-                    className={previewButtonByStrengthClass(s.strength)}
-                    title={
-                      s.strength === 'strong'
-                        ? 'Strong suggestion (verified identity match)'
-                        : 'Medium suggestion (unverified match)'
-                    }
+                    className={s.strength === 'strong'
+                      ? 'px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-black uppercase tracking-widest text-emerald-100'
+                      : 'px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-xs font-black uppercase tracking-widest text-amber-100'}
                   >
                     Preview
                   </button>
@@ -788,16 +857,8 @@ export default function AdminContactsMerge() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ContactPanel
-          title="Source"
-          contact={sourceContact}
-          identities={identityMap.get(sourceId) || []}
-        />
-        <ContactPanel
-          title="Target"
-          contact={targetContact}
-          identities={identityMap.get(targetId) || []}
-        />
+        <ContactPanel title="Source" contact={sourceContact} identities={identityMap.get(sourceId) || []} />
+        <ContactPanel title="Target" contact={targetContact} identities={identityMap.get(targetId) || []} />
       </div>
     </div>
   );
@@ -824,12 +885,12 @@ function MergePreviewIdentityList({
               key={`${row.provider}:${row.identity_type}:${row.identity_value}:${row.channel_account_id || 'null'}:${index}`}
               className="rounded-xl border border-white/10 bg-black/30 px-3 py-2"
             >
-              <div className="font-mono text-[11px] text-slate-200">
-                {row.provider}:{row.identity_type}
-              </div>
+              <div className="font-mono text-[11px] text-slate-200">{row.provider}:{row.identity_type}</div>
               <div className="font-mono text-[11px] text-slate-300 break-all">{row.identity_value}</div>
               <div className="mt-1 text-[10px] text-slate-500">
-                confidence {Number.isFinite(Number(row.confidence)) ? Number(row.confidence) : 0} | verified {row.verified ? 'true' : 'false'} | primary {row.is_primary ? 'true' : 'false'}
+                confidence {Number.isFinite(Number(row.confidence)) ? Number(row.confidence) : 0}
+                {' | '}verified {row.verified ? 'true' : 'false'}
+                {' | '}primary {row.is_primary ? 'true' : 'false'}
               </div>
             </div>
           ))}
@@ -871,7 +932,9 @@ function ContactPanel({
                 <div className="font-mono text-slate-100">{row.provider}:{row.identity_type}</div>
                 <div className="font-mono text-slate-300 break-all">{row.identity_value}</div>
                 <div className="text-slate-400 mt-1">
-                  confidence {row.confidence} | verified {row.verified ? 'true' : 'false'} | primary {row.is_primary ? 'true' : 'false'}
+                  confidence {row.confidence}
+                  {' | '}verified {row.verified ? 'true' : 'false'}
+                  {' | '}primary {row.is_primary ? 'true' : 'false'}
                 </div>
               </div>
             ))}

@@ -124,6 +124,17 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.SCENARIO_RUNNER} label="Scenario Runner" icon={FlaskConical} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.INFRA_MONITOR} label="Engine Room" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.SITEMAP} label="Core Sitemap" icon={List} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.CHANNEL_MAPPER} label="Channel Mapper" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.CONTACT_MERGE} label="Contact Merge" icon={Users} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.MERGE_JOBS} label="Merge Jobs" icon={List} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.MERGE_QUEUE} label="Merge Queue" icon={List} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.TEAM_MEMBERS} label="Team Members" icon={Users} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.ON_CALL} label="On-Call" icon={Calendar} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.CHANNEL_POOLS} label="Channel Pools" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.DEAD_LETTERS} label="Dead Letters" icon={AlertCircle} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.ADMIN_HEALTH} label="Gateway Health" icon={Shield} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.SRE_DASHBOARD} label="SRE Dashboard" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.OUTBOX} label="Outbox" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.SETTINGS} label="OS Settings" icon={Settings} currentView={currentView} onViewChange={handleNav} />
           </SidebarSection>
         </nav>

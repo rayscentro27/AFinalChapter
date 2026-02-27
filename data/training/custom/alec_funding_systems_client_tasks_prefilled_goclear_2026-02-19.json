@@ -1,0 +1,438 @@
+{
+  "title": "Alec Funding Systems + Scale Task Pack (Schema Mapped)",
+  "version": "2026-02-19",
+  "target_table": "public.client_tasks",
+  "notes": [
+    "Replace <TENANT_UUID> and <YYYY-MM-DD> values before insert/upsert.",
+    "task_id must remain stable per tenant for idempotent upserts.",
+    "meta.required_attachments is used by UI as requiredAttachments."
+  ],
+  "tasks": [
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:ingest-source-corpus",
+      "title": "Ingest and Normalize Source Corpus",
+      "description": "Load all source video transcripts, deduplicate repeating claims, and tag by theme for training synthesis.",
+      "status": "pending",
+      "due_date": "2026-02-19",
+      "type": "review",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 0,
+        "required_attachments": [
+          "Source inventory",
+          "Topic map",
+          "Duplicate map"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:claim-confidence-tagging",
+      "title": "Tag Claims by Confidence and Risk",
+      "description": "Mark each major claim as verified, pending verification, or unverified and attach risk categories.",
+      "status": "pending",
+      "due_date": "2026-02-20",
+      "type": "review",
+      "signal": "red",
+      "assigned_employee": "Forensic Bot",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 1,
+        "required_attachments": [
+          "Claim confidence sheet",
+          "Risk tag matrix"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:automation-delegation-blueprint",
+      "title": "Build Eliminate-Automate-Delegate Blueprint",
+      "description": "Translate source guidance into a practical sequence for removing low-value tasks and assigning ownership.",
+      "status": "pending",
+      "due_date": "2026-02-20",
+      "type": "action",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Founder",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 1,
+        "required_attachments": [
+          "Time audit summary",
+          "Delegation matrix",
+          "Automation list"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:crm-pipeline-standardization",
+      "title": "Standardize CRM Intake to Fulfillment Pipeline",
+      "description": "Map onboarding, optimization, funding, and follow-up to standardized statuses and owner handoffs.",
+      "status": "pending",
+      "due_date": "2026-02-21",
+      "type": "action",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Founder",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 2,
+        "required_attachments": [
+          "Pipeline map",
+          "Status definitions",
+          "Owner handoff rules"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:acquisition-reengagement-engine",
+      "title": "Implement Acquisition Re-Engagement Engine",
+      "description": "Deploy middle-funnel nurture loop with opt-ins, email cadence, retargeting, and content-driven call conversion.",
+      "status": "pending",
+      "due_date": "2026-02-21",
+      "type": "action",
+      "signal": "green",
+      "assigned_employee": "Sentinel Scout",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 2,
+        "required_attachments": [
+          "Lead magnet matrix",
+          "Nurture sequence",
+          "Retargeting audience setup"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:sales-call-qa-framework",
+      "title": "Deploy Sales Call QA and Objection Framework",
+      "description": "Operationalize call structure, qualification checks, and ethical objection handling scripts into repeatable QA criteria.",
+      "status": "pending",
+      "due_date": "2026-02-22",
+      "type": "review",
+      "signal": "yellow",
+      "assigned_employee": "Ghost Hunter",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 3,
+        "required_attachments": [
+          "Call scorecard",
+          "Objection handling playbook",
+          "No-guarantee messaging set"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:funding-sequence-sop",
+      "title": "Create Funding Sequence SOP Library",
+      "description": "Document sequence logic, prerequisites, and lender-step dependencies with update cadence and rollback notes.",
+      "status": "pending",
+      "due_date": "2026-02-22",
+      "type": "education",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 3,
+        "required_attachments": [
+          "Sequence SOP",
+          "Prerequisite checklist",
+          "Update log template"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:high-risk-industry-routing",
+      "title": "Implement High-Risk Industry Routing Rules",
+      "description": "Build compliant pathing for high-risk industries with accurate classification and lender-compatibility decisions.",
+      "status": "pending",
+      "due_date": "2026-02-23",
+      "type": "legal",
+      "signal": "red",
+      "assigned_employee": "Lex Ledger",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 4,
+        "required_attachments": [
+          "Industry risk matrix",
+          "Routing decision tree",
+          "Compliance sign-off"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:aged-entity-due-diligence",
+      "title": "Define Aged Entity Due Diligence Process",
+      "description": "Create a verification protocol for entity age, standing, debt flags, and documentation integrity before use.",
+      "status": "pending",
+      "due_date": "2026-02-23",
+      "type": "legal",
+      "signal": "red",
+      "assigned_employee": "Lex Ledger",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 4,
+        "required_attachments": [
+          "Due diligence checklist",
+          "Document validation log",
+          "Risk exception rules"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:application-method-compliance",
+      "title": "Set Application Method Compliance Controls",
+      "description": "Standardize approved submission methods and explicitly block bypass tactics such as fraud-evasion workflows.",
+      "status": "pending",
+      "due_date": "2026-02-24",
+      "type": "legal",
+      "signal": "red",
+      "assigned_employee": "Forensic Bot",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 5,
+        "required_attachments": [
+          "Allowed methods SOP",
+          "Blocked methods list",
+          "Exception handling procedure"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:liquidation-bridge-risk-policy",
+      "title": "Publish Liquidation and Bridge Risk Policy",
+      "description": "Document fee disclosures, settlement timing risks, and suitability checks for high-risk capital bridge workflows.",
+      "status": "pending",
+      "due_date": "2026-02-24",
+      "type": "legal",
+      "signal": "red",
+      "assigned_employee": "Lex Ledger",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 5,
+        "required_attachments": [
+          "Risk disclosure template",
+          "Suitability checklist",
+          "Escalation triggers"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:partnership-double-track-workflow",
+      "title": "Implement Partnership Double-Track Workflow",
+      "description": "Create compliant process for partnership cases with role separation, profile sequencing, and parallel eligibility pathways.",
+      "status": "pending",
+      "due_date": "2026-02-25",
+      "type": "review",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 6,
+        "required_attachments": [
+          "Partnership decision matrix",
+          "Sequence notes",
+          "Role ownership map"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:chase-strategy-change-log",
+      "title": "Track Lender Strategy Changes and Revisions",
+      "description": "Maintain revision log for lender policy changes and update procedural guidance with timestamped evidence.",
+      "status": "pending",
+      "due_date": "2026-02-25",
+      "type": "review",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 6,
+        "required_attachments": [
+          "Policy change log",
+          "Updated sequence notes",
+          "Effective date register"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:team-role-ramp-plan",
+      "title": "Deploy Team Role Ramp Plan",
+      "description": "Define phased staffing model and SOP handoffs for assistant, specialist, and client-facing execution roles.",
+      "status": "pending",
+      "due_date": "2026-02-26",
+      "type": "action",
+      "signal": "green",
+      "assigned_employee": "Nexus Founder",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 7,
+        "required_attachments": [
+          "Role descriptions",
+          "Hiring stages",
+          "Handoff SOPs"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:content-engine-install",
+      "title": "Install AI-Assisted Content Engine",
+      "description": "Build repeatable idea-to-script workflow from sales objections, source notes, and conversion goals.",
+      "status": "pending",
+      "due_date": "2026-02-26",
+      "type": "education",
+      "signal": "green",
+      "assigned_employee": "Sentinel Scout",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 7,
+        "required_attachments": [
+          "Content buckets",
+          "Script prompts",
+          "Publishing cadence"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:global-compliance-qa",
+      "title": "Run Global Compliance QA Sweep",
+      "description": "Audit all new training and task outputs for no-guarantee language, no bypass tactics, and legal-safe phrasing.",
+      "status": "pending",
+      "due_date": "2026-02-27",
+      "type": "review",
+      "signal": "red",
+      "assigned_employee": "Forensic Bot",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 8,
+        "required_attachments": [
+          "Compliance QA report",
+          "Blocked phrase list",
+          "Remediation edits"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "alecsys:kpi-review-rhythm",
+      "title": "Start Weekly KPI and Drift Review Rhythm",
+      "description": "Review show rates, qualification, close rates, fulfillment throughput, and compliance drift; publish adjustment actions.",
+      "status": "pending",
+      "due_date": "2026-02-28",
+      "type": "meeting",
+      "signal": "green",
+      "assigned_employee": "Nexus Founder",
+      "group_key": "alec_funding_systems_training",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 9,
+        "required_attachments": [
+          "Weekly KPI dashboard",
+          "Drift notes",
+          "Action register"
+        ],
+        "source": "alec_funding_systems_task_pack_v1"
+      }
+    }
+  ],
+  "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+  "start_date": "2026-02-19"
+}

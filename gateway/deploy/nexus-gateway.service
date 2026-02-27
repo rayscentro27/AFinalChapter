@@ -1,0 +1,16 @@
+[Unit]
+Description=Nexus Integrations Gateway
+After=network.target
+
+[Service]
+Type=simple
+User=opc
+WorkingDirectory=/home/opc/afinal_gateway
+Environment=NODE_ENV=production
+EnvironmentFile=/home/opc/afinal_gateway/.env
+ExecStart=/home/opc/.nvm/versions/node/v20.20.0/bin/node /home/opc/afinal_gateway/src/index.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

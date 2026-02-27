@@ -46,4 +46,9 @@ export const ENV = {
   META_GRAPH_VERSION: process.env.META_GRAPH_VERSION || 'v19.0',
 
   MATRIX_WEBHOOK_TOKEN: process.env.MATRIX_WEBHOOK_TOKEN || '',
+
+  AI_PROVIDER: process.env.AI_PROVIDER || 'heuristic',
+  AI_API_KEY: process.env.AI_API_KEY || '',
+  AI_MASK_PII: String(process.env.AI_MASK_PII || 'true').toLowerCase() !== 'false',
+  SAFE_MODE: String(process.env.SAFE_MODE || 'false').toLowerCase() === 'true',
 };

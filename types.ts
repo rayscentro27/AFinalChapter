@@ -9,6 +9,17 @@ export type MerchantPersona = 'Visionary Scaler' | 'Skeptical Veteran' | 'First-
 export type SentimentLevel = 'Positive' | 'Neutral' | 'Agitated' | 'Critical';
 export type AiIntensity = 'Ghost' | 'Concierge' | 'Hunter';
 
+export interface InboxRouting {
+  tenant_id?: string;
+  tenantId?: string;
+  conversation_id?: string;
+  conversationId?: string;
+  provider?: 'sms' | 'whatsapp' | 'meta' | 'twilio';
+  to?: string;
+  recipient_id?: string;
+  recipientId?: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -103,6 +114,7 @@ export interface Contact {
   legalStanding?: string;
   callReady?: boolean;
   feesWaived?: boolean;
+  inboxRouting?: InboxRouting;
 }
 
 export interface ClientTask {
@@ -159,6 +171,10 @@ export interface Message {
   timestamp: string;
   read: boolean;
   actionRequired?: any;
+  deliveryStatus?: string;
+  provider?: string;
+  conversationId?: string;
+  providerMessageIdReal?: string;
 }
 
 export interface Invoice {
@@ -209,7 +225,6 @@ export interface AgencyBranding {
   };
   tierPrices?: { Bronze: number; Silver: number; Gold: number };
   mailerLite?: {
-    apiKey?: string;
     groupId?: string;
     autoSync: boolean;
   };
@@ -267,6 +282,24 @@ export enum ViewMode {
   SYNDICATION = 'SYNDICATION',
   PARTNERS = 'PARTNERS',
   LANDING = 'LANDING',
+  CHANNEL_MAPPER = 'CHANNEL_MAPPER',
+  CONTACT_MERGE = 'CONTACT_MERGE',
+  MERGE_JOBS = 'MERGE_JOBS',
+  MERGE_QUEUE = 'MERGE_QUEUE',
+  SUGGESTIONS = 'SUGGESTIONS',
+  TEAM_MEMBERS = 'TEAM_MEMBERS',
+  ON_CALL = 'ON_CALL',
+  CHANNEL_POOLS = 'CHANNEL_POOLS',
+  DEAD_LETTERS = 'DEAD_LETTERS',
+  CHANNEL_HEALTH = 'CHANNEL_HEALTH',
+  ADMIN_HEALTH = 'ADMIN_HEALTH',
+  SRE_DASHBOARD = 'SRE_DASHBOARD',
+  OUTBOX = 'OUTBOX',
+  PUBLIC_API = 'PUBLIC_API',
+  ADMIN_ROLES = 'ADMIN_ROLES',
+  ADMIN_MEMBERS = 'ADMIN_MEMBERS',
+  ADMIN_POLICIES = 'ADMIN_POLICIES',
+  INVITE_ACCEPT = 'INVITE_ACCEPT',
   ADMIN_CMS = 'ADMIN_CMS'
 }
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Nexus Outbox Runner every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+RandomizedDelaySec=5s
+Persistent=true
+Unit=nexus-outbox-runner.service
+
+[Install]
+WantedBy=timers.target

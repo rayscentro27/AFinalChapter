@@ -9,7 +9,8 @@ import {
 import { twilioSendSMS } from '../providers/twilio.js';
 import { whatsappSendText } from '../providers/whatsapp.js';
 import { metaSendOutbox } from '../providers/meta_send_outbox.js';
-import { requireTenantRole } from '../lib/auth/requireTenantRole.js';
+import { requireTenantPermission } from '../lib/auth/requireTenantPermission.js';
+import { evaluatePolicy } from '../lib/policy/policyEngine.js';
 import { ADMIN_RATE_LIMIT } from '../util/rate-limit.js';
 import { sha256Hex } from '../util/hash.js';
 import { redactText } from '../util/redact.js';
@@ -22,8 +23,11 @@ import {
   tryAcquireTenantOutboxLock,
   releaseTenantOutboxLock,
 } from '../util/outbox-lock.js';
-import { resolveBestIdentityForSend } from '../util/send-route-selector.js';
+import { resolveBestIdentityForQueue, resolveBestIdentityForSend } from '../util/send-route-selector.js';
 import { recordSendFailure, recordSendSuccess } from '../lib/health/channelHealth.js';
+import { checkLimit } from '../lib/billing/planEnforcer.js';
+import { logAudit } from '../lib/audit/auditLog.js';
+import { buildWebhookEventKey, queueOutgoingWebhookEvent } from '../lib/public-api/webhookDispatcher.js';
 
 const SUPPORTED_PROVIDERS = new Set(['twilio', 'whatsapp', 'meta']);
 const BACKOFF_MINUTES = [1, 5, 15, 60, 360];
@@ -209,20 +213,148 @@ async function insertDeliveryEvent({ tenant_id, provider, provider_message_id, s
   }
 }
 
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
+}
+
+async function loadAttachmentsByIds({ tenant_id, attachmentIds }) {
+  const ids = Array.from(new Set((attachmentIds || []).filter((id) => isUuid(id))));
+  if (!ids.length) return [];
+
+  const { data, error } = await supabaseAdmin
+    .from('attachments')
+    .select('id,tenant_id,storage_bucket,storage_path,content_type,size_bytes,sha256,created_at')
+    .eq('tenant_id', tenant_id)
+    .in('id', ids);
+
+  if (error) {
+    if (isMissingSchema(error)) return [];
+    throw new Error(`attachments lookup failed: ${error.message}`);
+  }
+
+  return data || [];
+}
+
+function normalizeAttachmentRecord(row) {
+  return {
+    attachment_id: asText(row?.id),
+    storage_bucket: asText(row?.storage_bucket) || 'attachments',
+    storage_path: asText(row?.storage_path),
+    content_type: asText(row?.content_type) || 'application/octet-stream',
+    size_bytes: Number(row?.size_bytes || 0),
+    sha256: asText(row?.sha256) || null,
+    created_at: asText(row?.created_at) || null,
+  };
+}
+
+function normalizeAttachmentObject(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+  const storagePath = asText(item.storage_path);
+  if (!storagePath) return null;
+
+  return {
+    attachment_id: isUuid(item.attachment_id) ? asText(item.attachment_id) : null,
+    storage_bucket: asText(item.storage_bucket) || 'attachments',
+    storage_path: storagePath,
+    content_type: asText(item.content_type || item.mime_type) || 'application/octet-stream',
+    size_bytes: Number(item.size_bytes || 0),
+    sha256: asText(item.sha256) || null,
+  };
+}
+
+async function normalizeAttachmentsForOutbox({ tenant_id, attachments, content }) {
+  const source = asArray(attachments).length > 0
+    ? asArray(attachments)
+    : asArray(asObject(content).attachments);
+
+  if (!source.length) return [];
+
+  const attachmentIds = [];
+  const passthrough = [];
+
+  for (const item of source) {
+    if (typeof item === 'string' && isUuid(item)) {
+      attachmentIds.push(asText(item));
+      continue;
+    }
+
+    if (item && typeof item === 'object' && !Array.isArray(item)) {
+      const itemId = asText(item.attachment_id || item.id);
+      if (isUuid(itemId)) {
+        attachmentIds.push(itemId);
+        continue;
+      }
+
+      const normalized = normalizeAttachmentObject(item);
+      if (normalized) passthrough.push(normalized);
+    }
+  }
+
+  const fromDb = await loadAttachmentsByIds({ tenant_id, attachmentIds });
+  const fromDbNormalized = fromDb.map(normalizeAttachmentRecord).filter((row) => row.storage_path);
+
+  if (attachmentIds.length && fromDbNormalized.length !== Array.from(new Set(attachmentIds)).length) {
+    throw new Error('one_or_more_attachments_not_found_for_tenant');
+  }
+
+  const dedup = new Map();
+  for (const item of [...fromDbNormalized, ...passthrough]) {
+    const key = `${item.storage_bucket}:${item.storage_path}`;
+    if (!dedup.has(key)) dedup.set(key, item);
+  }
+
+  return Array.from(dedup.values());
+}
+
+async function signedAttachmentUrls(attachments, expiresSec = 3600) {
+  const out = [];
+  for (const item of attachments || []) {
+    const bucket = asText(item?.storage_bucket) || 'attachments';
+    const storagePath = asText(item?.storage_path);
+    if (!storagePath) continue;
+
+    const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(storagePath, expiresSec);
+    if (error) throw new Error(`attachment signed URL failed: ${error.message}`);
+
+    const url = asText(data?.signedUrl);
+    if (url) out.push(url);
+  }
+  return out;
+}
+
+function appendLinksToBody(bodyText, urls) {
+  const links = asArray(urls).filter(Boolean);
+  if (!links.length) return asText(bodyText);
+
+  const text = asText(bodyText) || '';
+  const block = links.map((u, i) => `Attachment ${i + 1}: ${u}`).join('\n');
+  return text ? `${text}\n\n${block}` : block;
+}
+
 async function sendViaProvider(outbox) {
+  const content = asObject(outbox.content);
+  const attachments = asArray(outbox.attachments).length > 0
+    ? asArray(outbox.attachments)
+    : asArray(content.attachments);
+
   const bodyText = asText(outbox.body_text) || asText(outbox.body);
+  const fallbackUrls = attachments.length > 0 && outbox.provider !== 'meta'
+    ? await signedAttachmentUrls(attachments)
+    : [];
+
+  const effectiveBody = appendLinksToBody(bodyText, fallbackUrls);
 
   if (outbox.provider === 'twilio') {
-    if (!bodyText) throw new Error('Missing outbound body_text for Twilio');
+    if (!effectiveBody) throw new Error('Missing outbound body_text for Twilio');
     return twilioSendSMS({
       to: outbox.to_address,
-      body: bodyText,
+      body: effectiveBody,
       from: asText(outbox.from_address) || asText(ENV.TWILIO_FROM_NUMBER),
     });
   }
 
   if (outbox.provider === 'whatsapp') {
-    if (!bodyText) throw new Error('Missing outbound body_text for WhatsApp');
+    if (!effectiveBody) throw new Error('Missing outbound body_text for WhatsApp');
 
     const phoneNumberId = asText(outbox.from_address);
     if (!phoneNumberId) throw new Error('Missing WhatsApp phone_number_id for outbound send');
@@ -230,7 +362,7 @@ async function sendViaProvider(outbox) {
     return whatsappSendText({
       phone_number_id: phoneNumberId,
       to: outbox.to_address,
-      body: bodyText,
+      body: effectiveBody,
     });
   }
 
@@ -361,6 +493,26 @@ async function attemptSendOnce(outbox) {
       received_at: new Date().toISOString(),
     });
 
+
+    if (messageId) {
+      await queueOutgoingWebhookEvent({
+        tenant_id: sentRow.tenant_id,
+        event_type: 'message.created',
+        event_key: buildWebhookEventKey('message.created', {
+          message_id: messageId,
+          provider_message_id: providerMessageId,
+        }),
+        payload: {
+          message_id: messageId,
+          conversation_id: sentRow.conversation_id || null,
+          contact_id: sentRow.contact_id || null,
+          provider: sentRow.provider,
+          status: 'sent',
+          provider_message_id: providerMessageId,
+        },
+      }).catch(() => {});
+    }
+
     if (claimedWithRoute.channel_account_id) {
       try {
         await recordSendSuccess({
@@ -464,14 +616,18 @@ async function buildOutboxInput(body) {
   }
 
   const normalizedContent = asObject(body.content);
-  const attachments = asArray(body.attachments).length > 0
-    ? asArray(body.attachments)
-    : asArray(normalizedContent.attachments);
+  const attachments = await normalizeAttachmentsForOutbox({
+    tenant_id: tenantId,
+    attachments: asArray(body.attachments),
+    content: normalizedContent,
+  });
+
+  if (attachments.length > 0) normalizedContent.attachments = attachments;
 
   const bodyText = asText(body.body_text) || asText(body.body) || asText(body.text);
 
-  if (!bodyText && !(provider === 'meta' && attachments.length > 0)) {
-    throw new Error('Missing body_text/body/text');
+  if (!bodyText && attachments.length === 0) {
+    throw new Error('Missing body_text/body/text or attachments');
   }
 
   let fromAddress = asText(body.from_address);
@@ -515,9 +671,9 @@ async function buildOutboxInput(body) {
 
 async function buildQueueOnlyInput(body) {
   const tenantId = String(body.tenant_id);
-  const provider = lower(body.provider);
-  if (!SUPPORTED_PROVIDERS.has(provider)) {
-    throw new Error(`Unsupported provider: ${provider}`);
+  const preferredProvider = lower(body.provider || body.channel_preference || '');
+  if (preferredProvider && !SUPPORTED_PROVIDERS.has(preferredProvider) && preferredProvider !== 'sms') {
+    throw new Error(`Unsupported provider: ${preferredProvider}`);
   }
 
   const conversationId = asText(body.conversation_id);
@@ -527,44 +683,80 @@ async function buildQueueOnlyInput(body) {
   }
 
   const contactId = asText(body.contact_id) || asText(conversation?.contact_id);
-  if (!contactId) {
-    throw new Error('Missing contact_id (or conversation_id with linked contact)');
+  if (!contactId && !conversationId) {
+    throw new Error('Missing contact_id or conversation_id');
   }
 
-  const bodyText = asText(body.body_text) || asText(body.body) || asText(body.text);
-  if (!bodyText) throw new Error('Missing body_text');
+  const normalizedContent = asObject(body.content);
+  const attachments = await normalizeAttachmentsForOutbox({
+    tenant_id: tenantId,
+    attachments: asArray(body.attachments),
+    content: normalizedContent,
+  });
 
-  const attachments = asArray(body.attachments);
-  const idempotencyKey = computeIdempotencyKey({
+  if (attachments.length > 0) normalizedContent.attachments = attachments;
+
+  const bodyText = asText(body.body_text) || asText(body.body) || asText(body.text);
+  if (!bodyText && attachments.length === 0) throw new Error('Missing body_text or attachments');
+
+  const toAddressOverride = asText(body.to_address) || asText(body.to) || asText(body.recipient_id) || null;
+  const preference = asText(body.channel_preference) || asText(body.provider) || null;
+
+  const route = await resolveBestIdentityForQueue({
+    supabaseAdmin,
     tenant_id: tenantId,
     contact_id: contactId,
+    conversation_id: conversationId,
+    preferred_provider: preferredProvider === 'sms' ? 'twilio' : preferredProvider,
+    channel_preference: preference,
+    to_address: toAddressOverride,
+    identity_id: asText(body.identity_id) || null,
+  });
+
+  if (!route?.ok) {
+    throw new Error(route?.reason || 'no_send_route_found');
+  }
+
+  const provider = lower(route.provider);
+  const idempotencyKey = computeIdempotencyKey({
+    tenant_id: tenantId,
+    contact_id: route.contact_id || contactId,
     provider,
     body_text: bodyText,
     attachments,
     clientKey: body.idempotency_key || body.client_request_id,
   });
 
-  const toAddress = asText(body.to_address) || asText(body.to) || asText(body.recipient_id) || null;
+  const effectiveContent = {
+    ...normalizedContent,
+    send_route: {
+      selected_provider: provider,
+      selected_channel_account_id: route.channel_account_id || null,
+      fallback_used: Boolean(route.fallback_used),
+      source: route.source || null,
+    },
+  };
 
   return {
     tenant_id: tenantId,
-    contact_id: contactId,
+    contact_id: route.contact_id || contactId,
     conversation_id: conversationId,
     provider,
-    identity_id: asText(body.identity_id) || null,
+    channel_account_id: route.channel_account_id || null,
+    identity_id: route.identity_id ? String(route.identity_id) : (asText(body.identity_id) || null),
     idempotency_key: idempotencyKey,
     body_text: bodyText,
     body: bodyText,
     attachments,
-    content: asObject(body.content),
+    content: effectiveContent,
     status: 'queued',
     attempts: 0,
     next_attempt_at: new Date().toISOString(),
     created_by: asText(body.created_by),
     updated_at: new Date().toISOString(),
     client_request_id: asText(body.client_request_id) || idempotencyKey,
-    to_address: toAddress,
-    from_address: asText(body.from_address) || null,
+    to_address: asText(route.to_address) || toAddressOverride,
+    from_address: asText(route.from_address) || asText(body.from_address) || null,
   };
 }
 
@@ -635,9 +827,14 @@ async function runOutboxBatch({ tenantId = null, limit = 25 }) {
 }
 
 export async function outboxRoutes(fastify) {
-  const agentRoleGuard = requireTenantRole({
+  const messagesSendGuard = requireTenantPermission({
     supabaseAdmin,
-    allowedRoles: ['owner', 'admin', 'agent'],
+    permission: 'messages.send',
+  });
+
+  const outboxRunGuard = requireTenantPermission({
+    supabaseAdmin,
+    permission: 'outbox.run',
   });
 
   const cronTenantAllowlist = parseAllowedTenantIds(ENV.ORACLE_TENANT_IDS);
@@ -674,7 +871,7 @@ export async function outboxRoutes(fastify) {
       return undefined;
     }
 
-    await agentRoleGuard(req, reply);
+    await outboxRunGuard(req, reply);
     if (reply.sent) return undefined;
 
     const scopedTenantId = asText(req.tenant?.id);
@@ -687,29 +884,103 @@ export async function outboxRoutes(fastify) {
   }
 
   fastify.post('/messages/send', {
-    preHandler: [requireApiKeyPreHandler, agentRoleGuard],
+    preHandler: [requireApiKeyPreHandler, messagesSendGuard],
     config: { rateLimit: ADMIN_RATE_LIMIT },
   }, async (req, reply) => {
     const body = req.body || {};
-    const missing = missingField(body, ['tenant_id', 'provider']);
+    const missing = missingField(body, ['tenant_id']);
     if (missing) {
       return reply.code(400).send({ ok: false, error: `Missing ${missing}` });
     }
 
+    const hasBody = Boolean(asText(body.body_text) || asText(body.body) || asText(body.text));
+    const hasAttachments = asArray(body.attachments).length > 0 || asArray(asObject(body.content).attachments).length > 0;
+    if (!hasBody && !hasAttachments) {
+      return reply.code(400).send({ ok: false, error: 'Missing body_text/text or attachments' });
+    }
+
+    if (!asText(body.contact_id) && !asText(body.conversation_id)) {
+      return reply.code(400).send({ ok: false, error: 'Missing contact_id or conversation_id' });
+    }
+
+    if (ENV.SAFE_MODE) {
+      return reply.code(503).send({ ok: false, error: 'safe_mode_enabled', message: 'Outbound sending is disabled while SAFE_MODE=true' });
+    }
+
     try {
+      const limitCheck = await checkLimit({
+        supabaseAdmin,
+        tenant_id: body.tenant_id || req.tenant?.id,
+        metric: 'messages_sent_per_month',
+        projected_increment: 1,
+      });
+
+      if (!limitCheck.allowed) {
+        return reply.code(402).send({
+          ok: false,
+          error: 'limit_exceeded',
+          metric: limitCheck.metric,
+          limit: limitCheck.limit,
+          used: limitCheck.used,
+        });
+      }
+
       const outboxInput = await buildQueueOnlyInput({
         ...body,
         tenant_id: body.tenant_id || req.tenant?.id,
         created_by: req.user?.id,
       });
 
+      const sendPolicy = await evaluatePolicy({
+        supabaseAdmin,
+        action: 'messages.send',
+        context: {
+          tenant_id: outboxInput.tenant_id,
+          user_id: req.user?.id || null,
+          ip: req.ip,
+          provider: outboxInput.provider || null,
+          message_length: String(outboxInput.body_text || '').length,
+          has_attachments: Array.isArray(outboxInput.attachments) && outboxInput.attachments.length > 0,
+          attachment_bytes: 0,
+        },
+      });
+
+      if (!sendPolicy.allowed) {
+        return reply.code(403).send({
+          ok: false,
+          error: 'policy_denied',
+          reason: sendPolicy.reason,
+          policy_id: sendPolicy.policy?.id || null,
+        });
+      }
+
       const { outboxRow, deduped } = await queueWithIdempotency(outboxInput);
+
+      await logAudit({
+        tenant_id: outboxRow.tenant_id,
+        actor_user_id: req.user?.id || null,
+        actor_type: 'user',
+        action: 'send_message_queued',
+        entity_type: 'outbox_message',
+        entity_id: String(outboxRow.id),
+        metadata: {
+          provider: outboxRow.provider,
+          channel_account_id: outboxRow.channel_account_id || null,
+          deduped,
+        },
+      }).catch(() => {});
 
       return reply.send({
         ok: true,
         outbox_id: outboxRow.id,
         status: outboxRow.status,
         deduped,
+        provider: outboxRow.provider,
+        channel_account_id: outboxRow.channel_account_id || null,
+        to_address: outboxRow.to_address || null,
+        from_address: outboxRow.from_address || null,
+        idempotency_key: outboxRow.idempotency_key || null,
+        warning: limitCheck.warning ? limitCheck.warning_message : null,
       });
     } catch (error) {
       return reply.code(400).send({ ok: false, error: String(error?.message || error) });
@@ -720,6 +991,10 @@ export async function outboxRoutes(fastify) {
     if (!requireApiKey(req, reply)) return;
 
     const body = req.body || {};
+    if (ENV.SAFE_MODE) {
+      return reply.code(503).send({ ok: false, error: 'safe_mode_enabled', message: 'Outbound sending is disabled while SAFE_MODE=true' });
+    }
+
     const missing = missingField(body, ['tenant_id', 'conversation_id', 'provider']);
     if (missing) {
       return reply.code(400).send({ ok: false, error: `Missing ${missing}` });
@@ -797,6 +1072,29 @@ export async function outboxRoutes(fastify) {
       return reply.code(400).send({ ok: false, error: 'missing_tenant_id' });
     }
 
+    if (ENV.SAFE_MODE) {
+      return reply.code(503).send({ ok: false, error: 'safe_mode_enabled', message: 'Outbound processing is disabled while SAFE_MODE=true', tenant_id: tenantId });
+    }
+
+    const runPolicy = await evaluatePolicy({
+      supabaseAdmin,
+      action: 'outbox.run',
+      context: {
+        tenant_id: tenantId,
+        user_id: req.user?.id || null,
+        ip: req.ip,
+      },
+    });
+
+    if (!runPolicy.allowed) {
+      return reply.code(403).send({
+        ok: false,
+        error: 'policy_denied',
+        reason: runPolicy.reason,
+        policy_id: runPolicy.policy?.id || null,
+      });
+    }
+
     const lock = await tryAcquireTenantOutboxLock({ tenantId });
     if (!lock.acquired) {
       if (lock.reason === 'lock_not_acquired') {
@@ -808,6 +1106,23 @@ export async function outboxRoutes(fastify) {
 
     try {
       const result = await runOutboxBatch({ tenantId, limit });
+
+      await logAudit({
+        tenant_id: tenantId,
+        actor_user_id: req.user?.id || null,
+        actor_type: req.auth_mode === 'cron' ? 'system' : 'user',
+        action: 'outbox_run',
+        entity_type: 'outbox',
+        entity_id: tenantId,
+        metadata: {
+          limit,
+          processed: result.processed,
+          sent: result.sent,
+          failed: result.failed,
+          auth_mode: req.auth_mode || 'unknown',
+        },
+      }).catch(() => {});
+
       return reply.send({
         ok: true,
         tenant_id: tenantId,
@@ -831,6 +1146,10 @@ export async function outboxRoutes(fastify) {
     const requested = Number(req.body?.limit || 25);
     const limit = Math.min(100, Math.max(1, Number.isFinite(requested) ? requested : 25));
     const tenantId = asText(req.body?.tenant_id);
+
+    if (ENV.SAFE_MODE) {
+      return reply.code(503).send({ ok: false, error: 'safe_mode_enabled', message: 'Outbound processing is disabled while SAFE_MODE=true', tenant_id: tenantId || null });
+    }
 
     try {
       const result = await runOutboxBatch({ tenantId, limit });

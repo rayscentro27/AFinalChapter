@@ -457,6 +457,7 @@ export async function adminMonitoringV2Routes(fastify) {
       return reply.send({
         ok: true,
         now: new Date().toISOString(),
+        safe_mode: ENV.SAFE_MODE,
         ...snapshot,
       });
     } catch (error) {
