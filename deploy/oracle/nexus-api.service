@@ -1,0 +1,26 @@
+# deploy/oracle/nexus-api.service
+[Unit]
+Description=Nexus Fastify API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/nexus-api/gateway
+EnvironmentFile=/opt/nexus-api/gateway/.env
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/nexus-api/gateway
+
+[Install]
+WantedBy=multi-user.target

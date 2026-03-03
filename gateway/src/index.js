@@ -6,7 +6,9 @@ import formbody from '@fastify/formbody';
 import multipart from '@fastify/multipart';
 
 import { ENV } from './env.js';
+import { isOriginAllowed } from './config/aiGatewayConfig.js';
 import { healthRoutes } from './routes/health.js';
+import { aiGatewayRoutes } from './routes/ai_gateway.js';
 import { twilioRoutes } from './routes/twilio.js';
 import { metaRoutes } from './routes/meta.js';
 import { whatsappRoutes } from './routes/whatsapp.js';
@@ -66,6 +68,9 @@ const fastify = Fastify({
         'app_secret',
         'service_role_key',
         'supabase_service_role_key',
+        'gemini_api_key',
+        'openrouter_api_key',
+        'nvidia_nim_api_key',
       ],
       censor: '[REDACTED]',
     },
@@ -103,7 +108,16 @@ fastify.addHook('onResponse', async (req, reply) => {
   }, 'request_completed');
 });
 
-await fastify.register(cors, { origin: true });
+await fastify.register(cors, {
+  origin: (origin, cb) => {
+    if (isOriginAllowed(origin)) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Origin not allowed by CORS policy'), false);
+  },
+  credentials: true,
+});
 await fastify.register(helmet);
 await fastify.register(rateLimit, {
   max: 600,
@@ -118,6 +132,7 @@ await fastify.register(multipart, {
 });
 
 await fastify.register(healthRoutes);
+await fastify.register(aiGatewayRoutes);
 await fastify.register(twilioRoutes);
 await fastify.register(metaRoutes);
 await fastify.register(whatsappRoutes);

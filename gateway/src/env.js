@@ -11,6 +11,7 @@ export const ENV = {
   PORT: Number(process.env.PORT || 3000),
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
   TRUST_PROXY: String(process.env.TRUST_PROXY || 'true').toLowerCase() !== 'false',
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'https://app.goclearonline.cc',
 
   INTERNAL_API_KEY: required('INTERNAL_API_KEY'),
 
@@ -46,6 +47,11 @@ export const ENV = {
   META_GRAPH_VERSION: process.env.META_GRAPH_VERSION || 'v19.0',
 
   MATRIX_WEBHOOK_TOKEN: process.env.MATRIX_WEBHOOK_TOKEN || '',
+
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+  NVIDIA_NIM_API_KEY: process.env.NVIDIA_NIM_API_KEY || '',
+  ENABLE_NIM_DEV: String(process.env.ENABLE_NIM_DEV || 'false').toLowerCase() === 'true',
 
   AI_PROVIDER: process.env.AI_PROVIDER || 'heuristic',
   AI_API_KEY: process.env.AI_API_KEY || '',
