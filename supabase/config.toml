@@ -391,3 +391,12 @@ verify_jwt = false
 
 [functions.docupost-mail]
 verify_jwt = false
+
+[functions.credit-extract-sanitize]
+verify_jwt = false
+
+[functions.dispute-letter-generate]
+verify_jwt = false
+
+[functions.dispute-letter-finalize]
+verify_jwt = false

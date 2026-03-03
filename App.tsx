@@ -90,6 +90,10 @@ import MembershipAgreementPage from './src/pages/MembershipAgreementPage';
 import AdminSubscriptionManager from './src/pages/AdminSubscriptionManager';
 import SmsTermsPage from './src/pages/SmsTermsPage';
 import CommunicationPreferencesPage from './src/pages/CommunicationPreferencesPage';
+import UploadCreditReportPage from './src/pages/UploadCreditReportPage';
+import DisputeFactsReviewPage from './src/pages/DisputeFactsReviewPage';
+import DraftPreviewPage from './src/pages/DraftPreviewPage';
+import FinalLetterPage from './src/pages/FinalLetterPage';
 import AdminSmsTemplateEditor from './src/pages/AdminSmsTemplateEditor';
 import MailingAuthorizationPage from './src/pages/MailingAuthorizationPage';
 import ClientMailingApprovalsPage from './src/pages/ClientMailingApprovalsPage';
@@ -147,6 +151,10 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/subscriptions': ViewMode.ADMIN_SUBSCRIPTIONS,
   '/sms-terms': ViewMode.SMS_TERMS,
   '/communication-preferences': ViewMode.COMMUNICATION_PREFERENCES,
+  '/credit-report-upload': ViewMode.UPLOAD_CREDIT_REPORT,
+  '/dispute-facts-review': ViewMode.DISPUTE_FACTS_REVIEW,
+  '/draft-preview': ViewMode.DRAFT_PREVIEW,
+  '/final-letter': ViewMode.FINAL_LETTER,
   '/dispute-letter-preview': ViewMode.DISPUTE_LETTER_PREVIEW,
   '/admin/sms-templates': ViewMode.ADMIN_SMS_TEMPLATES,
   '/mailing-authorization': ViewMode.MAILING_AUTHORIZATION,
@@ -375,6 +383,10 @@ export const App = () => {
         if (currentView === ViewMode.PRICING) return <PricingPage onNavigateBilling={(plan) => { setBillingUpgradeTarget(plan || null); navigate(ViewMode.BILLING); }} />;
         if (currentView === ViewMode.BILLING) return <BillingPage selectedPlan={billingUpgradeTarget} />;
         if (currentView === ViewMode.COMMUNICATION_PREFERENCES) return <CommunicationPreferencesPage />;
+        if (currentView === ViewMode.UPLOAD_CREDIT_REPORT) return <UploadCreditReportPage />;
+        if (currentView === ViewMode.DISPUTE_FACTS_REVIEW) return <DisputeFactsReviewPage />;
+        if (currentView === ViewMode.DRAFT_PREVIEW) return <DraftPreviewPage />;
+        if (currentView === ViewMode.FINAL_LETTER) return <FinalLetterPage />;
         if (currentView === ViewMode.CLIENT_MAILING_APPROVALS) return <ClientMailingApprovalsPage />;
         if (currentView === ViewMode.DISPUTE_LETTER_PREVIEW) return <DisputeLetterPreviewPage />;
         return <ClientLandingPage onNavigate={navigate} />;
@@ -404,6 +416,10 @@ export const App = () => {
                     case ViewMode.PRICING: return <PricingPage onNavigateBilling={(plan) => { setBillingUpgradeTarget(plan || null); navigate(ViewMode.BILLING); }} />;
                     case ViewMode.BILLING: return <BillingPage selectedPlan={billingUpgradeTarget} />;
                     case ViewMode.COMMUNICATION_PREFERENCES: return <CommunicationPreferencesPage />;
+                    case ViewMode.UPLOAD_CREDIT_REPORT: return <UploadCreditReportPage />;
+                    case ViewMode.DISPUTE_FACTS_REVIEW: return <DisputeFactsReviewPage />;
+                    case ViewMode.DRAFT_PREVIEW: return <DraftPreviewPage />;
+                    case ViewMode.FINAL_LETTER: return <FinalLetterPage />;
                     case ViewMode.MARKETING: return <MarketingCampaigns contacts={contacts} branding={branding} onUpdateBranding={updateBranding} />;
                     case ViewMode.NEURAL_FLOOR: return <NeuralFloor contacts={contacts} onUpdateContacts={setContacts} />;
                     case ViewMode.POWER_DIALER: return <PowerDialer queue={contacts} onUpdateContact={updateContact} onClose={() => navigate(ViewMode.CRM)} />;

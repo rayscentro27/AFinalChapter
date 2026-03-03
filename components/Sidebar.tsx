@@ -118,6 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.WEALTH_MANAGER} label="Wealth Alpha" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.LENDER_ROOM} label="Lender Room" icon={Scale} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.DOC_GENERATOR} label="Doc Draftsman" icon={FileText} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.UPLOAD_CREDIT_REPORT} label="Credit Upload" icon={FileText} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.REVIEW_QUEUE} label="Review Queue" icon={Fingerprint} currentView={currentView} onViewChange={handleNav} badge={derivedPendingDocCount || undefined} badgeColor="bg-amber-600" />
           </SidebarSection>
 
