@@ -5,6 +5,7 @@ import RequiredDisclaimers from '../../components/legal/RequiredDisclaimers';
 import { billingAdapter } from '../billing/adapter';
 import { canAccessFeature } from '../billing/entitlements';
 import { PlanCode, SubscriptionEvent, SubscriptionRecord } from '../billing/types';
+import { createCheckoutSession, createPortalSession } from '../billing/stripeApi';
 import { supabase } from '../../lib/supabaseClient';
 import { resolveTenantIdForUser } from '../../utils/tenantContext';
 import {
@@ -26,6 +27,14 @@ async function hashMarker(input: string): Promise<string | null> {
   if (typeof window === 'undefined' || !window.crypto?.subtle) return null;
   const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
   return Array.from(new Uint8Array(digest)).map((i) => i.toString(16).padStart(2, '0')).join('');
+}
+
+function tierToPlanCode(subscription: SubscriptionRecord | null): PlanCode {
+  const tier = String(subscription?.tier || '').toLowerCase();
+  if (tier === 'growth') return 'GROWTH';
+  if (tier === 'premium') return 'PREMIUM';
+  if (tier === 'free') return 'FREE';
+  return (subscription?.plan_code || 'FREE') as PlanCode;
 }
 
 export default function BillingPage({ selectedPlan = null }: BillingPageProps) {
@@ -106,7 +115,7 @@ export default function BillingPage({ selectedPlan = null }: BillingPageProps) {
     };
   }, [user?.id]);
 
-  const effectivePlan: PlanCode = subscription?.plan_code || 'FREE';
+  const effectivePlan: PlanCode = tierToPlanCode(subscription);
   const effectiveStatus = subscription?.status || 'active';
   const renewalDateLabel = subscription?.current_period_end
     ? new Date(subscription.current_period_end).toLocaleDateString()
@@ -123,13 +132,27 @@ export default function BillingPage({ selectedPlan = null }: BillingPageProps) {
     commission_disclosure_accepted: commissionDisclosureAccepted,
   }, 'FUNDING_SEQUENCE');
 
+  async function openStripePortal() {
+    const portalUrl = await createPortalSession();
+    window.location.assign(portalUrl);
+  }
+
   async function confirmUpgrade() {
     if (!user?.id || !upgradePlan) return;
 
     setBusy(true);
     setError('');
+
+    let redirecting = false;
+
     try {
       if (upgradePlan === 'FREE') {
+        if (subscription?.provider === 'stripe' || subscription?.stripe_customer_id || subscription?.provider_customer_id) {
+          redirecting = true;
+          await openStripePortal();
+          return;
+        }
+
         await billingAdapter.setSubscription({
           userId: user.id,
           tenantId,
@@ -138,39 +161,43 @@ export default function BillingPage({ selectedPlan = null }: BillingPageProps) {
           provider: 'manual',
           eventType: 'subscription.downgraded',
           eventPayload: {
-            source: 'billing_page_downgrade',
+            source: 'billing_page_free_selection',
             plan_code: 'FREE',
           },
         });
-      } else {
-        const contractMeta = await recordPaidUpgradeContractConsents({
-          userId: user.id,
-          tenantId,
-        });
 
-        await billingAdapter.setSubscription({
-          userId: user.id,
-          tenantId,
-          planCode: upgradePlan,
-          status: 'active',
-          provider: 'manual',
-          eventType: 'subscription.upgraded',
-          eventPayload: {
-            source: 'billing_page_upgrade',
-            plan_code: upgradePlan,
-            membership_agreement_version: contractMeta.membershipAgreementVersion,
-            refund_policy_version: contractMeta.refundPolicyVersion,
-            accepted_at: contractMeta.acceptedAt,
-          },
-        });
+        await refreshSubscriptionState(user.id, tenantId);
+        setUpgradePlan(null);
+        return;
       }
 
-      await refreshSubscriptionState(user.id, tenantId);
-      setUpgradePlan(null);
+      const contractMeta = await recordPaidUpgradeContractConsents({
+        userId: user.id,
+        tenantId,
+      });
+
+      const checkoutUrl = await createCheckoutSession(upgradePlan);
+
+      await supabase.from('audit_events').insert({
+        tenant_id: tenantId,
+        actor_user_id: user.id,
+        event_type: 'stripe.checkout.redirect',
+        metadata: {
+          plan_code: upgradePlan,
+          membership_agreement_version: contractMeta.membershipAgreementVersion,
+          refund_policy_version: contractMeta.refundPolicyVersion,
+          accepted_at: contractMeta.acceptedAt,
+        },
+      });
+
+      redirecting = true;
+      window.location.assign(checkoutUrl);
     } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
-      setBusy(false);
+      if (!redirecting) {
+        setBusy(false);
+      }
     }
   }
 
@@ -180,18 +207,23 @@ export default function BillingPage({ selectedPlan = null }: BillingPageProps) {
     setBusy(true);
     setError('');
     try {
+      if (subscription.provider === 'stripe' || subscription.stripe_customer_id || subscription.provider_customer_id) {
+        await openStripePortal();
+        return;
+      }
+
       await billingAdapter.setSubscription({
         userId: user.id,
         tenantId,
-        planCode: subscription.plan_code,
+        planCode: effectivePlan,
         status: 'canceled',
         provider: subscription.provider || 'manual',
         providerCustomerId: subscription.provider_customer_id,
         providerSubscriptionId: subscription.provider_subscription_id,
         eventType: 'subscription.canceled',
         eventPayload: {
-          source: 'billing_page_cancel',
-          plan_code: subscription.plan_code,
+          source: 'billing_page_manual_cancel',
+          plan_code: effectivePlan,
         },
       });
 
@@ -284,7 +316,7 @@ export default function BillingPage({ selectedPlan = null }: BillingPageProps) {
       <div>
         <h1 className="text-3xl font-black text-white">Billing</h1>
         <p className="text-sm text-slate-400 mt-2">
-          Plan: <span className="text-cyan-300 font-bold">{effectivePlan}</span> ({effectiveStatus}).
+          Tier: <span className="text-cyan-300 font-bold">{effectivePlan}</span> ({effectiveStatus}).
           Renewal: <span className="text-cyan-300 font-bold"> {renewalDateLabel}</span>.
         </p>
       </div>
@@ -293,20 +325,24 @@ export default function BillingPage({ selectedPlan = null }: BillingPageProps) {
 
       {error ? <div className="rounded-xl border border-rose-500/40 bg-rose-950/30 p-3 text-sm text-rose-200">{error}</div> : null}
 
-      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 flex flex-col gap-2">
-        <h2 className="text-lg font-bold text-white">Cancellation Instructions</h2>
+      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 flex flex-col gap-3">
+        <h2 className="text-lg font-bold text-white">Manage Subscription</h2>
         <p className="text-sm text-slate-300">
-          Paid memberships auto-renew until canceled. You can cancel anytime to stop future billing periods.
-          Access remains through the current period unless otherwise stated.
+          Paid memberships auto-renew monthly until canceled. Use Stripe Portal to cancel, update payment method,
+          and manage billing details.
         </p>
-        <p className="text-xs text-slate-500">
-          Provider mode is currently manual for contract testing. Stripe automation will be integrated later.
-        </p>
-        <div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            disabled={busy || !subscription || !(subscription.provider === 'stripe' || subscription.stripe_customer_id || subscription.provider_customer_id)}
+            onClick={() => void openStripePortal()}
+            className="rounded-xl bg-cyan-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-950 disabled:opacity-50"
+          >
+            Manage in Stripe Portal
+          </button>
           <button
             disabled={busy || !subscription || subscription.status === 'canceled'}
             onClick={() => void cancelCurrentSubscription()}
-            className="rounded-xl bg-cyan-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-950 disabled:opacity-50"
+            className="rounded-xl border border-slate-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-200 disabled:opacity-50"
           >
             {subscription?.status === 'canceled' ? 'Already Canceled' : 'Cancel Subscription'}
           </button>
@@ -320,13 +356,13 @@ export default function BillingPage({ selectedPlan = null }: BillingPageProps) {
             <div key={plan.code} className={`rounded-2xl border p-5 ${isCurrent ? 'border-cyan-400 bg-cyan-500/10' : 'border-slate-700 bg-slate-900'}`}>
               <p className="text-xs tracking-widest uppercase font-black text-cyan-300">{plan.code}</p>
               <p className="mt-2 text-3xl font-black text-white">${Math.round(plan.price_cents / 100)}<span className="text-xs text-slate-400">/mo</span></p>
-              <p className="mt-2 text-xs text-slate-400">Results vary. No guaranteed outcomes.</p>
+              <p className="mt-2 text-xs text-slate-400">Educational templates and workflow tools. Results vary. No guaranteed outcomes.</p>
               <button
                 disabled={busy || isCurrent}
                 className="mt-4 rounded-xl bg-cyan-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-950 disabled:opacity-50"
                 onClick={() => setUpgradePlan(plan.code)}
               >
-                {isCurrent ? 'Current Plan' : 'Switch Plan'}
+                {isCurrent ? 'Current Plan' : 'Choose Plan'}
               </button>
             </div>
           );

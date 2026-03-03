@@ -8,7 +8,15 @@ type Tenant = { id: string; name: string | null };
 type Member = { user_id: string; role: string | null };
 
 const PLAN_CODES: PlanCode[] = ['FREE', 'GROWTH', 'PREMIUM'];
-const STATUSES: SubscriptionStatus[] = ['active', 'trialing', 'past_due', 'canceled'];
+const STATUSES: SubscriptionStatus[] = ['active', 'trialing', 'past_due', 'canceled', 'incomplete'];
+
+function planFromSubscription(subscription: SubscriptionRecord | undefined): PlanCode {
+  const tier = String(subscription?.tier || '').toLowerCase();
+  if (tier === 'growth') return 'GROWTH';
+  if (tier === 'premium') return 'PREMIUM';
+  if (tier === 'free') return 'FREE';
+  return (subscription?.plan_code || 'FREE') as PlanCode;
+}
 
 export default function AdminSubscriptionManager() {
   const { user } = useAuth();
@@ -24,6 +32,9 @@ export default function AdminSubscriptionManager() {
 
   const [draftPlanByUser, setDraftPlanByUser] = useState<Record<string, PlanCode>>({});
   const [draftStatusByUser, setDraftStatusByUser] = useState<Record<string, SubscriptionStatus>>({});
+
+  const [tierFilter, setTierFilter] = useState<'ALL' | PlanCode>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | SubscriptionStatus>('ALL');
 
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
@@ -65,8 +76,9 @@ export default function AdminSubscriptionManager() {
 
     const subRes = await supabase
       .from('subscriptions')
-      .select('id,user_id,tenant_id,plan_code,status,provider,provider_customer_id,provider_subscription_id,current_period_end,created_at,updated_at')
-      .eq('tenant_id', selectedTenantId);
+      .select('id,user_id,tenant_id,plan_code,tier,status,provider,provider_customer_id,provider_subscription_id,stripe_customer_id,stripe_subscription_id,cancel_at_period_end,current_period_end,created_at,updated_at')
+      .eq('tenant_id', selectedTenantId)
+      .order('updated_at', { ascending: false });
 
     if (subRes.error) throw new Error(subRes.error.message || 'Unable to load subscriptions.');
 
@@ -99,7 +111,7 @@ export default function AdminSubscriptionManager() {
 
     for (const member of memberRows) {
       const found = subRows.find((s) => s.user_id === member.user_id);
-      initialPlan[member.user_id] = (found?.plan_code || 'FREE') as PlanCode;
+      initialPlan[member.user_id] = planFromSubscription(found);
       initialStatus[member.user_id] = (found?.status || 'active') as SubscriptionStatus;
     }
 
@@ -157,6 +169,18 @@ export default function AdminSubscriptionManager() {
     return map;
   }, [subs]);
 
+  const filteredMembers = useMemo(() => {
+    return members.filter((member) => {
+      const current = subByUser.get(member.user_id);
+      const plan = planFromSubscription(current);
+      const status = (current?.status || 'active') as SubscriptionStatus;
+
+      if (tierFilter !== 'ALL' && plan !== tierFilter) return false;
+      if (statusFilter !== 'ALL' && status !== statusFilter) return false;
+      return true;
+    });
+  }, [members, subByUser, tierFilter, statusFilter]);
+
   async function applyForUser(userId: string) {
     if (!tenantId) return;
 
@@ -176,6 +200,7 @@ export default function AdminSubscriptionManager() {
         eventType: 'subscription.admin_override',
         eventPayload: {
           plan_code: plan,
+          tier: plan.toLowerCase(),
           status,
           actor_user_id: user?.id || null,
         },
@@ -209,53 +234,90 @@ export default function AdminSubscriptionManager() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 text-slate-100 space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Admin Subscription Manager</h1>
-        <p className="text-sm text-slate-400 mt-1">Manual provider controls for testing plan entitlements and status transitions.</p>
+        <h1 className="text-2xl font-semibold text-white">Admin Subscriptions</h1>
+        <p className="text-sm text-slate-400 mt-1">View subscriptions by tier/status and apply manual test overrides.</p>
       </div>
 
-      <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
-        <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Tenant</label>
-        <select
-          className="w-full md:w-96 bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm"
-          value={tenantId}
-          onChange={(e) => {
-            const nextTenantId = e.target.value;
-            setTenantId(nextTenantId);
-            void loadTenantsAndSubscriptions(nextTenantId);
-          }}
-        >
-          {tenants.map((tenant) => (
-            <option key={tenant.id} value={tenant.id}>{tenant.name || tenant.id}</option>
-          ))}
-        </select>
+      <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Tenant</label>
+          <select
+            className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm"
+            value={tenantId}
+            onChange={(e) => {
+              const nextTenantId = e.target.value;
+              setTenantId(nextTenantId);
+              void loadTenantsAndSubscriptions(nextTenantId);
+            }}
+          >
+            {tenants.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>{tenant.name || tenant.id}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Tier Filter</label>
+          <select
+            className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm"
+            value={tierFilter}
+            onChange={(e) => setTierFilter(e.target.value as 'ALL' | PlanCode)}
+          >
+            <option value="ALL">All tiers</option>
+            {PLAN_CODES.map((tier) => (
+              <option key={tier} value={tier}>{tier}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Status Filter</label>
+          <select
+            className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'ALL' | SubscriptionStatus)}
+          >
+            <option value="ALL">All statuses</option>
+            {STATUSES.map((status) => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error ? <div className="rounded-md border border-rose-500/50 bg-rose-950/30 text-rose-200 text-sm px-4 py-3">{error}</div> : null}
       {success ? <div className="rounded-md border border-emerald-500/50 bg-emerald-950/30 text-emerald-200 text-sm px-4 py-3">{success}</div> : null}
 
+      <div className="text-xs text-slate-400">Showing {filteredMembers.length} of {members.length} members for current filters.</div>
+
       <div className="rounded-xl border border-slate-700 bg-slate-900 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[1200px] text-sm">
             <thead className="bg-slate-800/70 text-slate-300 uppercase text-xs tracking-wide">
               <tr>
                 <th className="px-4 py-3 text-left">User</th>
                 <th className="px-4 py-3 text-left">Role</th>
                 <th className="px-4 py-3 text-left">Current</th>
+                <th className="px-4 py-3 text-left">Provider</th>
+                <th className="px-4 py-3 text-left">Period End</th>
                 <th className="px-4 py-3 text-left">Plan</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {members.map((member) => {
+              {filteredMembers.map((member) => {
                 const current = subByUser.get(member.user_id);
+                const currentPlan = planFromSubscription(current);
                 return (
                   <tr key={member.user_id}>
                     <td className="px-4 py-3 font-mono text-xs text-slate-200">{member.user_id}</td>
                     <td className="px-4 py-3 text-slate-300">{member.role || '-'}</td>
                     <td className="px-4 py-3 text-slate-300">
-                      {(current?.plan_code || 'FREE')} / {(current?.status || 'active')}
+                      {currentPlan} / {(current?.status || 'active')}
                     </td>
+                    <td className="px-4 py-3 text-slate-300">{current?.provider || '-'}</td>
+                    <td className="px-4 py-3 text-slate-300">{current?.current_period_end ? new Date(current.current_period_end).toLocaleDateString() : '-'}</td>
                     <td className="px-4 py-3">
                       <select
                         className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs"

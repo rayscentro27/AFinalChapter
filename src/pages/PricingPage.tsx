@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import RequiredDisclaimers from '../../components/legal/RequiredDisclaimers';
-import UpgradeModal from '../../components/billing/UpgradeModal';
 import { billingAdapter } from '../billing/adapter';
 import { PlanCode } from '../billing/types';
-import { resolveTenantIdForUser } from '../../utils/tenantContext';
-import { recordPaidUpgradeContractConsents } from '../billing/contractConsents';
 
 type PricingPageProps = {
   onNavigateBilling?: (plan?: PlanCode) => void;
@@ -15,8 +12,6 @@ export default function PricingPage({ onNavigateBilling }: PricingPageProps) {
   const { user } = useAuth();
   const [plans, setPlans] = useState<Array<{ code: PlanCode; price_cents: number; is_active: boolean }>>([]);
   const [error, setError] = useState('');
-  const [upgradePlan, setUpgradePlan] = useState<PlanCode | null>(null);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -39,48 +34,6 @@ export default function PricingPage({ onNavigateBilling }: PricingPageProps) {
   }, []);
 
   const sorted = [...plans].sort((a, b) => a.price_cents - b.price_cents);
-
-  async function confirmUpgrade() {
-    if (!upgradePlan || !user?.id) return;
-
-    setBusy(true);
-    setError('');
-    try {
-      if (upgradePlan === 'FREE') {
-        onNavigateBilling?.(upgradePlan);
-        return;
-      }
-
-      const tenantId = await resolveTenantIdForUser(user.id);
-      const contractMeta = await recordPaidUpgradeContractConsents({
-        userId: user.id,
-        tenantId,
-      });
-
-      await billingAdapter.setSubscription({
-        userId: user.id,
-        tenantId,
-        planCode: upgradePlan,
-        status: 'active',
-        provider: 'manual',
-        eventType: 'subscription.upgraded',
-        eventPayload: {
-          source: 'pricing_page_upgrade',
-          plan_code: upgradePlan,
-          membership_agreement_version: contractMeta.membershipAgreementVersion,
-          refund_policy_version: contractMeta.refundPolicyVersion,
-          accepted_at: contractMeta.acceptedAt,
-        },
-      });
-
-      setUpgradePlan(null);
-      onNavigateBilling?.(upgradePlan);
-    } catch (e: any) {
-      setError(String(e?.message || e));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 text-slate-100 space-y-6">
@@ -116,36 +69,19 @@ export default function PricingPage({ onNavigateBilling }: PricingPageProps) {
                   return;
                 }
 
-                if (plan.code === 'FREE') {
-                  onNavigateBilling?.(plan.code);
-                  return;
-                }
-
-                setUpgradePlan(plan.code);
+                onNavigateBilling?.(plan.code);
               }}
             >
-              {user ? (plan.code === 'FREE' ? 'Open Billing' : 'Upgrade Plan') : 'Create Account'}
+              {user ? 'Open Billing' : 'Create Account'}
             </button>
           </div>
         ))}
       </div>
 
       <p className="text-xs text-slate-500">
-        By upgrading, you must accept the <a href="/membership-agreement" className="text-cyan-300 hover:text-cyan-200">Membership Agreement</a> and Refund Policy acknowledgment before paid features unlock.
+        Paid tier activation requires acceptance of the <a href="/membership-agreement" className="text-cyan-300 hover:text-cyan-200">Membership Agreement</a>
+        {' '}and <a href="/refund-policy" className="text-cyan-300 hover:text-cyan-200">Refund Policy</a> before checkout.
       </p>
-      <p className="text-xs text-slate-500">
-        Payment provider mode: manual adapter. Stripe integration is intentionally deferred.
-      </p>
-
-      <UpgradeModal
-        open={Boolean(upgradePlan)}
-        loading={busy}
-        targetPlan={upgradePlan}
-        targetPriceCents={upgradePlan ? sorted.find((p) => p.code === upgradePlan)?.price_cents || 0 : 0}
-        error={error || null}
-        onClose={() => setUpgradePlan(null)}
-        onConfirm={confirmUpgrade}
-      />
     </div>
   );
 }

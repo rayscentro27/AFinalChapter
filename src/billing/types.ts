@@ -1,5 +1,6 @@
 export type PlanCode = 'FREE' | 'GROWTH' | 'PREMIUM';
-export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled';
+export type TierCode = 'free' | 'growth' | 'premium';
+export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete';
 export type BillingProvider = 'stripe' | 'manual';
 
 export type FeatureKey =
@@ -24,10 +25,14 @@ export interface SubscriptionRecord {
   user_id: string;
   tenant_id: string | null;
   plan_code: PlanCode;
+  tier?: TierCode | null;
   status: SubscriptionStatus;
   provider: BillingProvider;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  cancel_at_period_end?: boolean | null;
   current_period_end: string | null;
   created_at: string;
   updated_at: string;

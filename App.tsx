@@ -123,6 +123,7 @@ import LegalFooterLinks from './components/legal/LegalFooterLinks';
 import ConsentGateModal from './components/consent/ConsentGateModal';
 import useConsentGate from './hooks/useConsentGate';
 import { PlanCode } from './src/billing/types';
+import { getUserTier, hasTierAccess, isSubscriptionEntitled, UserTierState } from './src/billing/tier';
 
 const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/contacts/merge': ViewMode.CONTACT_MERGE,
@@ -205,9 +206,47 @@ export const App = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [automationToast, setAutomationToast] = useState<{show: boolean, msg: string, type: 'success' | 'error' | 'info'}>({show: false, msg: '', type: 'info'});
   const [billingUpgradeTarget, setBillingUpgradeTarget] = useState<PlanCode | null>(null);
+  const [userTierState, setUserTierState] = useState<UserTierState | null>(null);
+  const [tierLoading, setTierLoading] = useState(false);
 
   const [isSystemReady, setIsSystemReady] = useState(false);
   const consentGate = useConsentGate(user?.id || null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadTier() {
+      if (!user?.id) {
+        if (!active) return;
+        setUserTierState(null);
+        setTierLoading(false);
+        return;
+      }
+
+      setTierLoading(true);
+      try {
+        const tier = await getUserTier(user.id);
+        if (!active) return;
+        setUserTierState(tier);
+      } catch {
+        if (!active) return;
+        setUserTierState({
+          tier: 'FREE',
+          status: 'active',
+          subscriptionId: null,
+          cancelAtPeriodEnd: false,
+        });
+      } finally {
+        if (active) setTierLoading(false);
+      }
+    }
+
+    void loadTier();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     const initData = async () => {
@@ -342,6 +381,55 @@ export const App = () => {
     && !consentGate.needsAcceptance
   );
 
+  const tierGateMap: Partial<Record<ViewMode, { requiredTier: PlanCode; moduleLabel: string }>> = {
+    [ViewMode.SCENARIO_RUNNER]: { requiredTier: 'GROWTH', moduleLabel: 'AI Task Runner' },
+    [ViewMode.GRANTS]: { requiredTier: 'PREMIUM', moduleLabel: 'Grants Engine' },
+    [ViewMode.LENDER_ROOM]: { requiredTier: 'PREMIUM', moduleLabel: 'SBA Module' },
+    [ViewMode.FUNDING_FLOW]: { requiredTier: 'PREMIUM', moduleLabel: 'Funding Research' },
+    [ViewMode.COMMISSIONS]: { requiredTier: 'PREMIUM', moduleLabel: 'Commission Ledger' },
+  };
+
+  const shouldBypassTierGate = Boolean(user && ['admin', 'supervisor', 'sales', 'salesperson'].includes(user.role));
+
+  const renderTierGate = (view: ViewMode, element: React.ReactNode) => {
+    const requirement = tierGateMap[view];
+    if (!requirement) return element;
+    if (!user || shouldBypassTierGate) return element;
+
+    if (tierLoading) {
+      return (
+        <div className="min-h-[50vh] flex items-center justify-center text-slate-300">
+          Checking subscription tier...
+        </div>
+      );
+    }
+
+    const tier = userTierState?.tier || 'FREE';
+    const status = userTierState?.status || 'active';
+
+    if (hasTierAccess(tier, requirement.requiredTier) && isSubscriptionEntitled(status)) {
+      return element;
+    }
+
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10">
+        <div className="rounded-2xl border border-cyan-500/30 bg-slate-900 p-6 space-y-3">
+          <h2 className="text-xl font-black text-white">Upgrade Required</h2>
+          <p className="text-sm text-slate-300">
+            {requirement.moduleLabel} requires the {requirement.requiredTier} tier with an active subscription.
+          </p>
+          <p className="text-xs text-slate-500">Educational tools only. Results vary and are not guaranteed.</p>
+          <button
+            className="rounded-xl bg-cyan-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-950"
+            onClick={() => navigate(ViewMode.BILLING)}
+          >
+            Open Billing
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     if (loading) return <div className="h-screen flex items-center justify-center bg-slate-950"><RefreshCw className="animate-spin text-blue-500" /></div>;
 
@@ -429,18 +517,19 @@ export const App = () => {
                     case ViewMode.REVIEW_QUEUE: return <DocumentQueue contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.SITEMAP: return <SystemSitemap onNavigate={navigate} />;
                     case ViewMode.EXPENSES: return <ExpenseTracker />;
-                    case ViewMode.COMMISSIONS: return <CommissionManager contacts={contacts} />;
+                    case ViewMode.GRANTS: return renderTierGate(ViewMode.GRANTS, <GrantManager contacts={contacts} onUpdateContact={updateContact} />);
+                    case ViewMode.COMMISSIONS: return renderTierGate(ViewMode.COMMISSIONS, <CommissionManager contacts={contacts} />);
                     case ViewMode.RISK_MONITOR: return <RiskMonitor />;
-                    case ViewMode.FUNDING_FLOW: return <PGFundingFlow />;
+                    case ViewMode.FUNDING_FLOW: return renderTierGate(ViewMode.FUNDING_FLOW, <PGFundingFlow />);
                     case ViewMode.AUTOMATION: return <LiveAutomationMonitor />;
                     case ViewMode.INVOICING: return <InvoicingHub contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.REPUTATION: return <ReputationManager branding={branding} onUpdateBranding={updateBranding} />;
                     case ViewMode.WEALTH_MANAGER: return <WealthPortfolio contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.INFRA_MONITOR: return <InfraMonitor />;
                     case ViewMode.LEAD_SCOUT: return <LeadScout onAddLead={addContact} />;
-                    case ViewMode.LENDER_ROOM: return <LenderRoom contacts={contacts} />;
+                    case ViewMode.LENDER_ROOM: return renderTierGate(ViewMode.LENDER_ROOM, <LenderRoom contacts={contacts} />);
                     case ViewMode.KNOWLEDGE_HUB: return <KnowledgeHub />;
-                    case ViewMode.SCENARIO_RUNNER: return <ScenarioRunner />;
+                    case ViewMode.SCENARIO_RUNNER: return renderTierGate(ViewMode.SCENARIO_RUNNER, <ScenarioRunner />);
                     case ViewMode.PARTNER_MARKETPLACE: return <AffiliateMarketplace />;
                     case ViewMode.FORENSIC_HUB: return <ForensicHub contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.SUPERVISOR_TRIAGE: return <SupervisorTriage contacts={contacts} onUpdateContact={updateContact} />;

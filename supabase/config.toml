@@ -389,6 +389,9 @@ verify_jwt = true
 [functions.stripe-webhook]
 verify_jwt = false
 
+[functions.stripe-webhooks]
+verify_jwt = false
+
 [functions.docupost-mail]
 verify_jwt = false
 
