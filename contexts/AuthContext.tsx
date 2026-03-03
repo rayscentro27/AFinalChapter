@@ -25,11 +25,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+
+    // Safety fallback: if auth listeners fail silently, avoid perma-loading UI.
+    const fallbackTimer = window.setTimeout(() => {
+      if (active) setLoading(false);
+    }, 6000);
+
+    const bootstrap = async () => {
+      try {
+        const existingUser = await auth.getCurrentUser();
+        if (active) {
+          setUser(existingUser);
+          setLoading(false);
+        }
+      } catch {
+        if (active) {
+          setUser(null);
+          setLoading(false);
+        }
+      }
+    };
+
+    void bootstrap();
+
     const unsubscribe = auth.onAuthStateChange((newUser) => {
+      if (!active) return;
       setUser(newUser);
       setLoading(false);
     });
-    return unsubscribe;
+
+    return () => {
+      active = false;
+      window.clearTimeout(fallbackTimer);
+      unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password?: string) => {

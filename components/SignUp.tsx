@@ -5,6 +5,7 @@ import { ViewMode, Contact } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { sanitizeString, isValidEmail } from '../utils/security';
+import RequiredDisclaimers from './legal/RequiredDisclaimers';
 
 interface SignUpProps {
   onNavigate: (view: ViewMode) => void;
@@ -86,6 +87,27 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
         // Non-fatal: session may already be active depending on Supabase settings.
       }
 
+      // Send onboarding welcome email through Supabase email orchestrator (non-fatal).
+      try {
+        await supabase.functions.invoke('email-orchestrator', {
+          body: {
+            message_type: 'onboarding',
+            to: formData.email,
+            subject: 'Welcome to Nexus',
+            html: '<p><strong>Welcome to Nexus.</strong></p><p>Your workspace is ready. This platform is educational only and does not guarantee outcomes.</p>',
+            text: 'Welcome to Nexus. Your workspace is ready. Educational only; no guarantees of outcomes.',
+            template_key: 'welcome',
+            user_id: authData.user.id,
+            data: {
+              company: formData.company,
+              name: formData.name,
+            },
+          },
+        });
+      } catch (welcomeError) {
+        console.warn('Welcome email enqueue failed', welcomeError);
+      }
+
       // 4. Update Parent State if required
       if (onRegister) {
           await onRegister({
@@ -160,6 +182,15 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
               <label className="block text-[10px] font-black text-[#45A29E] uppercase tracking-widest mb-2 ml-1">Access Cipher</label>
               <input required type="password" minLength={8} className="w-full px-4 py-4 bg-[#0B0C10] border border-[#45A29E]/30 rounded-xl focus:ring-2 focus:ring-[#66FCF1]/50 outline-none transition-all text-[#C5C6C7] text-sm font-bold" placeholder="••••••••" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
             </div>
+            <RequiredDisclaimers title="Educational Use Disclaimers" />
+
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              By creating an account, you acknowledge educational-only use and can review
+              <a href="/terms" className="text-cyan-300 hover:text-cyan-200"> Terms</a>,
+              <a href="/privacy" className="text-cyan-300 hover:text-cyan-200"> Privacy</a>, and
+              <a href="/ai-disclosure" className="text-cyan-300 hover:text-cyan-200"> AI Disclosure</a>.
+            </p>
+
             <button disabled={loading} type="submit" className="w-full bg-[#45A29E] text-white font-black py-5 rounded-2xl hover:bg-[#66FCF1] hover:text-slate-950 transition-all shadow-xl flex items-center justify-center gap-3 mt-10 uppercase tracking-[0.2em] text-xs disabled:opacity-50 transform active:scale-95">
               {loading ? <RefreshCw className="animate-spin" size={20} /> : <>Execute Registration <ArrowRight size={20} /></>}
             </button>

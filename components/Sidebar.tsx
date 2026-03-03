@@ -6,7 +6,7 @@ import {
   Store, Shield, ShieldCheck, TrendingUp, Scale, Briefcase, 
   FileText, Fingerprint, Brain, Cpu, List, Box, ShieldAlert,
   ChevronRight, Facebook, Instagram, Linkedin, MessageCircle, 
-  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone, FlaskConical
+  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone, FlaskConical, CreditCard
 } from 'lucide-react';
 import { ViewMode, AgencyBranding, Contact } from '../types';
 
@@ -18,6 +18,7 @@ interface SidebarProps {
   branding?: AgencyBranding;
   contacts?: Contact[];
   onOpenVoiceAssistant?: () => void;
+  userRole?: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -27,7 +28,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout, 
   branding,
   contacts = [],
-  onOpenVoiceAssistant
+  onOpenVoiceAssistant,
+  userRole
 }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -135,6 +137,19 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.ADMIN_HEALTH} label="Gateway Health" icon={Shield} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.SRE_DASHBOARD} label="SRE Dashboard" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.OUTBOX} label="Outbox" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.BILLING} label="Billing" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
+            {userRole === 'admin' && (
+              <>
+                <SidebarItem id={ViewMode.ADMIN_SUBSCRIPTIONS} label="Subscriptions" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_CONSENTS} label="Consent Ledger" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_SMS_TEMPLATES} label="SMS Templates" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_MAILING_QUEUE} label="Mailing Queue" icon={FileText} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_LEGAL_DOCS} label="Legal Publisher" icon={FileText} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_EMAIL_PROVIDERS} label="Email Providers" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_EMAIL_ROUTING} label="Email Routing" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_EMAIL_LOGS} label="Email Logs" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
+              </>
+            )}
             <SidebarItem id={ViewMode.SETTINGS} label="OS Settings" icon={Settings} currentView={currentView} onViewChange={handleNav} />
           </SidebarSection>
         </nav>
