@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 
-type Provider = 'sender' | 'brevo' | 'mailerlite';
+type Provider = 'brevo' | 'mailerlite';
 type MessageType = 'transactional' | 'billing' | 'system' | 'onboarding' | 'reminders' | 'marketing' | 'newsletter';
 
 type Tenant = { id: string; name: string | null };
@@ -21,17 +21,17 @@ type DraftRoutingRow = {
   throttle_per_min: number;
 };
 
-const PROVIDERS: Provider[] = ['sender', 'brevo', 'mailerlite'];
+const PROVIDERS: Provider[] = ['brevo', 'mailerlite'];
 const MESSAGE_TYPES: MessageType[] = ['transactional', 'billing', 'system', 'onboarding', 'reminders', 'marketing', 'newsletter'];
 
-const DEFAULT_ROUTING: Record<MessageType, { primary: Provider; fallback: Provider; throttle: number }> = {
-  transactional: { primary: 'sender', fallback: 'brevo', throttle: 60 },
-  billing: { primary: 'sender', fallback: 'brevo', throttle: 60 },
-  system: { primary: 'sender', fallback: 'brevo', throttle: 60 },
-  onboarding: { primary: 'sender', fallback: 'brevo', throttle: 60 },
-  reminders: { primary: 'sender', fallback: 'brevo', throttle: 60 },
-  marketing: { primary: 'mailerlite', fallback: 'sender', throttle: 30 },
-  newsletter: { primary: 'mailerlite', fallback: 'sender', throttle: 30 },
+const DEFAULT_ROUTING: Record<MessageType, { primary: Provider; fallback: Provider | ''; throttle: number }> = {
+  transactional: { primary: 'brevo', fallback: '', throttle: 90 },
+  billing: { primary: 'brevo', fallback: '', throttle: 90 },
+  system: { primary: 'brevo', fallback: '', throttle: 90 },
+  onboarding: { primary: 'brevo', fallback: '', throttle: 60 },
+  reminders: { primary: 'brevo', fallback: '', throttle: 60 },
+  marketing: { primary: 'mailerlite', fallback: 'brevo', throttle: 30 },
+  newsletter: { primary: 'mailerlite', fallback: 'brevo', throttle: 30 },
 };
 
 function toDraftRows(rows: RoutingRow[]): DraftRoutingRow[] {
@@ -166,7 +166,7 @@ export default function AdminEmailRoutingPage() {
     <div className="max-w-6xl mx-auto px-4 py-6 text-slate-100 space-y-5">
       <div>
         <h1 className="text-2xl font-semibold text-white">Email Routing Rules</h1>
-        <p className="text-sm text-slate-400 mt-1">Set provider routing and per-message-type throttle limits.</p>
+        <p className="text-sm text-slate-400 mt-1">Brevo is the default transactional provider. MailerLite is optional for marketing with Brevo fallback.</p>
       </div>
 
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
@@ -209,7 +209,11 @@ export default function AdminEmailRoutingPage() {
                       value={row.primary_provider}
                       onChange={(e) => {
                         const next = e.target.value as Provider;
-                        setRows((prev) => prev.map((item, idx) => idx === index ? { ...item, primary_provider: next } : item));
+                        setRows((prev) => prev.map((item, idx) => {
+                          if (idx !== index) return item;
+                          const fallback = item.fallback_provider === next ? '' : item.fallback_provider;
+                          return { ...item, primary_provider: next, fallback_provider: fallback };
+                        }));
                       }}
                       className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-xs"
                     >
@@ -228,7 +232,7 @@ export default function AdminEmailRoutingPage() {
                       className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-xs"
                     >
                       <option value="">none</option>
-                      {PROVIDERS.map((provider) => (
+                      {PROVIDERS.filter((provider) => provider !== row.primary_provider).map((provider) => (
                         <option key={provider} value={provider}>{provider}</option>
                       ))}
                     </select>

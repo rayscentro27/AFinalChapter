@@ -403,3 +403,6 @@ verify_jwt = false
 
 [functions.policy-admin]
 verify_jwt = false
+
+[functions.email-orchestrator]
+verify_jwt = false

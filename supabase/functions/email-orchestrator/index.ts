@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-type Provider = "sender" | "brevo" | "mailerlite";
+type Provider = "brevo" | "mailerlite";
 type MessageType =
   | "transactional"
   | "billing"
@@ -12,24 +12,23 @@ type MessageType =
   | "newsletter";
 
 type SendBody = {
-  tenant_id?: string;
-  message_type?: MessageType;
-  to?: string;
-  subject?: string;
-  html?: string;
-  text?: string;
-  template_key?: string;
-  data?: Record<string, unknown>;
-  user_id?: string;
-  to_name?: string;
+  tenant_id?: unknown;
+  message_type?: unknown;
+  to?: unknown;
+  subject?: unknown;
+  html?: unknown;
+  text?: unknown;
+  template_key?: unknown;
+  data?: unknown;
+  user_id?: unknown;
+  to_name?: unknown;
 };
 
-type SendAttemptResult = {
-  ok: boolean;
-  providerMessageId: string | null;
-  raw: unknown;
-  error: string | null;
-  unsupported?: boolean;
+type RoutingRuleRow = {
+  message_type: MessageType;
+  primary_provider: Provider;
+  fallback_provider: Provider | null;
+  throttle_per_min: number;
 };
 
 type ProviderConfigRow = {
@@ -40,17 +39,28 @@ type ProviderConfigRow = {
   config: Record<string, unknown>;
 };
 
-type RoutingRuleRow = {
-  message_type: MessageType;
-  primary_provider: Provider;
-  fallback_provider: Provider | null;
-  throttle_per_min: number;
+type ContactRow = {
+  id: string;
+  user_id: string | null;
+  consent_transactional: boolean;
+  consent_marketing: boolean;
+  unsubscribed: boolean;
+  tags: string[];
+  provider_refs: Record<string, unknown>;
+};
+
+type SendAttemptResult = {
+  ok: boolean;
+  providerMessageId: string | null;
+  raw: unknown;
+  error: string | null;
+  unsupported?: boolean;
 };
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-signature, x-webhook-signature, x-sender-signature",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-signature, x-webhook-signature, x-brevo-signature, x-mailerlite-signature",
+  "Access-Control-Allow-Methods": "POST,OPTIONS",
 };
 
 const ALLOWED_MESSAGE_TYPES: MessageType[] = [
@@ -66,13 +76,13 @@ const ALLOWED_MESSAGE_TYPES: MessageType[] = [
 const MARKETING_TYPES: MessageType[] = ["marketing", "newsletter"];
 
 const DEFAULT_ROUTING: Record<MessageType, { primary: Provider; fallback: Provider | null; throttle: number }> = {
-  transactional: { primary: "sender", fallback: "brevo", throttle: 60 },
-  billing: { primary: "sender", fallback: "brevo", throttle: 60 },
-  system: { primary: "sender", fallback: "brevo", throttle: 60 },
-  onboarding: { primary: "sender", fallback: "brevo", throttle: 60 },
-  reminders: { primary: "sender", fallback: "brevo", throttle: 60 },
-  marketing: { primary: "mailerlite", fallback: "sender", throttle: 30 },
-  newsletter: { primary: "mailerlite", fallback: "sender", throttle: 30 },
+  transactional: { primary: "brevo", fallback: null, throttle: 90 },
+  billing: { primary: "brevo", fallback: null, throttle: 90 },
+  system: { primary: "brevo", fallback: null, throttle: 90 },
+  onboarding: { primary: "brevo", fallback: null, throttle: 60 },
+  reminders: { primary: "brevo", fallback: null, throttle: 60 },
+  marketing: { primary: "mailerlite", fallback: "brevo", throttle: 30 },
+  newsletter: { primary: "mailerlite", fallback: "brevo", throttle: 30 },
 };
 
 function json(status: number, body: Record<string, unknown>) {
@@ -81,16 +91,22 @@ function json(status: number, body: Record<string, unknown>) {
     headers: {
       ...CORS_HEADERS,
       "Content-Type": "application/json",
+      "Cache-Control": "no-store",
     },
   });
 }
 
-function normalizeEmail(value: unknown): string {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
-}
-
 function normalizeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeEmail(value: unknown): string {
+  return normalizeString(value).toLowerCase();
+}
+
+function normalizeMessageType(value: unknown): MessageType | null {
+  const type = normalizeString(value).toLowerCase() as MessageType;
+  return ALLOWED_MESSAGE_TYPES.includes(type) ? type : null;
 }
 
 function isMarketingType(messageType: MessageType): boolean {
@@ -107,9 +123,7 @@ function dedupeProviders(values: Array<Provider | null | undefined>): Provider[]
   const output: Provider[] = [];
   for (const value of values) {
     if (!value) continue;
-    if (!output.includes(value)) {
-      output.push(value);
-    }
+    if (!output.includes(value)) output.push(value);
   }
   return output;
 }
@@ -118,7 +132,7 @@ function extractProviderMessageId(input: unknown): string | null {
   if (!input || typeof input !== "object") return null;
   const obj = input as Record<string, unknown>;
 
-  const direct = obj.id ?? obj.message_id ?? obj.messageId ?? obj["message-id"];
+  const direct = obj.messageId ?? obj.message_id ?? obj["message-id"] ?? obj.id;
   if (typeof direct === "string" && direct.trim()) return direct.trim();
   if (typeof direct === "number") return String(direct);
 
@@ -133,10 +147,35 @@ function extractProviderMessageId(input: unknown): string | null {
   return null;
 }
 
+function inferWebhookEventType(payload: Record<string, unknown>): string {
+  const candidates = [payload.event, payload.event_type, payload.type, payload.status, payload.action];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "unknown";
+}
+
+function inferWebhookEmail(payload: Record<string, unknown>): string | null {
+  const candidates = [payload.email, payload.to, payload.recipient, payload.email_to];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim().toLowerCase();
+  }
+
+  if (Array.isArray(payload.to) && payload.to.length > 0 && typeof payload.to[0] === "string") {
+    return String(payload.to[0]).trim().toLowerCase();
+  }
+
+  if (Array.isArray(payload.recipients) && payload.recipients.length > 0 && typeof payload.recipients[0] === "string") {
+    return String(payload.recipients[0]).trim().toLowerCase();
+  }
+
+  return null;
+}
+
 function mapWebhookStatus(eventTypeRaw: string): string | null {
-  const eventType = eventTypeRaw.toLowerCase();
+  const eventType = normalizeString(eventTypeRaw).toLowerCase();
   if (!eventType) return null;
-  if (eventType.includes("deliver") || eventType.includes("sent") || eventType.includes("processed")) return "delivered";
+  if (eventType.includes("deliver") || eventType.includes("processed") || eventType.includes("sent")) return "delivered";
   if (eventType.includes("open")) return "opened";
   if (eventType.includes("click")) return "clicked";
   if (eventType.includes("bounce")) return "bounced";
@@ -146,94 +185,52 @@ function mapWebhookStatus(eventTypeRaw: string): string | null {
   return null;
 }
 
-function inferWebhookEventType(payload: Record<string, unknown>): string {
-  const candidates = [
-    payload.event,
-    payload.event_type,
-    payload.type,
-    payload.status,
-    payload.action,
-  ];
-
-  for (const value of candidates) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-
-  return "unknown";
-}
-
-function inferWebhookEmail(payload: Record<string, unknown>): string | null {
-  const candidates = [
-    payload.email,
-    payload.to,
-    payload.recipient,
-    payload["email_to"],
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate === "string" && candidate.trim()) {
-      return candidate.trim().toLowerCase();
-    }
-  }
-
-  if (Array.isArray(payload.to) && payload.to.length > 0 && typeof payload.to[0] === "string") {
-    return String(payload.to[0]).trim().toLowerCase();
-  }
-
-  return null;
-}
-
-function addEducationalFooter(html: string, text: string): { html: string; text: string } {
-  const footerLine = "Educational only. No guarantees of outcomes.";
-
-  const htmlFooter = `<hr style="margin-top:24px;border:none;border-top:1px solid #e2e8f0"/><p style="font-size:12px;color:#64748b">${footerLine}</p>`;
-  const nextHtml = html
-    ? `${html}${htmlFooter}`
-    : `<p>${footerLine}</p>`;
-
-  const nextText = text
-    ? `${text}\n\n${footerLine}`
-    : footerLine;
-
-  return { html: nextHtml, text: nextText };
-}
-
 function errorMessageFromProviderResponse(status: number, raw: unknown, fallback: string): string {
   if (raw && typeof raw === "object") {
     const obj = raw as Record<string, unknown>;
     const message = obj.message ?? obj.error ?? obj.details;
-    if (typeof message === "string" && message.trim()) return message.trim();
+    if (typeof message === "string" && message.trim()) {
+      return message.trim();
+    }
   }
   return `${fallback} (${status})`;
 }
 
-async function resolveTenantId(serviceClient: SupabaseClient, preferredUserId: string | null, bodyTenantId: string | null): Promise<string | null> {
-  if (bodyTenantId) {
-    return bodyTenantId;
-  }
+function addEducationalFooter(html: string, text: string): { html: string; text: string } {
+  const footerLine = "Educational only. No guarantees of outcomes.";
+  const htmlFooter = `<hr style=\"margin-top:24px;border:none;border-top:1px solid #e2e8f0\"/><p style=\"font-size:12px;color:#64748b\">${footerLine}</p>`;
+
+  return {
+    html: html ? `${html}${htmlFooter}` : `<p>${footerLine}</p>`,
+    text: text ? `${text}\n\n${footerLine}` : footerLine,
+  };
+}
+
+async function resolveTenantId(serviceClient: SupabaseClient, preferredUserId: string | null, requestedTenantId: string | null): Promise<string | null> {
+  if (requestedTenantId) return requestedTenantId;
 
   const userId = preferredUserId || null;
   if (userId) {
-    const memberRes = await serviceClient
+    const membershipRes = await serviceClient
       .from("tenant_memberships")
       .select("tenant_id")
       .eq("user_id", userId)
       .limit(1)
       .maybeSingle();
 
-    if (!memberRes.error && memberRes.data?.tenant_id) {
-      return String(memberRes.data.tenant_id);
+    if (!membershipRes.error && membershipRes.data?.tenant_id) {
+      return String(membershipRes.data.tenant_id);
     }
 
-    const fallbackRes = await serviceClient
+    const legacyRes = await serviceClient
       .from("tenant_members")
       .select("tenant_id")
       .eq("user_id", userId)
       .limit(1)
       .maybeSingle();
 
-    if (!fallbackRes.error && (fallbackRes.data as Record<string, unknown> | null)?.tenant_id) {
-      return String((fallbackRes.data as Record<string, unknown>).tenant_id);
+    if (!legacyRes.error && (legacyRes.data as Record<string, unknown> | null)?.tenant_id) {
+      return String((legacyRes.data as Record<string, unknown>).tenant_id);
     }
   }
 
@@ -251,10 +248,50 @@ async function resolveTenantId(serviceClient: SupabaseClient, preferredUserId: s
   return null;
 }
 
-async function loadRouting(serviceClient: SupabaseClient, tenantId: string, messageType: MessageType): Promise<RoutingRuleRow> {
-  const defaultRule = DEFAULT_ROUTING[messageType];
+async function canRequesterManageTenant(userClient: SupabaseClient, serviceClient: SupabaseClient, requesterId: string, tenantId: string): Promise<boolean> {
+  const rpcManage = await userClient.rpc("nexus_email_can_manage_tenant", { p_tenant_id: tenantId });
+  if (!rpcManage.error) {
+    return Boolean(rpcManage.data);
+  }
 
-  const { data, error } = await serviceClient
+  const rpcSuper = await userClient.rpc("nexus_is_master_admin_compat");
+  if (!rpcSuper.error && rpcSuper.data) {
+    return true;
+  }
+
+  const membershipRes = await serviceClient
+    .from("tenant_memberships")
+    .select("role")
+    .eq("user_id", requesterId)
+    .eq("tenant_id", tenantId)
+    .limit(1)
+    .maybeSingle();
+
+  if (!membershipRes.error && membershipRes.data?.role) {
+    const role = normalizeString(membershipRes.data.role).toLowerCase();
+    if (["admin", "owner", "super_admin"].includes(role)) return true;
+  }
+
+  const legacyRes = await serviceClient
+    .from("tenant_members")
+    .select("role")
+    .eq("user_id", requesterId)
+    .eq("tenant_id", tenantId)
+    .limit(1)
+    .maybeSingle();
+
+  if (!legacyRes.error && (legacyRes.data as Record<string, unknown> | null)?.role) {
+    const role = normalizeString((legacyRes.data as Record<string, unknown>).role).toLowerCase();
+    if (["admin", "owner", "super_admin"].includes(role)) return true;
+  }
+
+  return false;
+}
+
+async function loadRouting(serviceClient: SupabaseClient, tenantId: string, messageType: MessageType): Promise<RoutingRuleRow> {
+  const fallback = DEFAULT_ROUTING[messageType];
+
+  const ruleRes = await serviceClient
     .from("esp_routing_rules")
     .select("message_type,primary_provider,fallback_provider,throttle_per_min")
     .eq("tenant_id", tenantId)
@@ -262,42 +299,57 @@ async function loadRouting(serviceClient: SupabaseClient, tenantId: string, mess
     .limit(1)
     .maybeSingle();
 
-  if (error || !data) {
+  if (ruleRes.error || !ruleRes.data) {
     return {
       message_type: messageType,
-      primary_provider: defaultRule.primary,
-      fallback_provider: defaultRule.fallback,
-      throttle_per_min: defaultRule.throttle,
+      primary_provider: fallback.primary,
+      fallback_provider: fallback.fallback,
+      throttle_per_min: fallback.throttle,
     };
   }
 
-  return data as RoutingRuleRow;
+  const row = ruleRes.data as RoutingRuleRow;
+  return {
+    message_type: messageType,
+    primary_provider: row.primary_provider || fallback.primary,
+    fallback_provider: row.fallback_provider || fallback.fallback,
+    throttle_per_min: Number(row.throttle_per_min || fallback.throttle),
+  };
 }
 
 async function loadEnabledProviders(serviceClient: SupabaseClient, tenantId: string): Promise<ProviderConfigRow[]> {
-  const { data, error } = await serviceClient
+  const providersRes = await serviceClient
     .from("esp_providers")
     .select("provider,is_enabled,priority,capabilities,config")
     .eq("tenant_id", tenantId)
     .eq("is_enabled", true)
     .order("priority", { ascending: true });
 
-  if (error || !data) {
-    return [];
+  if (providersRes.error || !providersRes.data || providersRes.data.length === 0) {
+    return [
+      {
+        provider: "brevo",
+        is_enabled: true,
+        priority: 10,
+        capabilities: { transactional: true, marketing: true },
+        config: {},
+      },
+    ];
   }
 
-  return data as ProviderConfigRow[];
+  return (providersRes.data as ProviderConfigRow[])
+    .filter((row) => row.provider === "brevo" || row.provider === "mailerlite");
 }
 
-async function enforceThrottle(
+async function enforceThrottleBestEffort(
   serviceClient: SupabaseClient,
   tenantId: string,
   provider: Provider,
   throttlePerMin: number,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ allowed: boolean; warning?: string; blockedReason?: string }> {
   const windowStart = minuteWindowStartISO();
 
-  const { data: existing, error: readError } = await serviceClient
+  const counterRes = await serviceClient
     .from("esp_send_counters")
     .select("id,request_count")
     .eq("tenant_id", tenantId)
@@ -306,42 +358,52 @@ async function enforceThrottle(
     .limit(1)
     .maybeSingle();
 
-  if (readError) {
-    return { ok: false, error: `Throttle lookup failed: ${readError.message}` };
+  if (counterRes.error) {
+    return {
+      allowed: true,
+      warning: `Throttle counter read failed (${counterRes.error.message}). Continuing with best-effort send.`,
+    };
   }
 
-  if (!existing) {
-    const { error: insertError } = await serviceClient
-      .from("esp_send_counters")
-      .insert({
-        tenant_id: tenantId,
-        provider,
-        window_start: windowStart,
-        request_count: 1,
-      });
+  if (!counterRes.data) {
+    const insertRes = await serviceClient.from("esp_send_counters").insert({
+      tenant_id: tenantId,
+      provider,
+      window_start: windowStart,
+      request_count: 1,
+    });
 
-    if (insertError) {
-      return { ok: false, error: `Throttle counter insert failed: ${insertError.message}` };
+    if (insertRes.error) {
+      return {
+        allowed: true,
+        warning: `Throttle counter insert failed (${insertRes.error.message}). Continuing with best-effort send.`,
+      };
     }
 
-    return { ok: true };
+    return { allowed: true };
   }
 
-  const requestCount = Number(existing.request_count || 0);
-  if (requestCount >= throttlePerMin) {
-    return { ok: false, error: `Throttle exceeded for provider ${provider}. Try again in the next minute.` };
+  const currentCount = Number(counterRes.data.request_count || 0);
+  if (currentCount >= throttlePerMin) {
+    return {
+      allowed: false,
+      blockedReason: `Throttle exceeded for ${provider}. Try again in the next minute.`,
+    };
   }
 
-  const { error: updateError } = await serviceClient
+  const updateRes = await serviceClient
     .from("esp_send_counters")
-    .update({ request_count: requestCount + 1 })
-    .eq("id", existing.id);
+    .update({ request_count: currentCount + 1 })
+    .eq("id", counterRes.data.id);
 
-  if (updateError) {
-    return { ok: false, error: `Throttle counter update failed: ${updateError.message}` };
+  if (updateRes.error) {
+    return {
+      allowed: true,
+      warning: `Throttle counter update failed (${updateRes.error.message}). Continuing with best-effort send.`,
+    };
   }
 
-  return { ok: true };
+  return { allowed: true };
 }
 
 async function syncMailerLiteSubscriber(
@@ -349,53 +411,20 @@ async function syncMailerLiteSubscriber(
   email: string,
   fullName: string | null,
   unsubscribed: boolean,
-): Promise<void> {
-  const body = {
-    email,
-    status: unsubscribed ? "unsubscribed" : "active",
-    fields: {
-      name: fullName || "",
-    },
-  };
-
-  await fetch("https://connect.mailerlite.com/api/subscribers", {
+): Promise<unknown> {
+  const response = await fetch("https://connect.mailerlite.com/api/subscribers", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "Accept": "application/json",
       "Authorization": `Bearer ${apiKey}`,
-      "Accept": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-}
-
-async function sendViaSender(params: {
-  token: string;
-  fromEmail: string;
-  fromName: string;
-  toEmail: string;
-  toName: string;
-  subject: string;
-  html: string;
-}): Promise<SendAttemptResult> {
-  const response = await fetch("https://api.sender.net/v2/message/send", {
-    method: "POST",
-    headers: {
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${params.token}`,
     },
     body: JSON.stringify({
-      from: {
-        email: params.fromEmail,
-        name: params.fromName,
+      email,
+      status: unsubscribed ? "unsubscribed" : "active",
+      fields: {
+        name: fullName || "",
       },
-      to: {
-        email: params.toEmail,
-        name: params.toName,
-      },
-      subject: params.subject,
-      html: params.html,
     }),
   });
 
@@ -410,20 +439,10 @@ async function sendViaSender(params: {
   }
 
   if (!response.ok) {
-    return {
-      ok: false,
-      providerMessageId: extractProviderMessageId(raw),
-      raw,
-      error: errorMessageFromProviderResponse(response.status, raw, "Sender send failed"),
-    };
+    throw new Error(errorMessageFromProviderResponse(response.status, raw, "MailerLite subscriber sync failed"));
   }
 
-  return {
-    ok: true,
-    providerMessageId: extractProviderMessageId(raw),
-    raw,
-    error: null,
-  };
+  return raw;
 }
 
 async function sendViaBrevo(params: {
@@ -435,6 +454,9 @@ async function sendViaBrevo(params: {
   subject: string;
   html: string;
   text: string;
+  messageType: MessageType;
+  templateKey: string | null;
+  tenantId: string;
 }): Promise<SendAttemptResult> {
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
@@ -456,24 +478,32 @@ async function sendViaBrevo(params: {
       ],
       subject: params.subject,
       htmlContent: params.html,
-      textContent: params.text,
+      textContent: params.text || undefined,
+      headers: {
+        "X-Nexus-Message-Type": params.messageType,
+        "X-Nexus-Template-Key": params.templateKey || "",
+        "X-Nexus-Tenant": params.tenantId,
+      },
     }),
   });
 
-  const text = await response.text();
+  const responseText = await response.text();
   let raw: unknown = null;
-  if (text) {
+  if (responseText) {
     try {
-      raw = JSON.parse(text);
+      raw = JSON.parse(responseText);
     } catch {
-      raw = { raw: text };
+      raw = { raw: responseText };
     }
   }
+
+  const responseRequestId = normalizeString(response.headers.get("x-request-id"));
+  const providerMessageId = extractProviderMessageId(raw) || responseRequestId || null;
 
   if (!response.ok) {
     return {
       ok: false,
-      providerMessageId: extractProviderMessageId(raw),
+      providerMessageId,
       raw,
       error: errorMessageFromProviderResponse(response.status, raw, "Brevo send failed"),
     };
@@ -481,7 +511,7 @@ async function sendViaBrevo(params: {
 
   return {
     ok: true,
-    providerMessageId: extractProviderMessageId(raw),
+    providerMessageId,
     raw,
     error: null,
   };
@@ -491,22 +521,27 @@ async function sendViaMailerLite(params: {
   apiKey: string;
   toEmail: string;
   toName: string;
-  messageType: MessageType;
   unsubscribed: boolean;
+  messageType: MessageType;
 }): Promise<SendAttemptResult> {
   try {
-    await syncMailerLiteSubscriber(params.apiKey, params.toEmail, params.toName, params.unsubscribed);
-  } catch {
-    // Subscriber sync failures should not crash orchestration.
+    const syncRaw = await syncMailerLiteSubscriber(params.apiKey, params.toEmail, params.toName, params.unsubscribed);
+    return {
+      ok: false,
+      providerMessageId: extractProviderMessageId(syncRaw),
+      raw: syncRaw,
+      error: "MailerLite direct send is unsupported for this workflow. Subscriber sync completed.",
+      unsupported: true,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      providerMessageId: null,
+      raw: null,
+      error: error instanceof Error ? error.message : "MailerLite subscriber sync failed.",
+      unsupported: true,
+    };
   }
-
-  return {
-    ok: false,
-    providerMessageId: null,
-    raw: { provider: "mailerlite", reason: "unsupported_send" },
-    error: "MailerLite direct send is not configured. Subscriber sync completed; configure campaign automation or fallback provider.",
-    unsupported: true,
-  };
 }
 
 async function upsertEspContact(params: {
@@ -516,54 +551,80 @@ async function upsertEspContact(params: {
   email: string;
   fullName: string | null;
   consentMarketing: boolean;
-}): Promise<{
-  id: string;
-  user_id: string | null;
-  consent_transactional: boolean;
-  consent_marketing: boolean;
-  unsubscribed: boolean;
-}> {
-  const { data: existing } = await params.serviceClient
+}): Promise<ContactRow> {
+  const existingRes = await params.serviceClient
     .from("esp_contacts")
-    .select("id,user_id,consent_transactional,consent_marketing,unsubscribed")
+    .select("id,user_id,consent_transactional,consent_marketing,unsubscribed,tags,provider_refs")
     .eq("tenant_id", params.tenantId)
     .eq("email", params.email)
     .limit(1)
     .maybeSingle();
 
-  const transactional = existing ? Boolean(existing.consent_transactional) : true;
-  const marketing = existing
-    ? Boolean(existing.consent_marketing || params.consentMarketing)
-    : Boolean(params.consentMarketing);
-  const unsubscribed = existing ? Boolean(existing.unsubscribed) : false;
+  const existing = (existingRes.data || null) as ContactRow | null;
+
+  const nextConsentMarketing = params.userId
+    ? Boolean(params.consentMarketing)
+    : existing
+      ? Boolean(existing.consent_marketing)
+      : Boolean(params.consentMarketing);
 
   const payload = {
     tenant_id: params.tenantId,
     user_id: params.userId || existing?.user_id || null,
     email: params.email,
     full_name: params.fullName,
-    consent_transactional: transactional,
-    consent_marketing: marketing,
-    unsubscribed,
+    consent_transactional: existing ? Boolean(existing.consent_transactional) : true,
+    consent_marketing: nextConsentMarketing,
+    unsubscribed: existing ? Boolean(existing.unsubscribed) : false,
+    tags: existing?.tags || [],
+    provider_refs: existing?.provider_refs || {},
   };
 
-  const { data, error } = await params.serviceClient
+  const upsertRes = await params.serviceClient
     .from("esp_contacts")
     .upsert(payload, { onConflict: "tenant_id,email" })
-    .select("id,user_id,consent_transactional,consent_marketing,unsubscribed")
+    .select("id,user_id,consent_transactional,consent_marketing,unsubscribed,tags,provider_refs")
     .single();
 
-  if (error || !data) {
-    throw new Error(error?.message || "Unable to upsert email contact.");
+  if (upsertRes.error || !upsertRes.data) {
+    throw new Error(upsertRes.error?.message || "Unable to upsert email contact.");
   }
 
-  return data as {
-    id: string;
-    user_id: string | null;
-    consent_transactional: boolean;
-    consent_marketing: boolean;
-    unsubscribed: boolean;
+  return upsertRes.data as ContactRow;
+}
+
+async function updateContactProviderRef(params: {
+  serviceClient: SupabaseClient;
+  tenantId: string;
+  email: string;
+  provider: Provider;
+  providerMessageId: string | null;
+}) {
+  if (!params.providerMessageId) return;
+
+  const contactRes = await params.serviceClient
+    .from("esp_contacts")
+    .select("provider_refs")
+    .eq("tenant_id", params.tenantId)
+    .eq("email", params.email)
+    .limit(1)
+    .maybeSingle();
+
+  if (contactRes.error || !contactRes.data) return;
+
+  const providerRefs = {
+    ...(contactRes.data.provider_refs || {}),
+    [params.provider]: {
+      last_message_id: params.providerMessageId,
+      updated_at: new Date().toISOString(),
+    },
   };
+
+  await params.serviceClient
+    .from("esp_contacts")
+    .update({ provider_refs: providerRefs })
+    .eq("tenant_id", params.tenantId)
+    .eq("email", params.email);
 }
 
 async function insertMessageAttempt(params: {
@@ -580,7 +641,7 @@ async function insertMessageAttempt(params: {
   error: string | null;
   meta: Record<string, unknown>;
 }): Promise<string | null> {
-  const { data, error } = await params.serviceClient
+  const insertRes = await params.serviceClient
     .from("esp_messages")
     .insert({
       tenant_id: params.tenantId,
@@ -598,19 +659,58 @@ async function insertMessageAttempt(params: {
     .select("id")
     .single();
 
-  if (error) {
+  if (insertRes.error || !insertRes.data?.id) {
     return null;
   }
 
-  return String(data.id);
+  return String(insertRes.data.id);
+}
+
+function resolveProviderChain(params: {
+  messageType: MessageType;
+  routing: RoutingRuleRow;
+  enabledProviders: ProviderConfigRow[];
+}): Provider[] {
+  const enabled = params.enabledProviders
+    .map((row) => row.provider)
+    .filter((provider): provider is Provider => provider === "brevo" || provider === "mailerlite");
+
+  const enabledSet = new Set<Provider>(enabled);
+  const defaultRoute = DEFAULT_ROUTING[params.messageType];
+
+  let primary = params.routing.primary_provider || defaultRoute.primary;
+  if (!enabledSet.has(primary)) {
+    if (isMarketingType(params.messageType) && enabledSet.has("mailerlite")) {
+      primary = "mailerlite";
+    } else if (enabledSet.has("brevo")) {
+      primary = "brevo";
+    } else if (enabled.length > 0) {
+      primary = enabled[0];
+    }
+  }
+
+  const requestedFallback = params.routing.fallback_provider || defaultRoute.fallback;
+  let fallback: Provider | null = requestedFallback && enabledSet.has(requestedFallback)
+    ? requestedFallback
+    : null;
+
+  if (!fallback && primary === "mailerlite" && enabledSet.has("brevo")) {
+    fallback = "brevo";
+  }
+
+  if (fallback === primary) {
+    fallback = null;
+  }
+
+  return dedupeProviders([primary, fallback]);
 }
 
 async function handleSend(req: Request): Promise<Response> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-  const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const supabaseUrl = normalizeString(Deno.env.get("SUPABASE_URL"));
+  const supabaseAnonKey = normalizeString(Deno.env.get("SUPABASE_ANON_KEY"));
+  const serviceRoleKey = normalizeString(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
 
-  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+  if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
     return json(500, { success: false, error: "Supabase environment not configured." });
   }
 
@@ -621,13 +721,13 @@ async function handleSend(req: Request): Promise<Response> {
     return json(400, { success: false, error: "Invalid JSON body." });
   }
 
-  const messageType = body.message_type;
+  const messageType = normalizeMessageType(body.message_type);
   const toEmail = normalizeEmail(body.to);
   const subject = normalizeString(body.subject);
   const html = typeof body.html === "string" ? body.html : "";
   const text = typeof body.text === "string" ? body.text : "";
 
-  if (!messageType || !ALLOWED_MESSAGE_TYPES.includes(messageType)) {
+  if (!messageType) {
     return json(400, { success: false, error: "Invalid message_type." });
   }
 
@@ -643,11 +743,10 @@ async function handleSend(req: Request): Promise<Response> {
   const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } },
   });
-
-  const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+  const serviceClient = createClient(supabaseUrl, serviceRoleKey);
 
   const authRes = await userClient.auth.getUser();
-  if (authRes.error || !authRes.data.user) {
+  if (authRes.error || !authRes.data.user?.id) {
     return json(401, { success: false, error: "Unauthorized." });
   }
 
@@ -655,26 +754,24 @@ async function handleSend(req: Request): Promise<Response> {
   const requestedUserId = normalizeString(body.user_id);
   const actingUserId = requestedUserId || requester.id;
 
-  if (requestedUserId && requestedUserId !== requester.id) {
-    const membershipCheck = await serviceClient
-      .from("tenant_memberships")
-      .select("role")
-      .eq("user_id", requester.id)
-      .eq("role", "admin")
-      .limit(1)
-      .maybeSingle();
+  const tenantId = await resolveTenantId(
+    serviceClient,
+    actingUserId || requester.id,
+    normalizeString(body.tenant_id) || null,
+  );
 
-    if (membershipCheck.error || !membershipCheck.data) {
-      return json(403, { success: false, error: "Cannot send on behalf of another user." });
-    }
-  }
-
-  const tenantId = await resolveTenantId(serviceClient, actingUserId, normalizeString(body.tenant_id) || null);
   if (!tenantId) {
     return json(400, { success: false, error: "Unable to resolve tenant_id." });
   }
 
-  const commPrefsRes = actingUserId
+  if (requestedUserId && requestedUserId !== requester.id) {
+    const canManage = await canRequesterManageTenant(userClient, serviceClient, requester.id, tenantId);
+    if (!canManage) {
+      return json(403, { success: false, error: "Cannot send on behalf of another user." });
+    }
+  }
+
+  const communicationPrefRes = actingUserId
     ? await serviceClient
       .from("communication_preferences")
       .select("marketing_email_opt_in")
@@ -692,7 +789,7 @@ async function handleSend(req: Request): Promise<Response> {
       .maybeSingle()
     : { data: null, error: null };
 
-  const consentMarketing = Boolean(commPrefsRes.data?.marketing_email_opt_in);
+  const consentMarketing = Boolean(communicationPrefRes.data?.marketing_email_opt_in);
   const commsEmailAccepted = Boolean(consentStatusRes.data?.comms_email_accepted);
 
   const contact = await upsertEspContact({
@@ -704,36 +801,43 @@ async function handleSend(req: Request): Promise<Response> {
     consentMarketing,
   });
 
+  const templateKey = normalizeString(body.template_key) || null;
+
   if (contact.unsubscribed) {
-    await insertMessageAttempt({
+    const blockedMessageId = await insertMessageAttempt({
       serviceClient,
       tenantId,
-      userId: actingUserId,
+      userId: actingUserId || null,
       toEmail,
       messageType,
       subject,
-      templateKey: normalizeString(body.template_key) || null,
-      provider: "sender",
+      templateKey,
+      provider: "brevo",
       providerMessageId: null,
       status: "blocked",
       error: "Recipient is unsubscribed.",
       meta: { blocked_reason: "unsubscribed" },
     });
 
-    return json(403, { success: false, error: "Recipient is unsubscribed.", status: "blocked" });
+    return json(403, {
+      success: false,
+      message_id: blockedMessageId,
+      status: "blocked",
+      error: "Recipient is unsubscribed.",
+    });
   }
 
   if (isMarketingType(messageType)) {
     if (!contact.consent_marketing || !commsEmailAccepted) {
-      await insertMessageAttempt({
+      const blockedMessageId = await insertMessageAttempt({
         serviceClient,
         tenantId,
-        userId: actingUserId,
+        userId: actingUserId || null,
         toEmail,
         messageType,
         subject,
-        templateKey: normalizeString(body.template_key) || null,
-        provider: "sender",
+        templateKey,
+        provider: "mailerlite",
         providerMessageId: null,
         status: "blocked",
         error: "Marketing email requires consent_marketing and comms_email policy acceptance.",
@@ -742,20 +846,21 @@ async function handleSend(req: Request): Promise<Response> {
 
       return json(403, {
         success: false,
-        error: "Marketing email requires consent_marketing and comms_email policy acceptance.",
+        message_id: blockedMessageId,
         status: "blocked",
+        error: "Marketing email requires consent_marketing and comms_email policy acceptance.",
       });
     }
   } else if (!contact.consent_transactional) {
-    await insertMessageAttempt({
+    const blockedMessageId = await insertMessageAttempt({
       serviceClient,
       tenantId,
-      userId: actingUserId,
+      userId: actingUserId || null,
       toEmail,
       messageType,
       subject,
-      templateKey: normalizeString(body.template_key) || null,
-      provider: "sender",
+      templateKey,
+      provider: "brevo",
       providerMessageId: null,
       status: "blocked",
       error: "Transactional consent not available for recipient.",
@@ -764,66 +869,51 @@ async function handleSend(req: Request): Promise<Response> {
 
     return json(403, {
       success: false,
-      error: "Transactional consent not available for recipient.",
+      message_id: blockedMessageId,
       status: "blocked",
+      error: "Transactional consent not available for recipient.",
     });
   }
 
   const routing = await loadRouting(serviceClient, tenantId, messageType);
   const enabledProviders = await loadEnabledProviders(serviceClient, tenantId);
+  const providerChain = resolveProviderChain({ messageType, routing, enabledProviders });
 
-  const enabledProviderKeys = enabledProviders.map((row) => row.provider);
-  const defaultRouting = DEFAULT_ROUTING[messageType];
-
-  let primaryProvider: Provider = routing.primary_provider || defaultRouting.primary;
-  if (!enabledProviderKeys.includes(primaryProvider)) {
-    primaryProvider = enabledProviderKeys[0] || defaultRouting.primary;
-  }
-
-  let fallbackProvider: Provider | null = routing.fallback_provider || defaultRouting.fallback;
-  if (fallbackProvider && !enabledProviderKeys.includes(fallbackProvider)) {
-    fallbackProvider = null;
-  }
-
-  const providerChain = dedupeProviders([primaryProvider, fallbackProvider]);
   if (providerChain.length === 0) {
-    return json(503, { success: false, error: "No enabled ESP providers configured for tenant." });
+    return json(503, {
+      success: false,
+      status: "failed",
+      error: "No enabled email providers are configured for this tenant.",
+    });
   }
 
-  const senderToken = normalizeString(Deno.env.get("SENDER_API_TOKEN") || Deno.env.get("SENDER_API_KEY"));
   const brevoApiKey = normalizeString(Deno.env.get("BREVO_API_KEY"));
   const mailerLiteApiKey = normalizeString(Deno.env.get("MAILERLITE_API_KEY"));
-
-  const defaultFromEmail = normalizeString(Deno.env.get("SENDER_FROM_EMAIL_OVERRIDE") || Deno.env.get("DEFAULT_FROM_EMAIL"));
-  const defaultFromName = normalizeString(Deno.env.get("DEFAULT_FROM_NAME") || "Nexus");
+  const defaultFromEmail = normalizeString(Deno.env.get("DEFAULT_FROM_EMAIL"));
+  const defaultFromName = normalizeString(Deno.env.get("DEFAULT_FROM_NAME")) || "Nexus";
 
   if (!defaultFromEmail) {
     return json(500, { success: false, error: "DEFAULT_FROM_EMAIL is missing." });
   }
 
   const withFooter = addEducationalFooter(html, text);
+  const throttlePerMin = Math.max(1, Number(routing.throttle_per_min || DEFAULT_ROUTING[messageType].throttle));
 
   for (const provider of providerChain) {
-    const throttleCheck = await enforceThrottle(
-      serviceClient,
-      tenantId,
-      provider,
-      Number(routing.throttle_per_min || DEFAULT_ROUTING[messageType].throttle),
-    );
-
-    if (!throttleCheck.ok) {
+    const throttleResult = await enforceThrottleBestEffort(serviceClient, tenantId, provider, throttlePerMin);
+    if (!throttleResult.allowed) {
       await insertMessageAttempt({
         serviceClient,
         tenantId,
-        userId: actingUserId,
+        userId: actingUserId || null,
         toEmail,
         messageType,
         subject,
-        templateKey: normalizeString(body.template_key) || null,
+        templateKey,
         provider,
         providerMessageId: null,
         status: "failed",
-        error: throttleCheck.error || "Throttle check failed",
+        error: throttleResult.blockedReason || "Throttle blocked send.",
         meta: { stage: "throttle" },
       });
       continue;
@@ -831,26 +921,7 @@ async function handleSend(req: Request): Promise<Response> {
 
     let attempt: SendAttemptResult;
 
-    if (provider === "sender") {
-      if (!senderToken) {
-        attempt = {
-          ok: false,
-          providerMessageId: null,
-          raw: null,
-          error: "SENDER_API_TOKEN is missing.",
-        };
-      } else {
-        attempt = await sendViaSender({
-          token: senderToken,
-          fromEmail: defaultFromEmail,
-          fromName: defaultFromName,
-          toEmail,
-          toName: normalizeString(body.to_name) || "Recipient",
-          subject,
-          html: withFooter.html,
-        });
-      }
-    } else if (provider === "brevo") {
+    if (provider === "brevo") {
       if (!brevoApiKey) {
         attempt = {
           ok: false,
@@ -868,6 +939,9 @@ async function handleSend(req: Request): Promise<Response> {
           subject,
           html: withFooter.html,
           text: withFooter.text,
+          messageType,
+          templateKey,
+          tenantId,
         });
       }
     } else {
@@ -884,8 +958,8 @@ async function handleSend(req: Request): Promise<Response> {
           apiKey: mailerLiteApiKey,
           toEmail,
           toName: normalizeString(body.to_name) || "Recipient",
-          messageType,
           unsubscribed: contact.unsubscribed,
+          messageType,
         });
       }
     }
@@ -899,22 +973,31 @@ async function handleSend(req: Request): Promise<Response> {
     const messageId = await insertMessageAttempt({
       serviceClient,
       tenantId,
-      userId: actingUserId,
+      userId: actingUserId || null,
       toEmail,
       messageType,
       subject,
-      templateKey: normalizeString(body.template_key) || null,
+      templateKey,
       provider,
       providerMessageId: attempt.providerMessageId,
       status,
       error: attempt.error,
       meta: {
+        payload_data: (body.data && typeof body.data === "object") ? body.data : {},
         response: attempt.raw,
-        payload_data: body.data || {},
+        throttle_warning: throttleResult.warning || null,
       },
     });
 
     if (attempt.ok) {
+      await updateContactProviderRef({
+        serviceClient,
+        tenantId,
+        email: toEmail,
+        provider,
+        providerMessageId: attempt.providerMessageId,
+      });
+
       return json(200, {
         success: true,
         message_id: messageId,
@@ -922,50 +1005,40 @@ async function handleSend(req: Request): Promise<Response> {
         status: "sent",
       });
     }
+
+    if (attempt.unsupported && providerChain[providerChain.length - 1] === provider) {
+      return json(422, {
+        success: false,
+        message_id: messageId,
+        provider,
+        status: "unsupported_send",
+        error: attempt.error || "Provider does not support direct send for this message type.",
+      });
+    }
   }
 
   return json(502, {
     success: false,
-    error: "All configured providers failed for this send request.",
     status: "failed",
+    error: "All configured providers failed for this send request.",
   });
 }
 
-async function handleWebhook(req: Request, provider: Provider): Promise<Response> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-  const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    return json(500, { success: false, error: "Supabase environment not configured." });
-  }
-
-  const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-  let payload: Record<string, unknown>;
-  try {
-    payload = (await req.json()) as Record<string, unknown>;
-  } catch {
-    return json(400, { success: false, error: "Invalid webhook JSON body." });
-  }
-
-  const providerUpper = provider.toUpperCase();
-  const expectedSecret = normalizeString(Deno.env.get(`EMAIL_WEBHOOK_SECRET_${providerUpper}`));
-  const signature = normalizeString(
-    req.headers.get("x-signature")
-      || req.headers.get("x-webhook-signature")
-      || req.headers.get("x-sender-signature")
-      || "",
-  );
-
-  const verified = Boolean(expectedSecret && signature && expectedSecret === signature);
-  const unverified = expectedSecret ? !verified : true;
+async function processSingleWebhookEvent(params: {
+  serviceClient: SupabaseClient;
+  provider: Provider;
+  payload: Record<string, unknown>;
+  verified: boolean;
+  unverified: boolean;
+}): Promise<void> {
+  const { serviceClient, provider, payload, verified, unverified } = params;
 
   const eventType = inferWebhookEventType(payload);
   const providerMessageId = extractProviderMessageId(payload);
   const email = inferWebhookEmail(payload);
   const mappedStatus = mapWebhookStatus(eventType);
 
-  let tenantId: string | null = normalizeString(payload.tenant_id) || null;
+  let tenantId = normalizeString(payload.tenant_id) || null;
   let messageRow: { id: string; tenant_id: string; user_id: string | null; to_email: string } | null = null;
 
   if (providerMessageId) {
@@ -984,7 +1057,7 @@ async function handleWebhook(req: Request, provider: Provider): Promise<Response
     }
   }
 
-  const { error: eventInsertError } = await serviceClient
+  await serviceClient
     .from("esp_webhook_events")
     .insert({
       tenant_id: tenantId,
@@ -993,14 +1066,10 @@ async function handleWebhook(req: Request, provider: Provider): Promise<Response
       event_type: eventType,
       payload: {
         ...payload,
-        webhook_unverified: unverified,
         webhook_verified: verified,
+        webhook_unverified: unverified,
       },
     });
-
-  if (eventInsertError) {
-    return json(500, { success: false, error: eventInsertError.message });
-  }
 
   if (mappedStatus && providerMessageId) {
     await serviceClient
@@ -1010,18 +1079,19 @@ async function handleWebhook(req: Request, provider: Provider): Promise<Response
       .eq("provider_message_id", providerMessageId);
   }
 
-  if (mappedStatus === "unsubscribed" && tenantId && (email || messageRow?.to_email)) {
-    const targetEmail = email || messageRow?.to_email || "";
-
-    await serviceClient
-      .from("esp_contacts")
-      .update({
-        unsubscribed: true,
-        consent_marketing: false,
-        consent_transactional: false,
-      })
-      .eq("tenant_id", tenantId)
-      .eq("email", targetEmail.toLowerCase());
+  if (mappedStatus === "unsubscribed" && tenantId) {
+    const targetEmail = (email || messageRow?.to_email || "").toLowerCase();
+    if (targetEmail) {
+      await serviceClient
+        .from("esp_contacts")
+        .update({
+          unsubscribed: true,
+          consent_marketing: false,
+          consent_transactional: false,
+        })
+        .eq("tenant_id", tenantId)
+        .eq("email", targetEmail);
+    }
 
     if (messageRow?.user_id) {
       await serviceClient
@@ -1036,44 +1106,96 @@ async function handleWebhook(req: Request, provider: Provider): Promise<Response
             source: "email_webhook",
             provider,
             event_type: eventType,
+            webhook_verified: verified,
           },
         });
     }
+  }
+}
+
+async function handleWebhook(req: Request, provider: Provider): Promise<Response> {
+  const supabaseUrl = normalizeString(Deno.env.get("SUPABASE_URL"));
+  const serviceRoleKey = normalizeString(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return json(500, { success: false, error: "Supabase environment not configured." });
+  }
+
+  const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+
+  const rawBody = await req.text();
+  let parsedBody: unknown;
+  try {
+    parsedBody = rawBody ? JSON.parse(rawBody) : {};
+  } catch {
+    return json(400, { success: false, error: "Invalid webhook JSON body." });
+  }
+
+  const providerUpper = provider.toUpperCase();
+  const expectedSecret = normalizeString(Deno.env.get(`EMAIL_WEBHOOK_SECRET_${providerUpper}`));
+
+  const signature = normalizeString(
+    req.headers.get("x-signature")
+      || req.headers.get("x-webhook-signature")
+      || req.headers.get("x-brevo-signature")
+      || req.headers.get("x-mailerlite-signature")
+      || "",
+  );
+
+  const verified = Boolean(expectedSecret && signature && expectedSecret === signature);
+  const unverified = expectedSecret ? !verified : true;
+
+  const events = Array.isArray(parsedBody)
+    ? parsedBody.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+    : (parsedBody && typeof parsedBody === "object")
+      ? [parsedBody as Record<string, unknown>]
+      : [];
+
+  if (events.length === 0) {
+    return json(400, { success: false, error: "Webhook payload must be an object or array of objects." });
+  }
+
+  for (const eventPayload of events) {
+    await processSingleWebhookEvent({
+      serviceClient,
+      provider,
+      payload: eventPayload,
+      verified,
+      unverified,
+    });
   }
 
   return json(200, {
     success: true,
     provider,
-    event_type: eventType,
-    provider_message_id: providerMessageId,
+    webhook_verified: verified,
     webhook_unverified: unverified,
+    processed: events.length,
   });
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
 
+  if (req.method !== "POST") {
+    return json(405, { success: false, error: "Method not allowed." });
+  }
+
   try {
     const url = new URL(req.url);
-    const pathname = url.pathname;
+    const pathname = url.pathname.replace(/\/+$/, "");
 
-    const isSendRoute = pathname === "/" || pathname.endsWith("/send") || pathname.endsWith("/email-orchestrator");
-
-    if (req.method === "POST" && isSendRoute) {
+    if (pathname === "" || pathname === "/" || pathname.endsWith("/send") || pathname.endsWith("/email-orchestrator")) {
       return await handleSend(req);
     }
 
-    if (req.method === "POST" && pathname.endsWith("/webhook/sender")) {
-      return await handleWebhook(req, "sender");
-    }
-
-    if (req.method === "POST" && pathname.endsWith("/webhook/brevo")) {
+    if (pathname.endsWith("/webhook/brevo")) {
       return await handleWebhook(req, "brevo");
     }
 
-    if (req.method === "POST" && pathname.endsWith("/webhook/mailerlite")) {
+    if (pathname.endsWith("/webhook/mailerlite")) {
       return await handleWebhook(req, "mailerlite");
     }
 

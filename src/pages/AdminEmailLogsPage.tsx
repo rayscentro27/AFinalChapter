@@ -164,7 +164,6 @@ export default function AdminEmailLogsPage() {
             onChange={(e) => setProviderFilter(e.target.value)}
           >
             <option value="all">all</option>
-            <option value="sender">sender</option>
             <option value="brevo">brevo</option>
             <option value="mailerlite">mailerlite</option>
           </select>

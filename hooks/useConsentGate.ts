@@ -118,6 +118,28 @@ async function sha256Hex(input: string): Promise<string | null> {
     .join('');
 }
 
+async function sendConsentWelcomeEmail(userId: string, tenantId: string | null): Promise<void> {
+  const authRes = await supabase.auth.getUser();
+  const toEmail = String(authRes.data.user?.email || '').trim();
+  if (!toEmail) return;
+
+  await supabase.functions.invoke('email-orchestrator', {
+    body: {
+      message_type: 'onboarding',
+      to: toEmail,
+      subject: 'Welcome to Nexus',
+      html: '<p><strong>Welcome to Nexus.</strong></p><p>Your account consents are complete and your workspace is ready to use.</p>',
+      text: 'Welcome to Nexus. Your account consents are complete and your workspace is ready to use.',
+      template_key: 'consent_gate_welcome',
+      user_id: userId,
+      tenant_id: tenantId,
+      data: {
+        source: 'consent_gate',
+      },
+    },
+  });
+}
+
 function isSchemaNotReadyError(code?: string): boolean {
   return code === '42P01' || code === 'PGRST116';
 }
@@ -313,6 +335,8 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
   const acceptConsents = useCallback(async (selected: ConsentSelections) => {
     if (!userId) return;
 
+    const hadRequiredConsents = Boolean(status?.has_required_consents);
+
     setSubmitting(true);
     setError(null);
     try {
@@ -391,13 +415,21 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
       }
 
       await refresh();
+
+      if (!hadRequiredConsents) {
+        try {
+          await sendConsentWelcomeEmail(userId, tenantId);
+        } catch (welcomeError) {
+          console.warn('Consent welcome email enqueue failed', welcomeError);
+        }
+      }
     } catch (e: any) {
       setError(String(e?.message || e));
       throw e;
     } finally {
       setSubmitting(false);
     }
-  }, [refresh, requiredPolicySnapshots, requiredTypes, requiredVersions, userId]);
+  }, [refresh, requiredPolicySnapshots, requiredTypes, requiredVersions, status, userId]);
 
   const needsAcceptance = !loading && !status?.has_required_consents;
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 
-type Provider = 'sender' | 'brevo' | 'mailerlite';
+type Provider = 'brevo' | 'mailerlite';
 
 type Tenant = {
   id: string;
@@ -25,12 +25,19 @@ type DraftRow = {
   configText: string;
 };
 
-const PROVIDERS: Provider[] = ['sender', 'brevo', 'mailerlite'];
+const PROVIDERS: Provider[] = ['brevo', 'mailerlite'];
 
-const DEFAULT_CAPABILITIES: Record<Provider, Record<string, unknown>> = {
-  sender: { transactional: true, marketing: true },
-  brevo: { transactional: true, marketing: true },
-  mailerlite: { transactional: false, marketing: true },
+const DEFAULT_PROVIDER_SETTINGS: Record<Provider, { isEnabled: boolean; priority: number; capabilities: Record<string, unknown> }> = {
+  brevo: {
+    isEnabled: true,
+    priority: 10,
+    capabilities: { transactional: true, marketing: true },
+  },
+  mailerlite: {
+    isEnabled: false,
+    priority: 20,
+    capabilities: { transactional: false, marketing: true, contact_sync: true },
+  },
 };
 
 function parseJsonObject(input: string): Record<string, unknown> {
@@ -44,13 +51,15 @@ function parseJsonObject(input: string): Record<string, unknown> {
 }
 
 function mapToDraftRows(rows: ProviderRow[]): DraftRow[] {
-  return PROVIDERS.map((provider, idx) => {
+  return PROVIDERS.map((provider) => {
     const found = rows.find((row) => row.provider === provider);
+    const defaults = DEFAULT_PROVIDER_SETTINGS[provider];
+
     return {
       provider,
-      is_enabled: found ? Boolean(found.is_enabled) : true,
-      priority: found ? Number(found.priority || 100) : (idx + 1) * 10,
-      capabilitiesText: JSON.stringify(found?.capabilities || DEFAULT_CAPABILITIES[provider], null, 2),
+      is_enabled: found ? Boolean(found.is_enabled) : defaults.isEnabled,
+      priority: found ? Number(found.priority || defaults.priority) : defaults.priority,
+      capabilitiesText: JSON.stringify(found?.capabilities || defaults.capabilities, null, 2),
       configText: JSON.stringify(found?.config || {}, null, 2),
     };
   });
@@ -177,7 +186,7 @@ export default function AdminEmailProvidersPage() {
     <div className="max-w-7xl mx-auto px-4 py-6 text-slate-100 space-y-5">
       <div>
         <h1 className="text-2xl font-semibold text-white">Email Providers</h1>
-        <p className="text-sm text-slate-400 mt-1">Enable providers, control priority, and configure non-secret routing metadata per tenant.</p>
+        <p className="text-sm text-slate-400 mt-1">Brevo is primary for transactional mail. MailerLite is optional for marketing/contact sync.</p>
       </div>
 
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">

@@ -5,6 +5,12 @@ import { getSmsConsentStatus, normalizePhoneToE164, SmsConsentStatus } from '../
 
 type TenantMembershipRow = { tenant_id: string };
 
+type EspContactRow = {
+  unsubscribed: boolean;
+  consent_transactional: boolean;
+  consent_marketing: boolean;
+};
+
 async function resolveTenantId(userId: string): Promise<string | null> {
   const preferred = await supabase
     .from('tenant_memberships')
@@ -46,6 +52,7 @@ export default function CommunicationPreferencesPage() {
 
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [marketingEmailOptIn, setMarketingEmailOptIn] = useState(false);
+  const [unsubscribeAllEmails, setUnsubscribeAllEmails] = useState(false);
 
   const [smsStatus, setSmsStatus] = useState<SmsConsentStatus | null>(null);
   const [smsOptIn, setSmsOptIn] = useState(false);
@@ -69,13 +76,22 @@ export default function CommunicationPreferencesPage() {
         if (!active) return;
         setTenantId(resolvedTenantId);
 
-        const [prefRes, status] = await Promise.all([
+        const [prefRes, status, contactRes] = await Promise.all([
           supabase
             .from('communication_preferences')
             .select('marketing_email_opt_in')
             .eq('user_id', user.id)
             .maybeSingle(),
           getSmsConsentStatus(user.id),
+          resolvedTenantId
+            ? supabase
+              .from('esp_contacts')
+              .select('unsubscribed,consent_transactional,consent_marketing')
+              .eq('tenant_id', resolvedTenantId)
+              .or(`user_id.eq.${user.id},email.eq.${String(user.email || '').toLowerCase()}`)
+              .limit(1)
+              .maybeSingle()
+            : Promise.resolve({ data: null, error: null } as { data: EspContactRow | null; error: any }),
         ]);
 
         if (!active) return;
@@ -84,7 +100,18 @@ export default function CommunicationPreferencesPage() {
           throw new Error(prefRes.error.message || 'Unable to load communication preferences.');
         }
 
-        setMarketingEmailOptIn(Boolean(prefRes.data?.marketing_email_opt_in));
+        if ((contactRes as any).error) {
+          throw new Error((contactRes as any).error.message || 'Unable to load contact email preferences.');
+        }
+
+        const contact = ((contactRes as any).data || null) as EspContactRow | null;
+        const unsubscribed = Boolean(contact?.unsubscribed);
+        setUnsubscribeAllEmails(unsubscribed);
+
+        const marketingFromPref = Boolean(prefRes.data?.marketing_email_opt_in);
+        const marketingFromContact = Boolean(contact?.consent_marketing);
+        const nextMarketing = marketingFromPref || marketingFromContact;
+        setMarketingEmailOptIn(unsubscribed ? false : nextMarketing);
 
         setSmsStatus(status);
         setSmsOptIn(Boolean(status?.is_opted_in));
@@ -114,12 +141,14 @@ export default function CommunicationPreferencesPage() {
     try {
       const now = new Date().toISOString();
       const userAgent = navigator.userAgent || 'unknown';
-      const ipHash = await hashMarker(`${user.id}:${now}:sms_pref`);
+      const ipHash = await hashMarker(`${user.id}:${now}:communication_pref`);
+
+      const effectiveMarketingOptIn = !unsubscribeAllEmails && marketingEmailOptIn;
 
       const { error: prefError } = await supabase.from('communication_preferences').upsert({
         user_id: user.id,
         tenant_id: tenantId,
-        marketing_email_opt_in: marketingEmailOptIn,
+        marketing_email_opt_in: effectiveMarketingOptIn,
         updated_at: now,
       });
 
@@ -136,25 +165,70 @@ export default function CommunicationPreferencesPage() {
 
       const requiredCommsVersion = String(commsVersionRes.data?.current_version || 'v1');
 
-      const { error: commsConsentError } = await supabase.from('consents').upsert({
-        user_id: user.id,
-        tenant_id: tenantId,
-        consent_type: 'comms_email',
-        version: requiredCommsVersion,
-        accepted_at: now,
-        ip_hash: ipHash,
-        user_agent: userAgent,
-        metadata: {
-          source: 'communication_preferences',
-          action: 'marketing_preference_updated',
-          marketing_email_opt_in: marketingEmailOptIn,
-        },
-      }, {
-        onConflict: 'user_id,consent_type,version',
-      });
+      if (unsubscribeAllEmails) {
+        const { error: commsOptOutError } = await supabase.from('consents').upsert({
+          user_id: user.id,
+          tenant_id: tenantId,
+          consent_type: 'comms_email',
+          version: 'opt_out_v1',
+          accepted_at: now,
+          ip_hash: ipHash,
+          user_agent: userAgent,
+          metadata: {
+            source: 'communication_preferences',
+            action: 'unsubscribe_all',
+            unsubscribed: true,
+          },
+        }, {
+          onConflict: 'user_id,consent_type,version',
+        });
 
-      if (commsConsentError) {
-        throw new Error(commsConsentError.message || 'Unable to save communication consent event.');
+        if (commsOptOutError) {
+          throw new Error(commsOptOutError.message || 'Unable to save email unsubscribe event.');
+        }
+      } else {
+        const { error: commsConsentError } = await supabase.from('consents').upsert({
+          user_id: user.id,
+          tenant_id: tenantId,
+          consent_type: 'comms_email',
+          version: requiredCommsVersion,
+          accepted_at: now,
+          ip_hash: ipHash,
+          user_agent: userAgent,
+          metadata: {
+            source: 'communication_preferences',
+            action: 'marketing_preference_updated',
+            marketing_email_opt_in: effectiveMarketingOptIn,
+            unsubscribed: false,
+          },
+        }, {
+          onConflict: 'user_id,consent_type,version',
+        });
+
+        if (commsConsentError) {
+          throw new Error(commsConsentError.message || 'Unable to save communication consent event.');
+        }
+      }
+
+      if (tenantId && user.email) {
+        const { error: contactError } = await supabase
+          .from('esp_contacts')
+          .upsert({
+            tenant_id: tenantId,
+            user_id: user.id,
+            email: String(user.email).toLowerCase(),
+            full_name: user.name || null,
+            consent_transactional: !unsubscribeAllEmails,
+            consent_marketing: effectiveMarketingOptIn,
+            unsubscribed: unsubscribeAllEmails,
+            updated_at: now,
+          }, {
+            onConflict: 'tenant_id,email',
+          });
+
+        if (contactError) {
+          throw new Error(contactError.message || 'Unable to update email contact preferences.');
+        }
       }
 
       const normalizedPhone = normalizePhoneToE164(smsPhone);
@@ -215,7 +289,8 @@ export default function CommunicationPreferencesPage() {
           metadata: {
             phone_e164: normalizePhoneToE164(smsPhone) || smsStatus?.phone_e164 || null,
             source: 'communication_preferences',
-            marketing_email_opt_in: marketingEmailOptIn,
+            marketing_email_opt_in: effectiveMarketingOptIn,
+            unsubscribe_all_emails: unsubscribeAllEmails,
             sms_opt_in: smsOptIn,
           },
         });
@@ -225,7 +300,7 @@ export default function CommunicationPreferencesPage() {
       setSmsStatus(refreshed);
       setSmsOptIn(Boolean(refreshed?.is_opted_in));
       setSmsPhone(refreshed?.phone_e164 || smsPhone);
-      setMarketingEmailOptIn(marketingEmailOptIn);
+      setMarketingEmailOptIn(effectiveMarketingOptIn);
       setSuccess('Communication preferences updated.');
     } catch (e: any) {
       setError(String(e?.message || e));
@@ -251,7 +326,7 @@ export default function CommunicationPreferencesPage() {
       <div>
         <h1 className="text-3xl font-black text-white">Communication Preferences</h1>
         <p className="text-sm text-slate-400 mt-2">
-          Transactional email remains enabled for account and security updates. Marketing channels are optional.
+          Transactional email is enabled by default for account and security notices. Marketing channels are optional.
         </p>
       </div>
 
@@ -260,18 +335,36 @@ export default function CommunicationPreferencesPage() {
 
       <section className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
         <h2 className="text-lg font-bold text-white">Email</h2>
+
         <label className="flex items-start gap-3 text-sm text-slate-200">
           <input
             type="checkbox"
             className="mt-1"
             checked={marketingEmailOptIn}
             onChange={() => setMarketingEmailOptIn((v) => !v)}
+            disabled={unsubscribeAllEmails}
           />
           <span>Receive optional marketing email updates.</span>
         </label>
 
+        <label className="flex items-start gap-3 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={unsubscribeAllEmails}
+            onChange={() => {
+              setUnsubscribeAllEmails((v) => {
+                const next = !v;
+                if (next) setMarketingEmailOptIn(false);
+                return next;
+              });
+            }}
+          />
+          <span>Unsubscribe from all Nexus email communications (transactional and marketing).</span>
+        </label>
+
         <p className="text-xs text-slate-500">
-          Transactional email notices for account access and security remain on.
+          Transactional account notices stay on unless you choose to unsubscribe from all email.
         </p>
       </section>
 
