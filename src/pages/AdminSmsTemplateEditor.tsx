@@ -17,8 +17,41 @@ export default function AdminSmsTemplateEditor() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [templates, setTemplates] = useState<SmsTemplate[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
 
-  const isSuperAdmin = user?.role === 'admin';
+  useEffect(() => {
+    let active = true;
+
+    async function checkAccess() {
+      if (!user?.id) {
+        if (!active) return;
+        setIsSuperAdmin(false);
+        setCheckingAccess(false);
+        return;
+      }
+
+      setCheckingAccess(true);
+
+      const { data, error: accessError } = await supabase.rpc('nexus_is_super_admin_only');
+
+      if (!active) return;
+
+      if (accessError) {
+        setIsSuperAdmin(false);
+      } else {
+        setIsSuperAdmin(Boolean(data));
+      }
+
+      setCheckingAccess(false);
+    }
+
+    void checkAccess();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   async function loadTemplates() {
     setLoading(true);
@@ -41,12 +74,12 @@ export default function AdminSmsTemplateEditor() {
   }
 
   useEffect(() => {
-    if (!isSuperAdmin) {
+    if (checkingAccess || !isSuperAdmin) {
       setLoading(false);
       return;
     }
     void loadTemplates();
-  }, [isSuperAdmin]);
+  }, [checkingAccess, isSuperAdmin]);
 
   async function saveTemplate(template: SmsTemplate) {
     setSavingId(template.id);
@@ -70,6 +103,10 @@ export default function AdminSmsTemplateEditor() {
     setSuccess(`Saved ${template.key}.`);
     setSavingId(null);
     await loadTemplates();
+  }
+
+  if (checkingAccess) {
+    return <div className="min-h-[50vh] flex items-center justify-center text-slate-300">Verifying super admin access...</div>;
   }
 
   if (!isSuperAdmin) {
