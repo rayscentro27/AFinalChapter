@@ -35,7 +35,16 @@ import ExpenseTracker from './components/ExpenseTracker';
 import CommissionManager from './components/CommissionManager';
 import RiskMonitor from './components/RiskMonitor';
 import SalesLeaderboard from './components/SalesLeaderboard';
-import GrantManager from './components/GrantManager';
+import FundingResearchPage from './src/pages/FundingResearchPage';
+import AdminFundingCatalogPage from './src/pages/AdminFundingCatalogPage';
+import GrantsPage from './src/pages/GrantsPage';
+import AdminGrantsCatalogPage from './src/pages/AdminGrantsCatalogPage';
+import AdminGrantsTrackingPage from './src/pages/AdminGrantsTrackingPage';
+import SBAPrepPage from './src/pages/SBAPrepPage';
+import AdminSBAPrepPage from './src/pages/AdminSBAPrepPage';
+import FundingOutcomesPage from './src/pages/FundingOutcomesPage';
+import BillingCommissionsPage from './src/pages/BillingCommissionsPage';
+import AdminCommissionsPage from './src/pages/AdminCommissionsPage';
 import CourseBuilder from './components/CourseBuilder';
 import LoanServicing from './components/LoanServicing';
 import CreditMemoBuilder from './components/CreditMemoBuilder';
@@ -155,6 +164,11 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/pricing': ViewMode.PRICING,
   '/billing': ViewMode.BILLING,
   '/documents': ViewMode.DOCUMENTS,
+  '/sba': ViewMode.SBA_PREP,
+  '/funding/research': ViewMode.FUNDING_RESEARCH,
+  '/funding/outcomes': ViewMode.FUNDING_OUTCOMES,
+  '/billing/commissions': ViewMode.BILLING_COMMISSIONS,
+  '/grants': ViewMode.GRANTS,
   '/workflow-detail': ViewMode.WORKFLOW_DETAIL,
   '/membership-agreement': ViewMode.MEMBERSHIP_AGREEMENT,
   '/admin/subscriptions': ViewMode.ADMIN_SUBSCRIPTIONS,
@@ -176,6 +190,11 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/email/routing': ViewMode.ADMIN_EMAIL_ROUTING,
   '/admin/email/logs': ViewMode.ADMIN_EMAIL_LOGS,
   '/admin/workflows': ViewMode.ADMIN_WORKFLOWS,
+  '/admin/funding/catalog': ViewMode.ADMIN_FUNDING_CATALOG,
+  '/admin/grants/catalog': ViewMode.ADMIN_GRANTS_CATALOG,
+  '/admin/grants/tracking': ViewMode.ADMIN_GRANTS_TRACKING,
+  '/admin/sba': ViewMode.ADMIN_SBA,
+  '/admin/commissions': ViewMode.ADMIN_COMMISSIONS,
   '/settings/communication': ViewMode.COMMUNICATION_PREFERENCES,
 };
 
@@ -339,6 +358,11 @@ export const App = () => {
           ViewMode.CLIENT_MAILING_APPROVALS,
           ViewMode.DISPUTE_LETTER_PREVIEW,
           ViewMode.WORKFLOW_DETAIL,
+          ViewMode.SBA_PREP,
+          ViewMode.GRANTS,
+          ViewMode.FUNDING_RESEARCH,
+          ViewMode.FUNDING_OUTCOMES,
+          ViewMode.BILLING_COMMISSIONS,
         ];
 
         if (!clientAllowedViews.includes(hash)) {
@@ -394,9 +418,11 @@ export const App = () => {
 
   const tierGateMap: Partial<Record<ViewMode, { requiredTier: PlanCode; moduleLabel: string }>> = {
     [ViewMode.SCENARIO_RUNNER]: { requiredTier: 'GROWTH', moduleLabel: 'AI Task Runner' },
-    [ViewMode.GRANTS]: { requiredTier: 'PREMIUM', moduleLabel: 'Grants Engine' },
     [ViewMode.LENDER_ROOM]: { requiredTier: 'PREMIUM', moduleLabel: 'SBA Module' },
     [ViewMode.FUNDING_FLOW]: { requiredTier: 'PREMIUM', moduleLabel: 'Funding Research' },
+    [ViewMode.FUNDING_RESEARCH]: { requiredTier: 'PREMIUM', moduleLabel: 'Funding Research Engine' },
+    [ViewMode.FUNDING_OUTCOMES]: { requiredTier: 'PREMIUM', moduleLabel: 'Funding Outcomes' },
+    [ViewMode.BILLING_COMMISSIONS]: { requiredTier: 'PREMIUM', moduleLabel: 'Commission Billing' },
     [ViewMode.COMMISSIONS]: { requiredTier: 'PREMIUM', moduleLabel: 'Commission Ledger' },
   };
 
@@ -490,6 +516,9 @@ export const App = () => {
         if (currentView === ViewMode.FINAL_LETTER) return <FinalLetterPage />;
         if (currentView === ViewMode.CLIENT_MAILING_APPROVALS) return <ClientMailingApprovalsPage />;
         if (currentView === ViewMode.DISPUTE_LETTER_PREVIEW) return <DisputeLetterPreviewPage />;
+        if (currentView === ViewMode.FUNDING_OUTCOMES) return <FundingOutcomesPage />;
+        if (currentView === ViewMode.BILLING_COMMISSIONS) return <BillingCommissionsPage />;
+        if (currentView === ViewMode.ADMIN_COMMISSIONS) return <AdminCommissionsPage />;
         return <ClientLandingPage onNavigate={navigate} />;
     }
 
@@ -530,10 +559,14 @@ export const App = () => {
                     case ViewMode.REVIEW_QUEUE: return <DocumentQueue contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.SITEMAP: return <SystemSitemap onNavigate={navigate} />;
                     case ViewMode.EXPENSES: return <ExpenseTracker />;
-                    case ViewMode.GRANTS: return renderTierGate(ViewMode.GRANTS, <GrantManager contacts={contacts} onUpdateContact={updateContact} />);
+                    case ViewMode.GRANTS: return <GrantsPage />;
+                    case ViewMode.SBA_PREP: return <SBAPrepPage />;
                     case ViewMode.COMMISSIONS: return renderTierGate(ViewMode.COMMISSIONS, <CommissionManager contacts={contacts} />);
                     case ViewMode.RISK_MONITOR: return <RiskMonitor />;
                     case ViewMode.FUNDING_FLOW: return renderTierGate(ViewMode.FUNDING_FLOW, <PGFundingFlow />);
+                    case ViewMode.FUNDING_RESEARCH: return renderTierGate(ViewMode.FUNDING_RESEARCH, <FundingResearchPage />);
+                    case ViewMode.FUNDING_OUTCOMES: return renderTierGate(ViewMode.FUNDING_OUTCOMES, <FundingOutcomesPage />);
+                    case ViewMode.BILLING_COMMISSIONS: return renderTierGate(ViewMode.BILLING_COMMISSIONS, <BillingCommissionsPage />);
                     case ViewMode.AUTOMATION: return <LiveAutomationMonitor />;
                     case ViewMode.INVOICING: return <InvoicingHub contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.REPUTATION: return <ReputationManager branding={branding} onUpdateBranding={updateBranding} />;
@@ -577,6 +610,11 @@ export const App = () => {
                     case ViewMode.ADMIN_EMAIL_ROUTING: return <AdminEmailRoutingPage />;
                     case ViewMode.ADMIN_EMAIL_LOGS: return <AdminEmailLogsPage />;
                     case ViewMode.ADMIN_WORKFLOWS: return <AdminWorkflowsPage />;
+                    case ViewMode.ADMIN_FUNDING_CATALOG: return <AdminFundingCatalogPage />;
+                    case ViewMode.ADMIN_GRANTS_CATALOG: return <AdminGrantsCatalogPage />;
+                    case ViewMode.ADMIN_GRANTS_TRACKING: return <AdminGrantsTrackingPage />;
+                    case ViewMode.ADMIN_SBA: return <AdminSBAPrepPage />;
+                    case ViewMode.ADMIN_COMMISSIONS: return <AdminCommissionsPage />;
                     case ViewMode.WORKFLOW_DETAIL: return <WorkflowDetailPage />;
                     case ViewMode.INVITE_ACCEPT: return <InviteAccept />;
                     default: return <Dashboard contacts={contacts} />;

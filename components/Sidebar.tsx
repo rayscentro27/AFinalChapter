@@ -117,6 +117,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.FORENSIC_HUB} label="Forensic Hub" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.WEALTH_MANAGER} label="Wealth Alpha" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.LENDER_ROOM} label="Lender Room" icon={Scale} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.SBA_PREP} label="SBA Prep" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.FUNDING_RESEARCH} label="Funding Research" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.FUNDING_OUTCOMES} label="Funding Outcomes" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.GRANTS} label="Grants Engine" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.DOC_GENERATOR} label="Doc Draftsman" icon={FileText} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.UPLOAD_CREDIT_REPORT} label="Credit Upload" icon={FileText} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.REVIEW_QUEUE} label="Review Queue" icon={Fingerprint} currentView={currentView} onViewChange={handleNav} badge={derivedPendingDocCount || undefined} badgeColor="bg-amber-600" />
@@ -139,6 +143,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.SRE_DASHBOARD} label="SRE Dashboard" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.OUTBOX} label="Outbox" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.BILLING} label="Billing" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.BILLING_COMMISSIONS} label="Commission Billing" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
             {userRole === 'admin' && (
               <>
                 <SidebarItem id={ViewMode.ADMIN_SUBSCRIPTIONS} label="Subscriptions" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
@@ -150,6 +155,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <SidebarItem id={ViewMode.ADMIN_EMAIL_PROVIDERS} label="Email Providers" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_EMAIL_ROUTING} label="Email Routing" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_EMAIL_LOGS} label="Email Logs" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_FUNDING_CATALOG} label="Funding Catalog" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_GRANTS_CATALOG} label="Grants Catalog" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_GRANTS_TRACKING} label="Grants Tracking" icon={FileText} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_SBA} label="SBA Prep Admin" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_COMMISSIONS} label="Commission Admin" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
               </>
             )}
             <SidebarItem id={ViewMode.SETTINGS} label="OS Settings" icon={Settings} currentView={currentView} onViewChange={handleNav} />

@@ -412,3 +412,6 @@ verify_jwt = false
 
 [functions.workflow-engine]
 verify_jwt = true
+
+[functions.commission-ledger]
+verify_jwt = false
