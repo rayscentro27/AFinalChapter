@@ -6,6 +6,7 @@ import {
   uploadCreditReportPdf,
   runCreditExtractSanitize,
 } from '../services/secureDisputePipelineService';
+import { createDocumentFromArtifact } from '../services/documentCenterService';
 
 const BUREAU_OPTIONS: Bureau[] = ['experian', 'equifax', 'transunion'];
 
@@ -36,6 +37,20 @@ export default function UploadCreditReportPage() {
         upload_id: upload.upload_id,
         bureau,
       });
+
+      try {
+        await createDocumentFromArtifact({
+          user_id: user?.id || '',
+          category: 'credit',
+          title: `Credit Report Upload - ${bureau.toUpperCase()}`,
+          status: 'draft',
+          source_type: 'upload',
+          source_id: upload.upload_id,
+          storage_path: `${upload.bucket}/${upload.object_path}`,
+        });
+      } catch {
+        // Non-fatal: upload + sanitize flow should continue even if document indexing fails.
+      }
 
       setSanitizedFactsId(run.sanitized_facts_id);
       setSuccess(

@@ -86,8 +86,10 @@ import DisclaimersPage from './src/pages/DisclaimersPage';
 import AdminConsentViewer from './src/pages/AdminConsentViewer';
 import PricingPage from './src/pages/PricingPage';
 import BillingPage from './src/pages/BillingPage';
+import DocumentsPage from './src/pages/DocumentsPage';
 import MembershipAgreementPage from './src/pages/MembershipAgreementPage';
 import AdminSubscriptionManager from './src/pages/AdminSubscriptionManager';
+import AdminDocumentsPage from './src/pages/AdminDocumentsPage';
 import SmsTermsPage from './src/pages/SmsTermsPage';
 import CommunicationPreferencesPage from './src/pages/CommunicationPreferencesPage';
 import UploadCreditReportPage from './src/pages/UploadCreditReportPage';
@@ -152,9 +154,11 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/consents': ViewMode.ADMIN_CONSENTS,
   '/pricing': ViewMode.PRICING,
   '/billing': ViewMode.BILLING,
+  '/documents': ViewMode.DOCUMENTS,
   '/workflow-detail': ViewMode.WORKFLOW_DETAIL,
   '/membership-agreement': ViewMode.MEMBERSHIP_AGREEMENT,
   '/admin/subscriptions': ViewMode.ADMIN_SUBSCRIPTIONS,
+  '/admin/documents': ViewMode.ADMIN_DOCUMENTS,
   '/sms-terms': ViewMode.SMS_TERMS,
   '/communication-preferences': ViewMode.COMMUNICATION_PREFERENCES,
   '/credit-report-upload': ViewMode.UPLOAD_CREDIT_REPORT,
@@ -329,6 +333,7 @@ export const App = () => {
           ViewMode.PARTNER_MARKETPLACE,
           ViewMode.PRICING,
           ViewMode.BILLING,
+          ViewMode.DOCUMENTS,
           ViewMode.COMMUNICATION_PREFERENCES,
           ViewMode.MEMBERSHIP_AGREEMENT,
           ViewMode.CLIENT_MAILING_APPROVALS,
@@ -477,6 +482,7 @@ export const App = () => {
         if (currentView === ViewMode.LOGIN) return <Login onLogin={() => {}} onBack={() => navigate(ViewMode.CLIENT_LANDING)} />;
         if (currentView === ViewMode.PRICING) return <PricingPage onNavigateBilling={(plan) => { setBillingUpgradeTarget(plan || null); navigate(ViewMode.BILLING); }} />;
         if (currentView === ViewMode.BILLING) return <BillingPage selectedPlan={billingUpgradeTarget} />;
+        if (currentView === ViewMode.DOCUMENTS) return <DocumentsPage />;
         if (currentView === ViewMode.COMMUNICATION_PREFERENCES) return <CommunicationPreferencesPage />;
         if (currentView === ViewMode.UPLOAD_CREDIT_REPORT) return <UploadCreditReportPage />;
         if (currentView === ViewMode.DISPUTE_FACTS_REVIEW) return <DisputeFactsReviewPage />;
@@ -510,6 +516,7 @@ export const App = () => {
                     case ViewMode.SETTINGS: return <Settings branding={branding} onUpdateBranding={updateBranding} onNavigate={navigate} />;
                     case ViewMode.PRICING: return <PricingPage onNavigateBilling={(plan) => { setBillingUpgradeTarget(plan || null); navigate(ViewMode.BILLING); }} />;
                     case ViewMode.BILLING: return <BillingPage selectedPlan={billingUpgradeTarget} />;
+                    case ViewMode.DOCUMENTS: return <DocumentsPage />;
                     case ViewMode.COMMUNICATION_PREFERENCES: return <CommunicationPreferencesPage />;
                     case ViewMode.UPLOAD_CREDIT_REPORT: return <UploadCreditReportPage />;
                     case ViewMode.DISPUTE_FACTS_REVIEW: return <DisputeFactsReviewPage />;
@@ -559,6 +566,7 @@ export const App = () => {
                     case ViewMode.ADMIN_POLICIES: return <AdminPolicies />;
                     case ViewMode.ADMIN_CONSENTS: return <AdminConsentViewer />;
                     case ViewMode.ADMIN_SUBSCRIPTIONS: return <AdminSubscriptionManager />;
+                    case ViewMode.ADMIN_DOCUMENTS: return <AdminDocumentsPage />;
                     case ViewMode.ADMIN_SMS_TEMPLATES: return <AdminSmsTemplateEditor />;
                     case ViewMode.CLIENT_MAILING_APPROVALS: return <ClientMailingApprovalsPage />;
                     case ViewMode.DISPUTE_LETTER_PREVIEW: return <DisputeLetterPreviewPage />;

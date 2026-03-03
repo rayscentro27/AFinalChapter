@@ -101,7 +101,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.CALENDAR} label="Smart Calendar" icon={Calendar} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.AUTOMATION} label="Sentinel Engine" icon={Zap} currentView={currentView} onViewChange={handleNav} />
             {userRole === 'admin' ? (
-              <SidebarItem id={ViewMode.ADMIN_WORKFLOWS} label="Workflow Ops" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
+              <>
+                <SidebarItem id={ViewMode.ADMIN_WORKFLOWS} label="Workflow Ops" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_DOCUMENTS} label="Document Center" icon={FileText} currentView={currentView} onViewChange={handleNav} />
+              </>
             ) : null}
           </SidebarSection>
 
