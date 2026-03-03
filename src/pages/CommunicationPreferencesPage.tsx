@@ -231,6 +231,45 @@ export default function CommunicationPreferencesPage() {
         }
       }
 
+      await supabase.functions.invoke('funnel-engine', {
+        body: { action: 'link-signup' },
+      });
+
+      if (tenantId) {
+        const leadLinkRes = await supabase
+          .from('lead_user_links')
+          .select('lead_id')
+          .eq('tenant_id', tenantId)
+          .eq('user_id', user.id)
+          .order('linked_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const leadId = String((leadLinkRes.data as any)?.lead_id || '');
+        if (leadId) {
+          const nextLeadStatus = unsubscribeAllEmails ? 'unsubscribed' : 'converted';
+
+          await supabase
+            .from('leads')
+            .update({
+              marketing_opt_in: effectiveMarketingOptIn,
+              status: nextLeadStatus,
+            })
+            .eq('id', leadId);
+
+          await supabase.from('lead_events').insert({
+            tenant_id: tenantId,
+            lead_id: leadId,
+            event_type: unsubscribeAllEmails ? 'LEAD_UNSUBSCRIBED' : 'OPTIN_CONFIRMED',
+            payload: {
+              source: 'settings_communication',
+              marketing_opt_in: effectiveMarketingOptIn,
+              unsubscribed: unsubscribeAllEmails,
+            },
+          });
+        }
+      }
+
       const normalizedPhone = normalizePhoneToE164(smsPhone);
       if (smsOptIn && !normalizedPhone) {
         throw new Error('Enter a valid phone number in E.164 format (example: +15551234567).');

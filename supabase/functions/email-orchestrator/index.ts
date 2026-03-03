@@ -22,6 +22,8 @@ type SendBody = {
   data?: unknown;
   user_id?: unknown;
   to_name?: unknown;
+  consent_marketing?: unknown;
+  comms_email_accepted?: unknown;
 };
 
 type RoutingRuleRow = {
@@ -104,6 +106,12 @@ function normalizeEmail(value: unknown): string {
   return normalizeString(value).toLowerCase();
 }
 
+function normalizeBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  const normalized = normalizeString(value).toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "y";
+}
+
 function normalizeMessageType(value: unknown): MessageType | null {
   const type = normalizeString(value).toLowerCase() as MessageType;
   return ALLOWED_MESSAGE_TYPES.includes(type) ? type : null;
@@ -183,6 +191,26 @@ function mapWebhookStatus(eventTypeRaw: string): string | null {
   if (eventType.includes("unsubscribe") || eventType.includes("unsub")) return "unsubscribed";
   if (eventType.includes("fail") || eventType.includes("reject") || eventType.includes("error")) return "failed";
   return null;
+}
+
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+
+  try {
+    const payloadBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = payloadBase64.padEnd(Math.ceil(payloadBase64.length / 4) * 4, "=");
+    const decoded = atob(padded);
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function isServiceRoleBearerToken(token: string, serviceRoleKey: string): boolean {
+  if (serviceRoleKey && token === serviceRoleKey) return true;
+  const payload = parseJwtPayload(token);
+  return normalizeString(payload?.role).toLowerCase() === "service_role";
 }
 
 function errorMessageFromProviderResponse(status: number, raw: unknown, fallback: string): string {
@@ -740,23 +768,33 @@ async function handleSend(req: Request): Promise<Response> {
     return json(401, { success: false, error: "Missing bearer token." });
   }
 
+  const bearerToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const isServiceRole = isServiceRoleBearerToken(bearerToken, serviceRoleKey);
+
   const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } },
   });
   const serviceClient = createClient(supabaseUrl, serviceRoleKey);
 
-  const authRes = await userClient.auth.getUser();
-  if (authRes.error || !authRes.data.user?.id) {
-    return json(401, { success: false, error: "Unauthorized." });
+  let requester: { id: string; user_metadata?: Record<string, unknown> } | null = null;
+  if (!isServiceRole) {
+    const authRes = await userClient.auth.getUser();
+    if (authRes.error || !authRes.data.user?.id) {
+      return json(401, { success: false, error: "Unauthorized." });
+    }
+    requester = {
+      id: authRes.data.user.id,
+      user_metadata: authRes.data.user.user_metadata as Record<string, unknown> | undefined,
+    };
   }
 
-  const requester = authRes.data.user;
-  const requestedUserId = normalizeString(body.user_id);
-  const actingUserId = requestedUserId || requester.id;
+  const requesterId = requester?.id || null;
+  const requestedUserId = normalizeString(body.user_id) || null;
+  const actingUserId = requestedUserId || requesterId;
 
   const tenantId = await resolveTenantId(
     serviceClient,
-    actingUserId || requester.id,
+    actingUserId,
     normalizeString(body.tenant_id) || null,
   );
 
@@ -764,8 +802,8 @@ async function handleSend(req: Request): Promise<Response> {
     return json(400, { success: false, error: "Unable to resolve tenant_id." });
   }
 
-  if (requestedUserId && requestedUserId !== requester.id) {
-    const canManage = await canRequesterManageTenant(userClient, serviceClient, requester.id, tenantId);
+  if (!isServiceRole && requestedUserId && requesterId && requestedUserId !== requesterId) {
+    const canManage = await canRequesterManageTenant(userClient, serviceClient, requesterId, tenantId);
     if (!canManage) {
       return json(403, { success: false, error: "Cannot send on behalf of another user." });
     }
@@ -789,15 +827,20 @@ async function handleSend(req: Request): Promise<Response> {
       .maybeSingle()
     : { data: null, error: null };
 
-  const consentMarketing = Boolean(communicationPrefRes.data?.marketing_email_opt_in);
-  const commsEmailAccepted = Boolean(consentStatusRes.data?.comms_email_accepted);
+  const consentMarketing = actingUserId
+    ? Boolean(communicationPrefRes.data?.marketing_email_opt_in)
+    : normalizeBoolean(body.consent_marketing);
+
+  const commsEmailAccepted = actingUserId
+    ? Boolean(consentStatusRes.data?.comms_email_accepted)
+    : normalizeBoolean(body.comms_email_accepted);
 
   const contact = await upsertEspContact({
     serviceClient,
     tenantId,
     userId: actingUserId || null,
     email: toEmail,
-    fullName: normalizeString(body.to_name) || normalizeString(requester.user_metadata?.name) || null,
+    fullName: normalizeString(body.to_name) || normalizeString(requester?.user_metadata?.name) || null,
     consentMarketing,
   });
 

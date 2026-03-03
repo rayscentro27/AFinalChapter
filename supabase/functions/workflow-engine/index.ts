@@ -8,6 +8,8 @@ type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "inc
 type StartBody = {
   template_key?: unknown;
   context?: unknown;
+  user_id?: unknown;
+  tenant_id?: unknown;
   action?: unknown;
 };
 
@@ -144,6 +146,26 @@ function parseRoute(pathname: string, action: string): "start" | "advance" | "tr
   if (action === "trigger") return "trigger";
 
   return null;
+}
+
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+
+  try {
+    const payloadBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = payloadBase64.padEnd(Math.ceil(payloadBase64.length / 4) * 4, "=");
+    const decoded = atob(padded);
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function isServiceRoleBearerToken(token: string, serviceRoleKey: string): boolean {
+  if (serviceRoleKey && token === serviceRoleKey) return true;
+  const payload = parseJwtPayload(token);
+  return normalizeString(payload?.role).toLowerCase() === "service_role";
 }
 
 function isActivePaidStatus(status: SubscriptionStatus): boolean {
@@ -819,15 +841,26 @@ async function handleStart(req: Request, body: StartBody): Promise<Response> {
     return json(401, { error: "Missing bearer token." });
   }
 
+  const bearerToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const isServiceRole = isServiceRoleBearerToken(bearerToken, serviceRoleKey);
+
   const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } },
   });
   const serviceClient = createClient(supabaseUrl, serviceRoleKey);
 
-  const authRes = await userClient.auth.getUser();
-  const authUserId = authRes.data.user?.id || null;
-  if (authRes.error || !authUserId) {
-    return json(401, { error: "Unauthorized." });
+  let authUserId: string | null = null;
+  if (isServiceRole) {
+    authUserId = normalizeString(body.user_id) || null;
+    if (!authUserId) {
+      return json(400, { error: "user_id is required when starting workflow with service role." });
+    }
+  } else {
+    const authRes = await userClient.auth.getUser();
+    authUserId = authRes.data.user?.id || null;
+    if (authRes.error || !authUserId) {
+      return json(401, { error: "Unauthorized." });
+    }
   }
 
   const templateKey = normalizeString(body.template_key).toUpperCase();
@@ -845,7 +878,8 @@ async function handleStart(req: Request, body: StartBody): Promise<Response> {
     return json(400, { error: "Workflow template has no steps." });
   }
 
-  const tenantId = await resolveTenantIdForUser(serviceClient, authUserId);
+  const explicitTenantId = normalizeString(body.tenant_id) || null;
+  const tenantId = explicitTenantId || (authUserId ? await resolveTenantIdForUser(serviceClient, authUserId) : null);
   if (!tenantId) {
     return json(400, { error: "Unable to resolve tenant context." });
   }

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import CRMTable from './components/CRMTable';
@@ -117,6 +117,12 @@ import AdminEmailRoutingPage from './src/pages/AdminEmailRoutingPage';
 import AdminEmailLogsPage from './src/pages/AdminEmailLogsPage';
 import WorkflowDetailPage from './src/pages/WorkflowDetailPage';
 import AdminWorkflowsPage from './src/pages/AdminWorkflowsPage';
+import FreeScorePage from './src/pages/FreeScorePage';
+import FreeChecklistPage from './src/pages/FreeChecklistPage';
+import UnsubscribePage from './src/pages/UnsubscribePage';
+import AdminFunnelSequencesPage from './src/pages/AdminFunnelSequencesPage';
+import AdminFunnelLeadsPage from './src/pages/AdminFunnelLeadsPage';
+import AdminFunnelMetricsPage from './src/pages/AdminFunnelMetricsPage';
 import SupervisorTriage from './components/SupervisorTriage';
 import AgenticHUD from './components/AgenticHUD';
 import NeuralStrategySandbox from './components/NeuralStrategySandbox';
@@ -137,6 +143,8 @@ import ConsentGateModal from './components/consent/ConsentGateModal';
 import useConsentGate from './hooks/useConsentGate';
 import { PlanCode } from './src/billing/types';
 import { getUserTier, hasTierAccess, isSubscriptionEntitled, UserTierState } from './src/billing/tier';
+import OfferBanner from './src/components/funnel/OfferBanner';
+import { linkSignupLead } from './src/services/funnelService';
 
 const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/dashboard': ViewMode.DASHBOARD,
@@ -196,6 +204,12 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/sba': ViewMode.ADMIN_SBA,
   '/admin/commissions': ViewMode.ADMIN_COMMISSIONS,
   '/settings/communication': ViewMode.COMMUNICATION_PREFERENCES,
+  '/free-score': ViewMode.FREE_SCORE,
+  '/free-checklist': ViewMode.FREE_CHECKLIST,
+  '/unsubscribe': ViewMode.UNSUBSCRIBE,
+  '/admin/funnel/sequences': ViewMode.ADMIN_FUNNEL_SEQUENCES,
+  '/admin/funnel/leads': ViewMode.ADMIN_FUNNEL_LEADS,
+  '/admin/funnel/metrics': ViewMode.ADMIN_FUNNEL_METRICS,
 };
 
 const LEGAL_VIEWS: ViewMode[] = [
@@ -239,6 +253,7 @@ export const App = () => {
 
   const [isSystemReady, setIsSystemReady] = useState(false);
   const consentGate = useConsentGate(user?.id || null);
+  const linkedUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -275,6 +290,22 @@ export const App = () => {
       active = false;
     };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      linkedUserRef.current = null;
+      return;
+    }
+
+    if (linkedUserRef.current === user.id) {
+      return;
+    }
+
+    linkedUserRef.current = user.id;
+    void linkSignupLead().catch(() => {
+      linkedUserRef.current = user.id;
+    });
+  }, [user?.id, user?.email]);
 
   useEffect(() => {
     const initData = async () => {
@@ -334,6 +365,13 @@ export const App = () => {
 
       const hash = window.location.hash.replace('#', '').toUpperCase() as ViewMode;
       const isValidView = Object.values(ViewMode).includes(hash);
+
+      if ([ViewMode.FREE_SCORE, ViewMode.FREE_CHECKLIST, ViewMode.UNSUBSCRIBE].includes(hash)) {
+        if (isValidView) {
+          setCurrentView(hash);
+          return;
+        }
+      }
 
       if (!user) {
         if (isValidView) setCurrentView(hash);
@@ -493,6 +531,10 @@ export const App = () => {
       }
     }
 
+    if (currentView === ViewMode.FREE_SCORE) return <FreeScorePage />;
+    if (currentView === ViewMode.FREE_CHECKLIST) return <FreeChecklistPage />;
+    if (currentView === ViewMode.UNSUBSCRIBE) return <UnsubscribePage />;
+
     if (user && consentGate.needsAcceptance) {
       return (
         <div className="min-h-[60vh] flex items-center justify-center">
@@ -506,6 +548,9 @@ export const App = () => {
     if (!user) {
         if (currentView === ViewMode.SIGNUP) return <SignUp onRegister={addContact} onNavigate={navigate} />;
         if (currentView === ViewMode.LOGIN) return <Login onLogin={() => {}} onBack={() => navigate(ViewMode.CLIENT_LANDING)} />;
+        if (currentView === ViewMode.FREE_SCORE) return <FreeScorePage />;
+        if (currentView === ViewMode.FREE_CHECKLIST) return <FreeChecklistPage />;
+        if (currentView === ViewMode.UNSUBSCRIBE) return <UnsubscribePage />;
         if (currentView === ViewMode.PRICING) return <PricingPage onNavigateBilling={(plan) => { setBillingUpgradeTarget(plan || null); navigate(ViewMode.BILLING); }} />;
         if (currentView === ViewMode.BILLING) return <BillingPage selectedPlan={billingUpgradeTarget} />;
         if (currentView === ViewMode.DOCUMENTS) return <DocumentsPage />;
@@ -610,6 +655,9 @@ export const App = () => {
                     case ViewMode.ADMIN_EMAIL_ROUTING: return <AdminEmailRoutingPage />;
                     case ViewMode.ADMIN_EMAIL_LOGS: return <AdminEmailLogsPage />;
                     case ViewMode.ADMIN_WORKFLOWS: return <AdminWorkflowsPage />;
+                    case ViewMode.ADMIN_FUNNEL_SEQUENCES: return <AdminFunnelSequencesPage />;
+                    case ViewMode.ADMIN_FUNNEL_LEADS: return <AdminFunnelLeadsPage />;
+                    case ViewMode.ADMIN_FUNNEL_METRICS: return <AdminFunnelMetricsPage />;
                     case ViewMode.ADMIN_FUNDING_CATALOG: return <AdminFundingCatalogPage />;
                     case ViewMode.ADMIN_GRANTS_CATALOG: return <AdminGrantsCatalogPage />;
                     case ViewMode.ADMIN_GRANTS_TRACKING: return <AdminGrantsTrackingPage />;
@@ -652,6 +700,7 @@ export const App = () => {
           </header>
         )}
         <div className={`flex-1 overflow-auto custom-scrollbar relative ${showNavigation ? 'p-6' : ''}`}>
+           {user && !isLegalView && !consentGate.needsAcceptance ? <OfferBanner onUpgrade={() => navigate(ViewMode.BILLING)} /> : null}
            {renderContent()}
         </div>
         {!isLegalView && (

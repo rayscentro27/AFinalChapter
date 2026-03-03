@@ -415,3 +415,12 @@ verify_jwt = true
 
 [functions.commission-ledger]
 verify_jwt = false
+
+[functions.lead-capture]
+verify_jwt = false
+
+[functions.funnel-engine]
+verify_jwt = true
+
+[functions.funnel-webhooks]
+verify_jwt = false

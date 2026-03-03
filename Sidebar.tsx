@@ -103,6 +103,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             {userRole === 'admin' ? (
               <>
                 <SidebarItem id={ViewMode.ADMIN_WORKFLOWS} label="Workflow Ops" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_FUNNEL_SEQUENCES} label="Funnel Sequences" icon={Megaphone} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_FUNNEL_LEADS} label="Funnel Leads" icon={Users} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_FUNNEL_METRICS} label="Funnel Metrics" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_DOCUMENTS} label="Document Center" icon={FileText} currentView={currentView} onViewChange={handleNav} />
               </>
             ) : null}
