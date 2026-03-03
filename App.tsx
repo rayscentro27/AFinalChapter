@@ -94,6 +94,8 @@ import AdminSmsTemplateEditor from './src/pages/AdminSmsTemplateEditor';
 import MailingAuthorizationPage from './src/pages/MailingAuthorizationPage';
 import ClientMailingApprovalsPage from './src/pages/ClientMailingApprovalsPage';
 import AdminMailingQueuePage from './src/pages/AdminMailingQueuePage';
+import DisputeLetterPreviewPage from './src/pages/DisputeLetterPreviewPage';
+import AdminMailingDashboard from './src/pages/AdminMailingDashboard';
 import AdminLegalPublisher from './src/pages/AdminLegalPublisher';
 import AdminEmailProvidersPage from './src/pages/AdminEmailProvidersPage';
 import AdminEmailRoutingPage from './src/pages/AdminEmailRoutingPage';
@@ -145,10 +147,12 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/subscriptions': ViewMode.ADMIN_SUBSCRIPTIONS,
   '/sms-terms': ViewMode.SMS_TERMS,
   '/communication-preferences': ViewMode.COMMUNICATION_PREFERENCES,
+  '/dispute-letter-preview': ViewMode.DISPUTE_LETTER_PREVIEW,
   '/admin/sms-templates': ViewMode.ADMIN_SMS_TEMPLATES,
   '/mailing-authorization': ViewMode.MAILING_AUTHORIZATION,
   '/mailing-approvals': ViewMode.CLIENT_MAILING_APPROVALS,
   '/admin/mailing-queue': ViewMode.ADMIN_MAILING_QUEUE,
+  '/admin/mailing-dashboard': ViewMode.ADMIN_MAILING_DASHBOARD,
   '/admin/legal-docs': ViewMode.ADMIN_LEGAL_DOCS,
   '/admin/email/providers': ViewMode.ADMIN_EMAIL_PROVIDERS,
   '/admin/email/routing': ViewMode.ADMIN_EMAIL_ROUTING,
@@ -275,6 +279,7 @@ export const App = () => {
           ViewMode.COMMUNICATION_PREFERENCES,
           ViewMode.MEMBERSHIP_AGREEMENT,
           ViewMode.CLIENT_MAILING_APPROVALS,
+          ViewMode.DISPUTE_LETTER_PREVIEW,
         ];
 
         if (!clientAllowedViews.includes(hash)) {
@@ -371,6 +376,7 @@ export const App = () => {
         if (currentView === ViewMode.BILLING) return <BillingPage selectedPlan={billingUpgradeTarget} />;
         if (currentView === ViewMode.COMMUNICATION_PREFERENCES) return <CommunicationPreferencesPage />;
         if (currentView === ViewMode.CLIENT_MAILING_APPROVALS) return <ClientMailingApprovalsPage />;
+        if (currentView === ViewMode.DISPUTE_LETTER_PREVIEW) return <DisputeLetterPreviewPage />;
         return <ClientLandingPage onNavigate={navigate} />;
     }
 
@@ -443,7 +449,9 @@ export const App = () => {
                     case ViewMode.ADMIN_SUBSCRIPTIONS: return <AdminSubscriptionManager />;
                     case ViewMode.ADMIN_SMS_TEMPLATES: return <AdminSmsTemplateEditor />;
                     case ViewMode.CLIENT_MAILING_APPROVALS: return <ClientMailingApprovalsPage />;
+                    case ViewMode.DISPUTE_LETTER_PREVIEW: return <DisputeLetterPreviewPage />;
                     case ViewMode.ADMIN_MAILING_QUEUE: return <AdminMailingQueuePage />;
+                    case ViewMode.ADMIN_MAILING_DASHBOARD: return <AdminMailingDashboard />;
                     case ViewMode.ADMIN_LEGAL_DOCS: return <AdminLegalPublisher />;
                     case ViewMode.ADMIN_EMAIL_PROVIDERS: return <AdminEmailProvidersPage />;
                     case ViewMode.ADMIN_EMAIL_ROUTING: return <AdminEmailRoutingPage />;
