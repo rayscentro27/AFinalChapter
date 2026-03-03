@@ -16,6 +16,7 @@ import * as geminiService from '../services/geminiService';
 import GlobalFundPulse from './GlobalFundPulse';
 import VoiceAssistant from './VoiceAssistant';
 import GlobalDirectives from './GlobalDirectives';
+import WorkflowDashboardPanel from './workflows/WorkflowDashboardPanel';
 
 interface DashboardProps {
   contacts?: Contact[];
@@ -68,6 +69,8 @@ const Dashboard: React.FC<DashboardProps> = ({ contacts = [], onFocusContact }) 
           <Mic size={16} className="animate-pulse" /> Command Voice Hub
         </button>
       </div>
+
+      <WorkflowDashboardPanel />
 
       {activeTab === 'brief' ? (
         <>

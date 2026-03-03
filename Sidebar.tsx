@@ -18,6 +18,7 @@ interface SidebarProps {
   branding?: AgencyBranding;
   contacts?: Contact[];
   onOpenVoiceAssistant?: () => void;
+  userRole?: 'admin' | 'supervisor' | 'salesperson' | 'client' | 'partner' | 'sales';
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -27,7 +28,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout, 
   branding,
   contacts = [],
-  onOpenVoiceAssistant
+  onOpenVoiceAssistant,
+  userRole
 }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -98,6 +100,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.SUPERVISOR_TRIAGE} label="Triage Hub" icon={ShieldAlert} currentView={currentView} onViewChange={handleNav} badge={triageCount || undefined} badgeColor="bg-red-600" />
             <SidebarItem id={ViewMode.CALENDAR} label="Smart Calendar" icon={Calendar} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.AUTOMATION} label="Sentinel Engine" icon={Zap} currentView={currentView} onViewChange={handleNav} />
+            {userRole === 'admin' ? (
+              <SidebarItem id={ViewMode.ADMIN_WORKFLOWS} label="Workflow Ops" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
+            ) : null}
           </SidebarSection>
 
           <SidebarSection label="Acquisition">

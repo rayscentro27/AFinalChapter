@@ -409,3 +409,6 @@ verify_jwt = false
 
 [functions.email-orchestrator]
 verify_jwt = false
+
+[functions.workflow-engine]
+verify_jwt = true

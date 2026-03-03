@@ -104,6 +104,8 @@ import AdminLegalPublisher from './src/pages/AdminLegalPublisher';
 import AdminEmailProvidersPage from './src/pages/AdminEmailProvidersPage';
 import AdminEmailRoutingPage from './src/pages/AdminEmailRoutingPage';
 import AdminEmailLogsPage from './src/pages/AdminEmailLogsPage';
+import WorkflowDetailPage from './src/pages/WorkflowDetailPage';
+import AdminWorkflowsPage from './src/pages/AdminWorkflowsPage';
 import SupervisorTriage from './components/SupervisorTriage';
 import AgenticHUD from './components/AgenticHUD';
 import NeuralStrategySandbox from './components/NeuralStrategySandbox';
@@ -126,6 +128,7 @@ import { PlanCode } from './src/billing/types';
 import { getUserTier, hasTierAccess, isSubscriptionEntitled, UserTierState } from './src/billing/tier';
 
 const PATH_TO_VIEW: Record<string, ViewMode> = {
+  '/dashboard': ViewMode.DASHBOARD,
   '/admin/contacts/merge': ViewMode.CONTACT_MERGE,
   '/admin/merge-jobs': ViewMode.MERGE_JOBS,
   '/admin/merge-queue': ViewMode.MERGE_QUEUE,
@@ -149,6 +152,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/consents': ViewMode.ADMIN_CONSENTS,
   '/pricing': ViewMode.PRICING,
   '/billing': ViewMode.BILLING,
+  '/workflow-detail': ViewMode.WORKFLOW_DETAIL,
   '/membership-agreement': ViewMode.MEMBERSHIP_AGREEMENT,
   '/admin/subscriptions': ViewMode.ADMIN_SUBSCRIPTIONS,
   '/sms-terms': ViewMode.SMS_TERMS,
@@ -167,6 +171,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/email/providers': ViewMode.ADMIN_EMAIL_PROVIDERS,
   '/admin/email/routing': ViewMode.ADMIN_EMAIL_ROUTING,
   '/admin/email/logs': ViewMode.ADMIN_EMAIL_LOGS,
+  '/admin/workflows': ViewMode.ADMIN_WORKFLOWS,
   '/settings/communication': ViewMode.COMMUNICATION_PREFERENCES,
 };
 
@@ -328,6 +333,7 @@ export const App = () => {
           ViewMode.MEMBERSHIP_AGREEMENT,
           ViewMode.CLIENT_MAILING_APPROVALS,
           ViewMode.DISPUTE_LETTER_PREVIEW,
+          ViewMode.WORKFLOW_DETAIL,
         ];
 
         if (!clientAllowedViews.includes(hash)) {
@@ -562,6 +568,8 @@ export const App = () => {
                     case ViewMode.ADMIN_EMAIL_PROVIDERS: return <AdminEmailProvidersPage />;
                     case ViewMode.ADMIN_EMAIL_ROUTING: return <AdminEmailRoutingPage />;
                     case ViewMode.ADMIN_EMAIL_LOGS: return <AdminEmailLogsPage />;
+                    case ViewMode.ADMIN_WORKFLOWS: return <AdminWorkflowsPage />;
+                    case ViewMode.WORKFLOW_DETAIL: return <WorkflowDetailPage />;
                     case ViewMode.INVITE_ACCEPT: return <InviteAccept />;
                     default: return <Dashboard contacts={contacts} />;
                 }

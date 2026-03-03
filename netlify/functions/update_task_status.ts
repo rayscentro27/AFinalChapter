@@ -22,6 +22,8 @@ type TaskRow = {
   status: string;
   signal: string | null;
   user_id: string | null;
+  workflow_instance_id: string | null;
+  workflow_step_number: number | null;
 };
 
 function getAuthHeader(headers?: Record<string, string | undefined>): string {
@@ -47,7 +49,7 @@ async function sendTaskUpdateEmailBestEffort(params: {
   const statusLabel = String(params.task.status || 'updated').toLowerCase();
   const subject = `Task update: ${params.task.title}`;
   const html = `<p>Your task <strong>${params.task.title}</strong> was updated to <strong>${statusLabel}</strong>.</p><p>This is an educational workflow notification.</p>`;
-  const text = `Your task \"${params.task.title}\" was updated to ${statusLabel}. This is an educational workflow notification.`;
+  const text = `Your task "${params.task.title}" was updated to ${statusLabel}. This is an educational workflow notification.`;
 
   await fetch(`${supabaseUrl}/functions/v1/email-orchestrator/send`, {
     method: 'POST',
@@ -72,6 +74,44 @@ async function sendTaskUpdateEmailBestEffort(params: {
         signal: params.task.signal,
         actor_user_id: params.actorUserId,
         actor_name: params.actorName,
+      },
+    }),
+  });
+}
+
+async function triggerWorkflowAdvanceOnTaskCompleteBestEffort(params: {
+  authHeader: string;
+  tenantId: string;
+  task: TaskRow;
+}) {
+  const instanceId = String(params.task.workflow_instance_id || '').trim();
+  const status = String(params.task.status || '').trim().toLowerCase();
+
+  if (!instanceId || status !== 'completed') {
+    return;
+  }
+
+  const supabaseUrl = String(process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  const anonKey = String(process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+
+  if (!supabaseUrl || !anonKey || !params.authHeader) {
+    return;
+  }
+
+  await fetch(`${supabaseUrl}/functions/v1/workflow-engine/trigger`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: params.authHeader,
+      apikey: anonKey,
+    },
+    body: JSON.stringify({
+      event_type: 'task.completed',
+      payload: {
+        instance_id: instanceId,
+        task_id: params.task.task_id,
+        tenant_id: params.tenantId,
+        workflow_step_number: params.task.workflow_step_number,
       },
     }),
   });
@@ -106,6 +146,7 @@ export const handler: Handler = async (event) => {
     if (error) throw new Error(error.message);
 
     const task = data as TaskRow;
+    const authHeader = getAuthHeader(event.headers);
 
     // Best-effort transactional notification via email orchestrator.
     if (task?.user_id) {
@@ -123,7 +164,7 @@ export const handler: Handler = async (event) => {
 
         const profileEmail = String((profileRes.data as any)?.email || '').trim().toLowerCase();
         await sendTaskUpdateEmailBestEffort({
-          authHeader: getAuthHeader(event.headers),
+          authHeader,
           tenantId: tenant_id,
           task,
           actorUserId,
@@ -133,6 +174,17 @@ export const handler: Handler = async (event) => {
       } catch {
         // Non-fatal email path.
       }
+    }
+
+    // Workflow integration: completing a workflow-bound task triggers secure server-side advance validation.
+    try {
+      await triggerWorkflowAdvanceOnTaskCompleteBestEffort({
+        authHeader,
+        tenantId: tenant_id,
+        task,
+      });
+    } catch {
+      // Non-fatal workflow trigger path.
     }
 
     return json(200, { ok: true, tenant_id, task: data });
