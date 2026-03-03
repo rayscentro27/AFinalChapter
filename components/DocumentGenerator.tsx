@@ -3,6 +3,10 @@ import React, { useState } from 'react';
 import { Contact, DocumentTemplate } from '../types';
 import { FileText, Sparkles, Save, Download, Copy, RefreshCw, ChevronRight, User, Shield, Gavel, Zap, MessageSquare, Fingerprint, Mail, Smartphone } from 'lucide-react';
 import * as geminiService from '../services/geminiService';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabaseClient';
+import { resolveTenantIdForUser } from '../utils/tenantContext';
+import RequiredDisclaimers from './legal/RequiredDisclaimers';
 
 interface DocumentGeneratorProps {
   contacts: Contact[];
@@ -48,6 +52,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ contacts, onUpdat
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGeneratingDisclosure, setIsGeneratingDisclosure] = useState(false);
   const [isNeuralEditing, setIsNeuralEditing] = useState(false);
+  const [isRequestingApproval, setIsRequestingApproval] = useState(false);
+  const { user } = useAuth();
 
   const selectedContact = contacts.find(c => c.id === selectedContactId);
 
@@ -120,6 +126,73 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ contacts, onUpdat
     }
   };
 
+  const handleRequestClientApproval = async () => {
+    if (!selectedContact) { alert("Please select a contact first."); return; }
+    if (!documentContent.trim()) { alert("Document content is empty."); return; }
+    if (!user?.id) { alert("Sign in required."); return; }
+
+    if (!selectedContact.email) {
+      alert("Selected contact is missing an email. Client approval requires an approver email.");
+      return;
+    }
+
+    setIsRequestingApproval(true);
+    try {
+      const tenantId = await resolveTenantIdForUser(user.id);
+      if (!tenantId) throw new Error('No tenant context found for current user.');
+
+      const packetTitle = `${selectedContact.company} - ${selectedTemplate?.name || 'Dispute Package'}`;
+      const { data: packet, error: packetError } = await supabase
+        .from('dispute_mail_packets')
+        .insert({
+          tenant_id: tenantId,
+          requester_user_id: user.id,
+          approver_email: selectedContact.email,
+          contact_id: selectedContact.id,
+          contact_name: selectedContact.name,
+          contact_email: selectedContact.email,
+          packet_title: packetTitle,
+          document_name: `${selectedTemplate?.name || 'Document'}.txt`,
+          document_body: documentContent,
+          status: 'pending_client_approval',
+          provider: 'docupost',
+        })
+        .select('id')
+        .single();
+
+      if (packetError || !packet?.id) {
+        throw new Error(packetError?.message || 'Unable to create mailing approval packet.');
+      }
+
+      await supabase.from('dispute_mail_events').insert({
+        packet_id: packet.id,
+        tenant_id: tenantId,
+        actor_user_id: user.id,
+        event_type: 'mail_packet.approval_requested',
+        metadata: {
+          approver_email: selectedContact.email,
+          contact_name: selectedContact.name,
+        },
+      });
+
+      await supabase.from('audit_events').insert({
+        tenant_id: tenantId,
+        actor_user_id: user.id,
+        event_type: 'mail_packet.approval_requested',
+        metadata: {
+          packet_id: packet.id,
+          approver_email: selectedContact.email,
+        },
+      });
+
+      alert(`Client approval requested from ${selectedContact.email}. Packet is now pending client approval.`);
+    } catch (e: any) {
+      alert(e?.message || 'Failed to request client approval.');
+    } finally {
+      setIsRequestingApproval(false);
+    }
+  };
+
   const handleSaveToVault = () => {
     if (!selectedContact) { alert("Please select a contact first."); return; }
     const blob = new Blob([documentContent], { type: 'text/plain' });
@@ -150,6 +223,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ contacts, onUpdat
     <div className="h-[calc(100vh-100px)] flex flex-col md:flex-row gap-6 animate-fade-in">
       
       <div className="w-full md:w-80 flex flex-col gap-6 bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm overflow-y-auto">
+         <RequiredDisclaimers title="Dispute Workflow Disclaimers" />
          <div>
             <label className="block text-[10px] font-black text-slate-500 uppercase mb-4 tracking-widest px-2">1. Select Subject</label>
             <div className="relative">
@@ -226,7 +300,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ contacts, onUpdat
             className="flex-1 p-10 text-sm font-mono leading-relaxed resize-none outline-none text-slate-700 bg-slate-50/10 custom-scrollbar"
             placeholder="Select a protocol template to begin synthesis..."
          />
-         <div className="p-6 border-t border-slate-100 flex justify-end">
+         <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+             <button
+                onClick={handleRequestClientApproval}
+                disabled={!selectedContact || !documentContent || isRequestingApproval}
+                className="border-2 border-cyan-200 text-cyan-700 px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.16em] hover:bg-cyan-50 flex items-center gap-3 disabled:opacity-50 transition-all"
+             >
+                {isRequestingApproval ? <RefreshCw className="animate-spin" size={16} /> : <MessageSquare size={16} />}
+                {isRequestingApproval ? 'Requesting Approval...' : 'Request Client Approval'}
+             </button>
              <button 
                 onClick={handleSaveToVault}
                 disabled={!selectedContact || !documentContent}
