@@ -400,3 +400,6 @@ verify_jwt = false
 
 [functions.dispute-letter-finalize]
 verify_jwt = false
+
+[functions.policy-admin]
+verify_jwt = false

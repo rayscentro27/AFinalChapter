@@ -35,9 +35,10 @@ export type LegalDocumentKey =
   | 'ai_disclosure'
   | 'disclaimers'
   | 'refund_policy'
-  | 'membership_agreement'
   | 'sms_terms'
-  | 'mailing_authorization';
+  | 'commission_disclosure'
+  | 'docupost_mailing_auth'
+  | 'membership_agreement';
 
 export const LEGAL_DOCUMENT_KEYS: LegalDocumentKey[] = [
   'terms',
@@ -45,9 +46,10 @@ export const LEGAL_DOCUMENT_KEYS: LegalDocumentKey[] = [
   'ai_disclosure',
   'disclaimers',
   'refund_policy',
-  'membership_agreement',
   'sms_terms',
-  'mailing_authorization',
+  'commission_disclosure',
+  'docupost_mailing_auth',
+  'membership_agreement',
 ];
 
 export const LEGAL_DOCUMENT_LABELS: Record<LegalDocumentKey, string> = {
@@ -56,22 +58,23 @@ export const LEGAL_DOCUMENT_LABELS: Record<LegalDocumentKey, string> = {
   ai_disclosure: 'AI Disclosure',
   disclaimers: 'Required Disclaimers',
   refund_policy: 'Refund Policy',
-  membership_agreement: 'Membership Agreement',
   sms_terms: 'SMS Terms',
-  mailing_authorization: 'Mailing Authorization',
+  commission_disclosure: 'Commission Disclosure',
+  docupost_mailing_auth: 'DocuPost Mailing Authorization',
+  membership_agreement: 'Membership Agreement',
 };
-
-export type LegalDocumentStatus = 'draft' | 'published' | 'archived';
 
 export type LegalDocumentRow = {
   id: string;
+  policy_version_id: string;
   doc_key: LegalDocumentKey;
   version: string;
   title: string;
   subtitle: string | null;
   markdown_body: string;
-  status: LegalDocumentStatus;
-  is_active: boolean;
+  content_hash: string | null;
+  is_published: boolean;
+  published_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -87,6 +90,14 @@ export function legalDocKeyToConsentType(docKey: LegalDocumentKey): RequiredCons
   if (docKey === 'privacy') return 'privacy';
   if (docKey === 'ai_disclosure') return 'ai_disclosure';
   if (docKey === 'disclaimers') return 'disclaimers';
+  return null;
+}
+
+export function consentTypeToLegalDocKey(consentType: RequiredConsentType): LegalDocumentKey | null {
+  if (consentType === 'terms') return 'terms';
+  if (consentType === 'privacy') return 'privacy';
+  if (consentType === 'ai_disclosure') return 'ai_disclosure';
+  if (consentType === 'disclaimers') return 'disclaimers';
   return null;
 }
 

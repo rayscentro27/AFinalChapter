@@ -6,10 +6,59 @@ import {
   DEFAULT_REQUIRED_CONSENT_VERSIONS,
   REQUIRED_CONSENT_TYPES,
   RequiredConsentType,
+  consentTypeToLegalDocKey,
 } from '../components/legal/legalDocuments';
 
 export type ConsentSelections = Record<RequiredConsentType, boolean>;
 export type ConsentVersionMap = Record<RequiredConsentType, string>;
+
+export type ConsentPolicySnapshot = {
+  policyKey: string | null;
+  policyTitle: string | null;
+  policyVersionId: string | null;
+  policyHash: string | null;
+  version: string | null;
+};
+
+export type ConsentPolicySnapshotMap = Record<RequiredConsentType, ConsentPolicySnapshot>;
+
+const DEFAULT_POLICY_SNAPSHOT_MAP: ConsentPolicySnapshotMap = {
+  terms: {
+    policyKey: 'terms',
+    policyTitle: null,
+    policyVersionId: null,
+    policyHash: null,
+    version: null,
+  },
+  privacy: {
+    policyKey: 'privacy',
+    policyTitle: null,
+    policyVersionId: null,
+    policyHash: null,
+    version: null,
+  },
+  ai_disclosure: {
+    policyKey: 'ai_disclosure',
+    policyTitle: null,
+    policyVersionId: null,
+    policyHash: null,
+    version: null,
+  },
+  disclaimers: {
+    policyKey: 'disclaimers',
+    policyTitle: null,
+    policyVersionId: null,
+    policyHash: null,
+    version: null,
+  },
+  comms_email: {
+    policyKey: null,
+    policyTitle: null,
+    policyVersionId: null,
+    policyHash: null,
+    version: null,
+  },
+};
 
 export type ConsentStatusRow = {
   user_id: string;
@@ -30,8 +79,24 @@ type UseConsentGateResult = {
   error: string | null;
   requiredTypes: RequiredConsentType[];
   requiredVersions: ConsentVersionMap;
+  requiredPolicySnapshots: ConsentPolicySnapshotMap;
   acceptConsents: (selected: ConsentSelections) => Promise<void>;
   refresh: () => Promise<void>;
+};
+
+type PolicyDocumentRow = {
+  id: string;
+  key: string;
+  title: string;
+};
+
+type PolicyVersionRow = {
+  id: string;
+  document_id: string;
+  version: string;
+  content_hash: string;
+  is_published: boolean;
+  published_at: string | null;
 };
 
 function emptySelections(): ConsentSelections {
@@ -105,6 +170,7 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
   const [error, setError] = useState<string | null>(null);
   const [requiredTypes, setRequiredTypes] = useState<RequiredConsentType[]>(REQUIRED_CONSENT_TYPES);
   const [requiredVersions, setRequiredVersions] = useState<ConsentVersionMap>(DEFAULT_REQUIRED_CONSENT_VERSIONS);
+  const [requiredPolicySnapshots, setRequiredPolicySnapshots] = useState<ConsentPolicySnapshotMap>(DEFAULT_POLICY_SNAPSHOT_MAP);
 
   const refresh = useCallback(async () => {
     if (!userId) {
@@ -113,6 +179,7 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
       setError(null);
       setRequiredTypes(REQUIRED_CONSENT_TYPES);
       setRequiredVersions(DEFAULT_REQUIRED_CONSENT_VERSIONS);
+      setRequiredPolicySnapshots(DEFAULT_POLICY_SNAPSHOT_MAP);
       return;
     }
 
@@ -152,13 +219,83 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
 
     const nextRequiredTypes = REQUIRED_CONSENT_TYPES.filter((type) => nextFlags[type]);
     setRequiredTypes(nextRequiredTypes.length > 0 ? nextRequiredTypes : REQUIRED_CONSENT_TYPES);
+
+    const linkedPolicyKeys = REQUIRED_CONSENT_TYPES
+      .map((consentType) => ({ consentType, policyKey: consentTypeToLegalDocKey(consentType) }))
+      .filter((item): item is { consentType: RequiredConsentType; policyKey: string } => Boolean(item.policyKey));
+
+    const nextPolicySnapshots: ConsentPolicySnapshotMap = { ...DEFAULT_POLICY_SNAPSHOT_MAP };
+
+    if (linkedPolicyKeys.length > 0) {
+      const keyList = linkedPolicyKeys.map((item) => item.policyKey);
+      const docsRes = await supabase
+        .from('policy_documents')
+        .select('id,key,title')
+        .in('key', keyList)
+        .eq('is_active', true);
+
+      if (docsRes.error) {
+        if (!isSchemaNotReadyError(docsRes.error.code)) {
+          setError((prev) => prev || docsRes.error.message || 'Unable to load policy documents.');
+        }
+      } else {
+        const docs = (docsRes.data || []) as PolicyDocumentRow[];
+        const docsByKey = new Map<string, PolicyDocumentRow>();
+        for (const doc of docs) {
+          docsByKey.set(doc.key, doc);
+        }
+
+        if (docs.length > 0) {
+          const docIds = docs.map((doc) => doc.id);
+          const versionsRes = await supabase
+            .from('policy_versions')
+            .select('id,document_id,version,content_hash,is_published,published_at')
+            .in('document_id', docIds)
+            .eq('is_published', true)
+            .order('published_at', { ascending: false });
+
+          if (versionsRes.error) {
+            if (!isSchemaNotReadyError(versionsRes.error.code)) {
+              setError((prev) => prev || versionsRes.error.message || 'Unable to load policy versions.');
+            }
+          } else {
+            const versions = (versionsRes.data || []) as PolicyVersionRow[];
+            const latestByDocument = new Map<string, PolicyVersionRow>();
+            for (const version of versions) {
+              if (!latestByDocument.has(version.document_id)) {
+                latestByDocument.set(version.document_id, version);
+              }
+            }
+
+            for (const item of linkedPolicyKeys) {
+              const doc = docsByKey.get(item.policyKey);
+              if (!doc) continue;
+              const latest = latestByDocument.get(doc.id);
+              if (!latest) continue;
+
+              nextPolicySnapshots[item.consentType] = {
+                policyKey: doc.key,
+                policyTitle: doc.title,
+                policyVersionId: latest.id,
+                policyHash: latest.content_hash || null,
+                version: latest.version,
+              };
+
+              nextVersions[item.consentType] = latest.version || nextVersions[item.consentType];
+            }
+          }
+        }
+      }
+    }
+
     setRequiredVersions(nextVersions);
+    setRequiredPolicySnapshots(nextPolicySnapshots);
 
     if (readError) {
       if (isSchemaNotReadyError(readError.code)) {
         setStatus(null);
       } else {
-        setError(readError.message || 'Unable to load consent status.');
+        setError((prev) => prev || readError.message || 'Unable to load consent status.');
         setStatus(null);
       }
       setLoading(false);
@@ -194,15 +331,27 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
         throw new Error('No required consents were selected.');
       }
 
-      const consentRows = acceptedTypes.map((consentType) => ({
-        user_id: userId,
-        tenant_id: tenantId,
-        consent_type: consentType,
-        version: requiredVersions[consentType] || 'v1',
-        accepted_at: now,
-        ip_hash: ipHash,
-        user_agent: userAgent,
-      }));
+      const consentRows = acceptedTypes.map((consentType) => {
+        const policySnapshot = requiredPolicySnapshots[consentType];
+        const version = requiredVersions[consentType] || policySnapshot?.version || 'v1';
+        return {
+          user_id: userId,
+          tenant_id: tenantId,
+          consent_type: consentType,
+          version,
+          policy_version_id: policySnapshot?.policyVersionId || null,
+          accepted_at: now,
+          ip_hash: ipHash,
+          user_agent: userAgent,
+          metadata: {
+            policy_key: policySnapshot?.policyKey || null,
+            policy_title: policySnapshot?.policyTitle || null,
+            policy_version_id: policySnapshot?.policyVersionId || null,
+            policy_version: version,
+            policy_hash: policySnapshot?.policyHash || null,
+          },
+        };
+      });
 
       const { error: insertError } = await supabase.from('consents').upsert(consentRows, {
         onConflict: 'user_id,consent_type,version',
@@ -213,7 +362,8 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
       }
 
       const auditRows = acceptedTypes.map((consentType) => {
-        const version = requiredVersions[consentType] || 'v1';
+        const policySnapshot = requiredPolicySnapshots[consentType];
+        const version = requiredVersions[consentType] || policySnapshot?.version || 'v1';
         return {
           tenant_id: tenantId,
           actor_user_id: userId,
@@ -226,6 +376,8 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
           metadata: {
             consent_type: consentType,
             version,
+            policy_version_id: policySnapshot?.policyVersionId || null,
+            policy_hash: policySnapshot?.policyHash || null,
             accepted_at: now,
             ip_hash: ipHash,
             user_agent: userAgent,
@@ -245,7 +397,7 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
     } finally {
       setSubmitting(false);
     }
-  }, [refresh, requiredTypes, requiredVersions, userId]);
+  }, [refresh, requiredPolicySnapshots, requiredTypes, requiredVersions, userId]);
 
   const needsAcceptance = !loading && !status?.has_required_consents;
 
@@ -257,6 +409,7 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
     error,
     requiredTypes,
     requiredVersions,
+    requiredPolicySnapshots,
     acceptConsents,
     refresh,
   };

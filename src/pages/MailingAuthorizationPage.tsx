@@ -14,8 +14,9 @@ export default function MailingAuthorizationPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const legalDoc = useLegalDocument('mailing_authorization');
+  const legalDoc = useLegalDocument('docupost_mailing_auth');
   const activeVersion = useMemo(() => legalDoc.document?.version || 'v1', [legalDoc.document?.version]);
+  const activePolicyVersionId = useMemo(() => legalDoc.document?.policy_version_id || null, [legalDoc.document?.policy_version_id]);
 
   async function loadState() {
     if (!user?.id) {
@@ -24,15 +25,21 @@ export default function MailingAuthorizationPage() {
     }
 
     setLoading(true);
-    const { data, error: readError } = await supabase
+    let query = supabase
       .from('consents')
       .select('accepted_at')
       .eq('user_id', user.id)
       .eq('consent_type', 'docupost_mailing_auth')
-      .eq('version', activeVersion)
       .order('accepted_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    if (activePolicyVersionId) {
+      query = query.eq('policy_version_id', activePolicyVersionId);
+    } else {
+      query = query.eq('version', activeVersion);
+    }
+
+    const { data, error: readError } = await query.maybeSingle();
 
     if (readError) {
       setError(readError.message || 'Unable to load authorization status.');
@@ -46,7 +53,7 @@ export default function MailingAuthorizationPage() {
 
   useEffect(() => {
     void loadState();
-  }, [user?.id, activeVersion]);
+  }, [user?.id, activeVersion, activePolicyVersionId]);
 
   async function acceptAuthorization() {
     if (!user?.id) return;
@@ -66,9 +73,15 @@ export default function MailingAuthorizationPage() {
         tenant_id: tenantId,
         consent_type: 'docupost_mailing_auth',
         version: activeVersion,
+        policy_version_id: activePolicyVersionId,
         accepted_at: now,
         ip_hash: ipHash,
         user_agent: userAgent,
+        metadata: {
+          policy_version: activeVersion,
+          policy_version_id: activePolicyVersionId,
+          policy_hash: legalDoc.document?.content_hash || null,
+        },
       }, {
         onConflict: 'user_id,consent_type,version',
       });
@@ -84,6 +97,7 @@ export default function MailingAuthorizationPage() {
           event_type: 'docupost_mailing_auth.accepted',
           metadata: {
             version: activeVersion,
+            policy_version_id: activePolicyVersionId,
             accepted_at: now,
           },
         });

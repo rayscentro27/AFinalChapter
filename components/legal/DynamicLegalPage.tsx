@@ -11,6 +11,13 @@ type DynamicLegalPageProps = {
   fallbackContent: React.ReactNode;
 };
 
+function shortHash(hash: string | null | undefined): string {
+  const value = String(hash || '').trim();
+  if (!value) return '';
+  if (value.length <= 14) return value;
+  return `${value.slice(0, 10)}...${value.slice(-4)}`;
+}
+
 export default function DynamicLegalPage({
   docKey,
   fallbackTitle,
@@ -29,8 +36,15 @@ export default function DynamicLegalPage({
       ) : document?.markdown_body ? (
         <>
           <LegalMarkdownContent markdown={document.markdown_body} />
-          <div className="rounded-lg border border-cyan-300/20 bg-cyan-900/20 px-3 py-2 text-[11px] text-cyan-100 inline-block">
-            Version: {document.version}
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="rounded-lg border border-cyan-300/20 bg-cyan-900/20 px-3 py-1.5 text-cyan-100 inline-block">
+              Version: {document.version}
+            </span>
+            {document.content_hash ? (
+              <span className="rounded-lg border border-indigo-300/20 bg-indigo-900/20 px-3 py-1.5 text-indigo-100 inline-block font-mono">
+                Hash: {shortHash(document.content_hash)}
+              </span>
+            ) : null}
           </div>
         </>
       ) : (
