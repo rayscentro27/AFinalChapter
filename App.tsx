@@ -78,6 +78,26 @@ import AdminRoles from './src/pages/AdminRoles';
 import AdminMembers from './src/pages/AdminMembers';
 import AdminPolicies from './src/pages/AdminPolicies';
 import InviteAccept from './src/pages/InviteAccept';
+import TermsPage from './src/pages/TermsPage';
+import PrivacyPage from './src/pages/PrivacyPage';
+import AIDisclosurePage from './src/pages/AIDisclosurePage';
+import RefundPolicyPage from './src/pages/RefundPolicyPage';
+import DisclaimersPage from './src/pages/DisclaimersPage';
+import AdminConsentViewer from './src/pages/AdminConsentViewer';
+import PricingPage from './src/pages/PricingPage';
+import BillingPage from './src/pages/BillingPage';
+import MembershipAgreementPage from './src/pages/MembershipAgreementPage';
+import AdminSubscriptionManager from './src/pages/AdminSubscriptionManager';
+import SmsTermsPage from './src/pages/SmsTermsPage';
+import CommunicationPreferencesPage from './src/pages/CommunicationPreferencesPage';
+import AdminSmsTemplateEditor from './src/pages/AdminSmsTemplateEditor';
+import MailingAuthorizationPage from './src/pages/MailingAuthorizationPage';
+import ClientMailingApprovalsPage from './src/pages/ClientMailingApprovalsPage';
+import AdminMailingQueuePage from './src/pages/AdminMailingQueuePage';
+import AdminLegalPublisher from './src/pages/AdminLegalPublisher';
+import AdminEmailProvidersPage from './src/pages/AdminEmailProvidersPage';
+import AdminEmailRoutingPage from './src/pages/AdminEmailRoutingPage';
+import AdminEmailLogsPage from './src/pages/AdminEmailLogsPage';
 import SupervisorTriage from './components/SupervisorTriage';
 import AgenticHUD from './components/AgenticHUD';
 import NeuralStrategySandbox from './components/NeuralStrategySandbox';
@@ -92,6 +112,11 @@ import { processAutomations } from './services/automationEngine';
 import { runBackgroundProtocols } from './services/neuralEscalator';
 import * as geminiService from './services/geminiService';
 import * as costService from './services/costService';
+import RequiredDisclaimers from './components/legal/RequiredDisclaimers';
+import LegalFooterLinks from './components/legal/LegalFooterLinks';
+import ConsentGateModal from './components/consent/ConsentGateModal';
+import useConsentGate from './hooks/useConsentGate';
+import { PlanCode } from './src/billing/types';
 
 const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/contacts/merge': ViewMode.CONTACT_MERGE,
@@ -108,7 +133,43 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/members': ViewMode.ADMIN_MEMBERS,
   '/admin/policies': ViewMode.ADMIN_POLICIES,
   '/invite-accept': ViewMode.INVITE_ACCEPT,
+  '/terms': ViewMode.TERMS,
+  '/privacy': ViewMode.PRIVACY,
+  '/ai-disclosure': ViewMode.AI_DISCLOSURE,
+  '/refund-policy': ViewMode.REFUND_POLICY,
+  '/disclaimers': ViewMode.DISCLAIMERS,
+  '/admin/consents': ViewMode.ADMIN_CONSENTS,
+  '/pricing': ViewMode.PRICING,
+  '/billing': ViewMode.BILLING,
+  '/membership-agreement': ViewMode.MEMBERSHIP_AGREEMENT,
+  '/admin/subscriptions': ViewMode.ADMIN_SUBSCRIPTIONS,
+  '/sms-terms': ViewMode.SMS_TERMS,
+  '/communication-preferences': ViewMode.COMMUNICATION_PREFERENCES,
+  '/admin/sms-templates': ViewMode.ADMIN_SMS_TEMPLATES,
+  '/mailing-authorization': ViewMode.MAILING_AUTHORIZATION,
+  '/mailing-approvals': ViewMode.CLIENT_MAILING_APPROVALS,
+  '/admin/mailing-queue': ViewMode.ADMIN_MAILING_QUEUE,
+  '/admin/legal-docs': ViewMode.ADMIN_LEGAL_DOCS,
+  '/admin/email/providers': ViewMode.ADMIN_EMAIL_PROVIDERS,
+  '/admin/email/routing': ViewMode.ADMIN_EMAIL_ROUTING,
+  '/admin/email/logs': ViewMode.ADMIN_EMAIL_LOGS,
+  '/settings/communication': ViewMode.COMMUNICATION_PREFERENCES,
 };
+
+const LEGAL_VIEWS: ViewMode[] = [
+  ViewMode.TERMS,
+  ViewMode.PRIVACY,
+  ViewMode.AI_DISCLOSURE,
+  ViewMode.REFUND_POLICY,
+  ViewMode.DISCLAIMERS,
+  ViewMode.MEMBERSHIP_AGREEMENT,
+  ViewMode.MAILING_AUTHORIZATION,
+  ViewMode.SMS_TERMS,
+];
+
+function isLegalViewMode(view: ViewMode): boolean {
+  return LEGAL_VIEWS.includes(view);
+}
 
 function normalizePathname(pathname: string): string {
   const raw = String(pathname || '/').trim().toLowerCase();
@@ -130,8 +191,10 @@ export const App = () => {
   const [isGlobalVoiceOpen, setIsGlobalVoiceOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [automationToast, setAutomationToast] = useState<{show: boolean, msg: string, type: 'success' | 'error' | 'info'}>({show: false, msg: '', type: 'info'});
+  const [billingUpgradeTarget, setBillingUpgradeTarget] = useState<PlanCode | null>(null);
 
   const [isSystemReady, setIsSystemReady] = useState(false);
+  const consentGate = useConsentGate(user?.id || null);
 
   useEffect(() => {
     const initData = async () => {
@@ -199,7 +262,22 @@ export const App = () => {
       }
 
       if (user.role === 'client') {
-        if (hash !== ViewMode.PORTAL && hash !== ViewMode.PARTNER_MARKETPLACE) {
+        if (isLegalViewMode(hash)) {
+          setCurrentView(hash);
+          return;
+        }
+
+        const clientAllowedViews: ViewMode[] = [
+          ViewMode.PORTAL,
+          ViewMode.PARTNER_MARKETPLACE,
+          ViewMode.PRICING,
+          ViewMode.BILLING,
+          ViewMode.COMMUNICATION_PREFERENCES,
+          ViewMode.MEMBERSHIP_AGREEMENT,
+          ViewMode.CLIENT_MAILING_APPROVALS,
+        ];
+
+        if (!clientAllowedViews.includes(hash)) {
           window.location.hash = 'portal';
         } else {
           setCurrentView(hash);
@@ -240,18 +318,63 @@ export const App = () => {
     window.location.hash = view.toLowerCase();
   };
 
-  const showNavigation = user && user.role !== 'client' && ![ViewMode.CLIENT_LANDING, ViewMode.LOGIN, ViewMode.SIGNUP, ViewMode.ONBOARDING].includes(currentView) && isSystemReady;
+  const isLegalView = isLegalViewMode(currentView);
+  const showNavigation = Boolean(
+    user
+    && user.role !== 'client'
+    && ![ViewMode.CLIENT_LANDING, ViewMode.LOGIN, ViewMode.SIGNUP, ViewMode.ONBOARDING].includes(currentView)
+    && !isLegalView
+    && isSystemReady
+    && !consentGate.needsAcceptance
+  );
 
   const renderContent = () => {
     if (loading) return <div className="h-screen flex items-center justify-center bg-slate-950"><RefreshCw className="animate-spin text-blue-500" /></div>;
 
+    if (isLegalViewMode(currentView)) {
+      switch (currentView) {
+        case ViewMode.TERMS:
+          return <TermsPage />;
+        case ViewMode.PRIVACY:
+          return <PrivacyPage />;
+        case ViewMode.AI_DISCLOSURE:
+          return <AIDisclosurePage />;
+        case ViewMode.REFUND_POLICY:
+          return <RefundPolicyPage />;
+        case ViewMode.DISCLAIMERS:
+          return <DisclaimersPage />;
+        case ViewMode.MEMBERSHIP_AGREEMENT:
+          return <MembershipAgreementPage />;
+        case ViewMode.MAILING_AUTHORIZATION:
+          return <MailingAuthorizationPage />;
+        case ViewMode.SMS_TERMS:
+          return <SmsTermsPage />;
+        default:
+          return <DisclaimersPage />;
+      }
+    }
+
+    if (user && consentGate.needsAcceptance) {
+      return (
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <div className="rounded-2xl border border-cyan-300/25 bg-slate-900 p-6 text-sm text-slate-200">
+            Accept required policies to continue.
+          </div>
+        </div>
+      );
+    }
+
     if (!user) {
         if (currentView === ViewMode.SIGNUP) return <SignUp onRegister={addContact} onNavigate={navigate} />;
         if (currentView === ViewMode.LOGIN) return <Login onLogin={() => {}} onBack={() => navigate(ViewMode.CLIENT_LANDING)} />;
+        if (currentView === ViewMode.PRICING) return <PricingPage onNavigateBilling={(plan) => { setBillingUpgradeTarget(plan || null); navigate(ViewMode.BILLING); }} />;
+        if (currentView === ViewMode.BILLING) return <BillingPage selectedPlan={billingUpgradeTarget} />;
+        if (currentView === ViewMode.COMMUNICATION_PREFERENCES) return <CommunicationPreferencesPage />;
+        if (currentView === ViewMode.CLIENT_MAILING_APPROVALS) return <ClientMailingApprovalsPage />;
         return <ClientLandingPage onNavigate={navigate} />;
     }
 
-    if (user.role === 'client' || currentView === ViewMode.PORTAL) {
+    if (currentView === ViewMode.PORTAL) {
       let myContact = contacts.find(c => c.email.toLowerCase() === user.email.toLowerCase());
       if (!myContact && contacts.length > 0) myContact = contacts[0];
       const skeletonContact: Contact = {
@@ -272,6 +395,9 @@ export const App = () => {
                     case ViewMode.CRM: return <CRMTable contacts={contacts} onUpdateContact={updateContact} onAddContact={addContact} />;
                     case ViewMode.INBOX: return <UnifiedInbox contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.SETTINGS: return <Settings branding={branding} onUpdateBranding={updateBranding} onNavigate={navigate} />;
+                    case ViewMode.PRICING: return <PricingPage onNavigateBilling={(plan) => { setBillingUpgradeTarget(plan || null); navigate(ViewMode.BILLING); }} />;
+                    case ViewMode.BILLING: return <BillingPage selectedPlan={billingUpgradeTarget} />;
+                    case ViewMode.COMMUNICATION_PREFERENCES: return <CommunicationPreferencesPage />;
                     case ViewMode.MARKETING: return <MarketingCampaigns contacts={contacts} branding={branding} onUpdateBranding={updateBranding} />;
                     case ViewMode.NEURAL_FLOOR: return <NeuralFloor contacts={contacts} onUpdateContacts={setContacts} />;
                     case ViewMode.POWER_DIALER: return <PowerDialer queue={contacts} onUpdateContact={updateContact} onClose={() => navigate(ViewMode.CRM)} />;
@@ -313,6 +439,15 @@ export const App = () => {
                     case ViewMode.ADMIN_ROLES: return <AdminRoles />;
                     case ViewMode.ADMIN_MEMBERS: return <AdminMembers />;
                     case ViewMode.ADMIN_POLICIES: return <AdminPolicies />;
+                    case ViewMode.ADMIN_CONSENTS: return <AdminConsentViewer />;
+                    case ViewMode.ADMIN_SUBSCRIPTIONS: return <AdminSubscriptionManager />;
+                    case ViewMode.ADMIN_SMS_TEMPLATES: return <AdminSmsTemplateEditor />;
+                    case ViewMode.CLIENT_MAILING_APPROVALS: return <ClientMailingApprovalsPage />;
+                    case ViewMode.ADMIN_MAILING_QUEUE: return <AdminMailingQueuePage />;
+                    case ViewMode.ADMIN_LEGAL_DOCS: return <AdminLegalPublisher />;
+                    case ViewMode.ADMIN_EMAIL_PROVIDERS: return <AdminEmailProvidersPage />;
+                    case ViewMode.ADMIN_EMAIL_ROUTING: return <AdminEmailRoutingPage />;
+                    case ViewMode.ADMIN_EMAIL_LOGS: return <AdminEmailLogsPage />;
                     case ViewMode.INVITE_ACCEPT: return <InviteAccept />;
                     default: return <Dashboard contacts={contacts} />;
                 }
@@ -333,6 +468,7 @@ export const App = () => {
             branding={branding} 
             contacts={contacts} 
             onOpenVoiceAssistant={() => setIsGlobalVoiceOpen(true)}
+            userRole={user?.role}
           />
       )}
       <main className={`flex-1 flex flex-col h-full overflow-hidden transition-all duration-500 ${showNavigation ? 'md:ml-64 bg-slate-900 border-l border-white/5' : ''}`}>
@@ -341,12 +477,32 @@ export const App = () => {
              <div onClick={() => setIsCommandOpen(true)} className="flex items-center gap-3 bg-white/5 hover:bg-white/10 transition-all px-4 py-2 rounded-xl cursor-pointer text-slate-500 text-xs w-full max-sm border border-white/5 group">
                 <Search size={14} className="group-hover:text-[#66FCF1] transition-colors" /><span className="flex-1 font-bold uppercase tracking-widest">Execute Command...</span><kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[9px] font-mono font-bold text-slate-500"><Command size={8} /> K</kbd>
              </div>
-             <UserHeader />
+             <div className="flex items-center gap-3 ml-4">
+               <RequiredDisclaimers variant="badge" />
+               <UserHeader />
+             </div>
           </header>
         )}
         <div className={`flex-1 overflow-auto custom-scrollbar relative ${showNavigation ? 'p-6' : ''}`}>
            {renderContent()}
         </div>
+        {!isLegalView && (
+          <div className={showNavigation ? "border-t border-white/10 bg-slate-900 px-6" : "border-t border-white/10 bg-slate-950 px-4 sm:px-6"}>
+            <LegalFooterLinks compact />
+          </div>
+        )}
+
+        <ConsentGateModal
+          open={Boolean(user && !isLegalView && consentGate.needsAcceptance)}
+          loading={consentGate.loading}
+          submitting={consentGate.submitting}
+          status={consentGate.status}
+          error={consentGate.error}
+          requiredTypes={consentGate.requiredTypes}
+          requiredVersions={consentGate.requiredVersions}
+          onAccept={consentGate.acceptConsents}
+        />
+
         {showNavigation && <AgenticHUD />}
         
         <VoiceAssistant isOpen={isGlobalVoiceOpen} onClose={() => setIsGlobalVoiceOpen(false)} contacts={contacts} />

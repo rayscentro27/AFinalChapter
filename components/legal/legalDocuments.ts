@@ -1,0 +1,113 @@
+export type RequiredConsentType =
+  | 'terms'
+  | 'privacy'
+  | 'ai_disclosure'
+  | 'disclaimers'
+  | 'comms_email';
+
+export const REQUIRED_CONSENT_TYPES: RequiredConsentType[] = [
+  'terms',
+  'privacy',
+  'ai_disclosure',
+  'disclaimers',
+  'comms_email',
+];
+
+export const DEFAULT_REQUIRED_CONSENT_VERSIONS: Record<RequiredConsentType, string> = {
+  terms: 'v1',
+  privacy: 'v1',
+  ai_disclosure: 'v1',
+  disclaimers: 'v1',
+  comms_email: 'v1',
+};
+
+export const DEFAULT_REQUIRED_CONSENT_FLAGS: Record<RequiredConsentType, boolean> = {
+  terms: true,
+  privacy: true,
+  ai_disclosure: true,
+  disclaimers: true,
+  comms_email: true,
+};
+
+export type LegalDocumentKey =
+  | 'terms'
+  | 'privacy'
+  | 'ai_disclosure'
+  | 'disclaimers'
+  | 'refund_policy'
+  | 'membership_agreement'
+  | 'sms_terms'
+  | 'mailing_authorization';
+
+export const LEGAL_DOCUMENT_KEYS: LegalDocumentKey[] = [
+  'terms',
+  'privacy',
+  'ai_disclosure',
+  'disclaimers',
+  'refund_policy',
+  'membership_agreement',
+  'sms_terms',
+  'mailing_authorization',
+];
+
+export const LEGAL_DOCUMENT_LABELS: Record<LegalDocumentKey, string> = {
+  terms: 'Terms of Service',
+  privacy: 'Privacy Policy',
+  ai_disclosure: 'AI Disclosure',
+  disclaimers: 'Required Disclaimers',
+  refund_policy: 'Refund Policy',
+  membership_agreement: 'Membership Agreement',
+  sms_terms: 'SMS Terms',
+  mailing_authorization: 'Mailing Authorization',
+};
+
+export type LegalDocumentStatus = 'draft' | 'published' | 'archived';
+
+export type LegalDocumentRow = {
+  id: string;
+  doc_key: LegalDocumentKey;
+  version: string;
+  title: string;
+  subtitle: string | null;
+  markdown_body: string;
+  status: LegalDocumentStatus;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConsentRequirementRow = {
+  consent_type: RequiredConsentType;
+  current_version: string;
+  is_required: boolean;
+};
+
+export function legalDocKeyToConsentType(docKey: LegalDocumentKey): RequiredConsentType | null {
+  if (docKey === 'terms') return 'terms';
+  if (docKey === 'privacy') return 'privacy';
+  if (docKey === 'ai_disclosure') return 'ai_disclosure';
+  if (docKey === 'disclaimers') return 'disclaimers';
+  return null;
+}
+
+export function extractMarkdownListItems(markdown: string): string[] {
+  return String(markdown || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('- ') || line.startsWith('* '))
+    .map((line) => line.replace(/^[-*]\s+/, '').trim())
+    .filter(Boolean);
+}
+
+export function suggestNextVersionTag(versions: string[]): string {
+  let maxVersionNumber = 0;
+  for (const version of versions) {
+    const match = String(version || '').trim().match(/^v(\d+)$/i);
+    if (!match) continue;
+    const value = Number(match[1]);
+    if (Number.isFinite(value) && value > maxVersionNumber) {
+      maxVersionNumber = value;
+    }
+  }
+  return `v${maxVersionNumber + 1}`;
+}

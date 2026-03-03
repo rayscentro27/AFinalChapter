@@ -11,6 +11,7 @@ const ROLE_PRIORITY: Record<UserProfile['role'], number> = {
 };
 
 const coerceRole = (role: any): UserProfile['role'] => {
+  if (role === 'super_admin') return 'admin';
   if (
     role === 'admin'
     || role === 'supervisor'
@@ -51,19 +52,41 @@ function emailDomain(email: string): string {
   return parts[1].trim();
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: number | null = null;
+  try {
+    const timeoutPromise = new Promise<T>((resolve) => {
+      timer = window.setTimeout(() => resolve(fallback), ms);
+    });
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer !== null) {
+      window.clearTimeout(timer);
+    }
+  }
+}
+
 async function resolveMembershipRows(userId: string): Promise<any[]> {
-  const preferred = await supabase
-    .from('tenant_memberships')
-    .select('tenant_id,role,role_id')
-    .eq('user_id', userId);
+  const preferred = await withTimeout(
+    supabase
+      .from('tenant_memberships')
+      .select('tenant_id,role,role_id')
+      .eq('user_id', userId),
+    4500,
+    { data: null, error: new Error('tenant_memberships_timeout') } as any
+  );
 
   if (!preferred.error) return preferred.data || [];
   if (!isMissingSchema(preferred.error)) return [];
 
-  const fallback = await supabase
-    .from('tenant_members')
-    .select('tenant_id,role,role_id')
-    .eq('user_id', userId);
+  const fallback = await withTimeout(
+    supabase
+      .from('tenant_members')
+      .select('tenant_id,role,role_id')
+      .eq('user_id', userId),
+    4500,
+    { data: null, error: new Error('tenant_members_timeout') } as any
+  );
 
   if (fallback.error) return [];
   return fallback.data || [];
@@ -78,11 +101,15 @@ async function enforceSsoConstraints(user: any): Promise<void> {
   const tenantId = String(memberships[0]?.tenant_id || '').trim();
   if (!tenantId) return;
 
-  const settingsRes = await supabase
-    .from('tenant_auth_settings')
-    .select('sso_enabled,allowed_email_domains,require_email_verified')
-    .eq('tenant_id', tenantId)
-    .maybeSingle();
+  const settingsRes = await withTimeout(
+    supabase
+      .from('tenant_auth_settings')
+      .select('sso_enabled,allowed_email_domains,require_email_verified')
+      .eq('tenant_id', tenantId)
+      .maybeSingle(),
+    4500,
+    { data: null, error: new Error('tenant_auth_settings_timeout') } as any
+  );
 
   if (settingsRes.error) {
     if (isMissingSchema(settingsRes.error)) return;
@@ -141,10 +168,19 @@ const toUserProfile = async (user: any): Promise<UserProfile> => {
 
 export const supabaseAuthAdapter: AuthAdapter = {
   signIn: async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: password || '',
-    });
+    const result = await withTimeout(
+      supabase.auth.signInWithPassword({
+        email,
+        password: password || '',
+      }),
+      12000,
+      {
+        data: { user: null, session: null },
+        error: { message: 'Login timed out. Please retry.' },
+      } as any
+    );
+
+    const { data, error } = result as any;
 
     if (error) return { user: null, error };
 
