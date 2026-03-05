@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import { GoogleGenAI } from '@google/genai';
-import { requireAuthenticatedUser } from './_shared/staff_auth';
+import { requireStaffUser } from './_shared/staff_auth';
 import { getPromptMeta } from './_shared/prompt_library';
 import { routeModel, type RiskClass } from './_shared/model_router';
 import {
@@ -53,15 +53,15 @@ export const handler: Handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
-    const actor = await requireAuthenticatedUser(event);
+    const actor = await requireStaffUser(event);
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const geminiApiKey = process.env.API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
 
     if (!supabaseUrl) throw new Error('Missing SUPABASE_URL');
     if (!supabaseServiceRoleKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
-    if (!geminiApiKey) throw new Error('Missing API_KEY (Gemini)');
+    if (!geminiApiKey) throw new Error('Missing GEMINI_API_KEY');
 
     const body = BodySchema.parse(JSON.parse(event.body || '{}'));
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
@@ -72,10 +72,12 @@ export const handler: Handler = async (event) => {
     const taskType = body.task_type || promptMeta?.taskType || 'general';
     const riskClass = (body.risk_class || promptMeta?.riskClass || 'medium') as RiskClass;
 
+    const allowModelOverride = String(process.env.AI_ALLOW_MODEL_OVERRIDE || '').toLowerCase() === 'true';
     const model = routeModel({
       taskType,
       riskClass,
       requestedModel: body.model || null,
+      allowRequestedModel: allowModelOverride,
     });
 
     const mergedConfig = mergeConfig(body.config, promptMeta?.text || null);
@@ -196,20 +198,48 @@ async function resolveTenantIdForUser(
   userId: string,
   requestedTenantId: string | null
 ): Promise<string> {
-  const { data, error } = await supabase
+  const membershipRes = await supabase
     .from('tenant_memberships')
     .select('tenant_id')
     .eq('user_id', userId);
 
-  if (error) {
-    const err: any = new Error(`Failed to resolve tenant membership: ${error.message}`);
+  if (membershipRes.error) {
+    const err: any = new Error(`Failed to resolve tenant membership: ${membershipRes.error.message}`);
     err.statusCode = 400;
     throw err;
   }
 
-  const ids: string[] = Array.from(new Set((data || []).map((r: any) => String(r?.tenant_id || '')).filter(Boolean))); 
-  if (ids.length === 0) {
+  const tenantIds: string[] = Array.from(
+    new Set((membershipRes.data || []).map((r: any) => String(r?.tenant_id || '')).filter(Boolean))
+  );
+
+  if (tenantIds.length === 0) {
     const err: any = new Error('No tenant membership found for user');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const tenantRes = await supabase
+    .from('tenants')
+    .select('id,status')
+    .in('id', tenantIds);
+
+  if (tenantRes.error) {
+    const err: any = new Error(`Failed to resolve tenant status: ${tenantRes.error.message}`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const activeIds = new Set(
+    (tenantRes.data || [])
+      .filter((t: any) => !t?.status || String(t.status).toLowerCase() === 'active')
+      .map((t: any) => String(t?.id || ''))
+      .filter(Boolean)
+  );
+
+  const ids = tenantIds.filter((id) => activeIds.has(id));
+  if (ids.length === 0) {
+    const err: any = new Error('No active tenant membership found for user');
     err.statusCode = 403;
     throw err;
   }

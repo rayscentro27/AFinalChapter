@@ -4,11 +4,12 @@ export function routeModel(input: {
   taskType?: string | null;
   riskClass?: RiskClass | null;
   requestedModel?: string | null;
+  allowRequestedModel?: boolean | null;
 }) {
   const task = String(input.taskType || '').toLowerCase();
   const risk = (String(input.riskClass || 'medium').toLowerCase() as RiskClass);
 
-  if (input.requestedModel && String(input.requestedModel).trim().length > 0) {
+  if (input.allowRequestedModel && input.requestedModel && String(input.requestedModel).trim().length > 0) {
     return String(input.requestedModel).trim();
   }
 
