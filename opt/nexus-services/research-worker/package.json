@@ -1,0 +1,17 @@
+{
+  "name": "research-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Transcript-first research worker for Nexus Research Brain",
+  "main": "worker.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "transcript:test": "node worker.js --transcript-test"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "dotenv": "^16.4.5",
+    "undici": "^6.19.8"
+  }
+}
