@@ -265,7 +265,7 @@ const SalesTrainer: React.FC = () => {
             }
           },
           onclose: () => setStatus('idle'),
-          onerror: (err) => { console.error(err); stopSession(); }
+          onerror: (err: any) => { console.error(err); stopSession(); }
         }
       });
 
