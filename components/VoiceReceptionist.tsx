@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { VoiceAgentConfig, CallLog } from '../types';
 import { PhoneCall, Mic, StopCircle, Settings, Save, PlayCircle, BarChart3, User, BookOpen, Volume2, ShieldCheck, AlertTriangle, RefreshCw, X } from 'lucide-react';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage, Modality } from '../services/clientAiBridge';
 
 // Audio Utils
 function decode(base64: string) {
@@ -89,7 +89,7 @@ Deployment Time: 24-48 hours.`,
       audioContextRef.current = new AudioContextClass({ sampleRate: 24000 });
       nextStartTimeRef.current = audioContextRef.current.currentTime;
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000 } });
       streamRef.current = stream;
 

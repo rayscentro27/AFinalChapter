@@ -83,16 +83,26 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
 
   // API Override State
   const [apiKeys, setApiKeys] = useState({
-    GEMINI: localStorage.getItem('nexus_override_API_KEY') || '',
     STRIPE_PK: localStorage.getItem('nexus_override_VITE_STRIPE_PUBLIC_KEY') || '',
     TWILIO_SID: localStorage.getItem('nexus_override_TWILIO_SID') || '',
     PLAID_CLIENT: localStorage.getItem('nexus_override_PLAID_CLIENT_ID') || ''
   });
 
   useEffect(() => {
-    const apiKey = process.env.API_KEY || apiKeys.GEMINI;
-    setHasAiKey(!!apiKey && apiKey.length > 5);
-  }, [apiKeys.GEMINI]);
+    let cancelled = false;
+    const checkAi = async () => {
+      try {
+        const ok = await geminiService.pingServerAI();
+        if (!cancelled) setHasAiKey(ok);
+      } catch {
+        if (!cancelled) setHasAiKey(false);
+      }
+    };
+    checkAi();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -115,7 +125,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
 
   const handleUpdateApiKey = (key: string, value: string) => {
     setApiKeys(prev => ({ ...prev, [key]: value }));
-    localStorage.setItem(`nexus_override_${key === 'GEMINI' ? 'API_KEY' : key === 'STRIPE_PK' ? 'VITE_STRIPE_PUBLIC_KEY' : key}`, value);
+    localStorage.setItem(`nexus_override_${key === 'STRIPE_PK' ? 'VITE_STRIPE_PUBLIC_KEY' : key}`, value);
     setSuccessMsg(`${key} Protocol Override Updated.`);
     setTimeout(() => setSuccessMsg(''), 2000);
   };
@@ -192,12 +202,13 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <ApiField 
-                            label="Google Gemini (AI Core)" 
-                            value={apiKeys.GEMINI} 
-                            onChange={(val) => handleUpdateApiKey('GEMINI', val)}
+                            label="AI Gateway (Server Managed)" 
+                            value={hasAiKey ? 'connected' : 'disconnected'} 
+                            onChange={() => undefined}
                             icon={<BrainCircuit size={18}/>}
                             status={hasAiKey ? 'Authenticated' : 'Unlinked'}
-                            placeholder="Enter Pro API Key"
+                            placeholder="Managed by secure server env"
+                            readOnly
                         />
                         <ApiField 
                             label="Stripe (Capital Settlement)" 
@@ -483,7 +494,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
   );
 };
 
-const ApiField: React.FC<{ label: string; value: string; onChange: (val: string) => void; icon: any; status: string; placeholder?: string }> = ({ label, value, onChange, icon, status, placeholder }) => (
+const ApiField: React.FC<{ label: string; value: string; onChange: (val: string) => void; icon: any; status: string; placeholder?: string; readOnly?: boolean }> = ({ label, value, onChange, icon, status, placeholder, readOnly = false }) => (
     <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#66FCF1] transition-all shadow-sm">
         <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3 text-[11px] font-black text-slate-500 uppercase tracking-widest">
@@ -497,9 +508,10 @@ const ApiField: React.FC<{ label: string; value: string; onChange: (val: string)
         <div className="relative">
             <div className="absolute left-4 top-1/2 -translate-y-1/2 p-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-400 group-hover:text-[#66FCF1] transition-colors"><Lock size={12}/></div>
             <input 
-                type="password" 
+                type={readOnly ? 'text' : 'password'} 
                 value={value}
                 onChange={e => onChange(e.target.value)}
+                readOnly={readOnly}
                 placeholder={placeholder}
                 className="w-full bg-white border border-slate-200 rounded-2xl py-4 pl-14 pr-6 text-xs font-mono outline-none focus:ring-4 focus:ring-[#66FCF1]/10 focus:border-[#66FCF1] transition-all shadow-inner"
             />

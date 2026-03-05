@@ -1,20 +1,6 @@
-import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { generateContentWithPolicy, buildSlimConversation } from "./aiPolicy";
+import { supabase } from '../lib/supabaseClient';
 import { Contact, MerchantPersona, SalesBattleCard, EnrichedData, FinancialSpreading, CreditMemo, Grant, Course, MarketReport, Stipulation, FundedDeal, RescuePlan, Investor, RiskAlert, EmailStep, PipelineRule, Review, NegativeItem, Lender, AgencyBranding, FundingOffer, InvestmentIdea, ClientTask, BusinessProfile, UnifiedMessage, Message, KnowledgeDoc, TrainingPair, ContentAudit, ForensicReport, SentimentLevel, AutoReplyRule, MarketPulse } from "../types";
-
-const getApiKey = () => {
-  try {
-    const override = localStorage.getItem('nexus_override_API_KEY');
-    if (override && override.trim().length > 0) return override.trim();
-  } catch {
-    // ignore
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const envKey = (process as any)?.env?.API_KEY as string | undefined;
-  return envKey || '';
-};
-
-const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
 
 
 const GEMINI_FN = '/.netlify/functions/gemini_generate';
@@ -25,9 +11,13 @@ const generateContentViaNetlify = async (args: any): Promise<GeminiFnResponse | 
   try {
     if (!args?.model) return null;
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
     const res = await fetch(GEMINI_FN, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({
         model: args.model,
         contents: args.contents,
@@ -36,11 +26,11 @@ const generateContentViaNetlify = async (args: any): Promise<GeminiFnResponse | 
       }),
     });
 
-    const data = await res.json().catch(() => ({}));
+    const payload = await res.json().catch(() => ({}));
     if (!res.ok) return null;
-    if (!data || typeof (data as any).text !== 'string') return null;
+    if (!payload || typeof (payload as any).text !== 'string') return null;
 
-    return data as GeminiFnResponse;
+    return payload as GeminiFnResponse;
   } catch {
     return null;
   }
@@ -60,6 +50,16 @@ const generateContentShim = async (args: any): Promise<GeminiFnResponse> => {
     expect: { json: expectJson, minChars: expectJson ? 2 : 1 },
   });
   return { text, candidates: undefined };
+};
+
+export const pingServerAI = async (): Promise<boolean> => {
+    const response = await generateContentViaNetlify({
+        model: 'gemini-3-flash-preview',
+        contents: 'Respond with: pong',
+        config: { temperature: 0 },
+        cache_namespace: 'healthcheck',
+    });
+    return Boolean(response && typeof response.text === 'string' && response.text.length >= 0);
 };
 
 const MASTER_BLUEPRINT = `
@@ -184,17 +184,13 @@ export const auditContentValue = async (url: string): Promise<ContentAudit> => {
 };
 
 export const generateSocialVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'): Promise<string | null> => {
-    const ai = getAI();
-    let operation = await ai.models.generateVideos({
-        model: 'veo-3.1-fast-generate-preview',
-        prompt,
-        config: { numberOfVideos: 1, resolution: '720p', aspectRatio }
+    const response = await generateContentShim({
+        model: 'gemini-3-flash-preview',
+        contents: `Generate a concise production brief for a ${aspectRatio} marketing video with this prompt: ${prompt}`,
+        config: { systemInstruction: MASTER_BLUEPRINT }
     });
-    while (!operation.done) {
-        await new Promise(r => setTimeout(r, 10000));
-        operation = await ai.operations.getVideosOperation({ operation });
-    }
-    return `${operation.response?.generatedVideos?.[0]?.video?.uri}&key=${getApiKey()}`;
+    // Browser-side direct video generation is intentionally disabled for security.
+    return response.text ? null : null;
 };
 
 export const verifyBiometricIdentity = async (cameraBase64: string, idBase64: string) => {

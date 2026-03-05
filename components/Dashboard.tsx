@@ -33,8 +33,6 @@ const Dashboard: React.FC<DashboardProps> = ({ contacts = [], onFocusContact }) 
 
   useEffect(() => {
     const runNeuralBriefing = async () => {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey || apiKey === 'YOUR_API_KEY') return;
       try {
         const thoughts = await geminiService.generateSystemThoughts(contacts);
         setSystemThoughts(thoughts);

@@ -1,7 +1,7 @@
 
 import React from 'react';
-// Import Type from @google/genai to re-export it
-import { Type } from "@google/genai";
+// Import Type from ./services/clientAiBridge to re-export it
+import { Type } from "./services/clientAiBridge";
 
 export { Type };
 
@@ -312,6 +312,7 @@ export enum ViewMode {
   FUNDING_OUTCOMES = 'FUNDING_OUTCOMES',
   BILLING_COMMISSIONS = 'BILLING_COMMISSIONS',
   COMMUNICATION_PREFERENCES = 'COMMUNICATION_PREFERENCES',
+  SECURITY_SETTINGS = 'SECURITY_SETTINGS',
   UPLOAD_CREDIT_REPORT = 'UPLOAD_CREDIT_REPORT',
   DISPUTE_FACTS_REVIEW = 'DISPUTE_FACTS_REVIEW',
   DRAFT_PREVIEW = 'DRAFT_PREVIEW',

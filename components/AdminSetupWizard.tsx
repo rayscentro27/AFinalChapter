@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { ViewMode, AgencyBranding } from '../types';
 import { createClient } from '@supabase/supabase-js';
+import * as geminiService from '../services/geminiService';
 
 interface AdminSetupWizardProps {
   onNavigate: (view: ViewMode) => void;
@@ -34,9 +35,12 @@ const AdminSetupWizard: React.FC<AdminSetupWizardProps> = ({ onNavigate, brandin
     setIsVerifying(true);
     setAiStatus('idle');
     await new Promise(resolve => setTimeout(resolve, 1500));
-    const apiKey = process.env.API_KEY;
-    const hasKey = !!apiKey && apiKey !== 'YOUR_API_KEY' && apiKey.length > 10;
-    setAiStatus(hasKey ? 'success' : 'error');
+    try {
+      const ok = await geminiService.pingServerAI();
+      setAiStatus(ok ? 'success' : 'error');
+    } catch {
+      setAiStatus('error');
+    }
     setIsVerifying(false);
   };
 
@@ -99,8 +103,8 @@ const AdminSetupWizard: React.FC<AdminSetupWizardProps> = ({ onNavigate, brandin
             </div>
             
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-              Detection Mode: Checking environment for <code className="bg-slate-200 px-1 rounded font-mono">API_KEY</code>. 
-              Ensure this is set in your Netlify/Vercel settings.
+              Detection Mode: Checking secure server-side AI gateway reachability.
+              Browser-side API keys are intentionally disabled.
             </p>
 
             {aiStatus === 'error' ? (
