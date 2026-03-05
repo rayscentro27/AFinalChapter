@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import { classifyDrift, type DriftSeverity } from './_shared/drift';
+import { requireAuthenticatedUser } from './_shared/staff_auth';
 
 const GLOBAL_GUARDRAILS = `
 ESCALATION & HUMAN OVERRIDE:
@@ -332,6 +333,8 @@ function ensureCeoRealityCoverage(finalAnswer: string): string {
 export const handler: Handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
+
+    await requireAuthenticatedUser(event);
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

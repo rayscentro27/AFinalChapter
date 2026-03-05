@@ -1,6 +1,7 @@
 import type { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { requireStaffUser } from './_shared/staff_auth';
 import crypto from "crypto";
 
 const BodySchema = z.object({
@@ -24,6 +25,8 @@ const ensureHistory = async (supabase: any, agentId: string, promptVersion: numb
 export const handler: Handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
+
+    const actor = await requireStaffUser(event);
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -98,9 +101,10 @@ export const handler: Handler = async (event) => {
     }
 
     return json(200, { ok: true, agent: patch.agent_name, version: newVersion });
-  } catch (e: any) {
-    const msg = typeof e?.message === "string" ? e.message : "Bad Request";
-    return json(400, { error: msg });
+   } catch (e: any) {
+    const statusCode = Number(e?.statusCode) || 400;
+    const msg = typeof e?.message === 'string' ? e.message : 'Bad Request';
+    return json(statusCode, { error: msg });
   }
 };
 

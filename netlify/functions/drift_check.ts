@@ -2,6 +2,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { classifyDrift, type DriftSeverity } from './_shared/drift';
+import { requireAuthenticatedUser } from './_shared/staff_auth';
 
 const supabase = createClient(
   process.env.SUPABASE_URL as string,
@@ -44,6 +45,8 @@ export const handler: Handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
+    await requireAuthenticatedUser(event);
+
     if (!process.env.SUPABASE_URL) throw new Error('Missing SUPABASE_URL');
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
 
@@ -63,7 +66,8 @@ export const handler: Handler = async (event) => {
       persisted: Boolean(body.client_id && res.severity !== 'none'),
     });
   } catch (e: any) {
-    return json(400, { error: e?.message || 'Bad Request' });
+    const statusCode = Number(e?.statusCode) || 400;
+    return json(statusCode, { error: e?.message || 'Bad Request' });
   }
 };
 

@@ -53,3 +53,23 @@ export async function requireStaffUser(event: Pick<HandlerEvent, 'headers'>): Pr
 
   return { userId, roles };
 }
+
+
+export async function requireAuthenticatedUser(event: Pick<HandlerEvent, 'headers'>): Promise<{ userId: string }> {
+  const jwt = getBearerToken(event);
+  if (!jwt) {
+    const err: any = new Error('Missing Authorization bearer token');
+    err.statusCode = 401;
+    throw err;
+  }
+
+  const admin = getAdminSupabaseClient();
+  const { data: userRes, error: userErr } = await admin.auth.getUser(jwt);
+  if (userErr || !userRes?.user?.id) {
+    const err: any = new Error('Invalid bearer token');
+    err.statusCode = 401;
+    throw err;
+  }
+
+  return { userId: userRes.user.id };
+}
