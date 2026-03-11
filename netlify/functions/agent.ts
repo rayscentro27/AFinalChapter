@@ -8,6 +8,8 @@ const BodySchema = z.object({
   user_message: z.string().min(1),
   context: z.unknown().optional(),
   mode: z.enum(["simulated", "live"]).optional().default("simulated"),
+  approval_mode: z.boolean().optional().default(false),
+  client_id: z.string().optional(),
 });
 
 type ToolRequest = {
@@ -136,14 +138,15 @@ export const handler: Handler = async (event) => {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const openaiApiKey = process.env.OPENAI_API_KEY;
+    const geminiApiKey = process.env.API_KEY;
 
     if (!supabaseUrl || !supabaseServiceRoleKey) {
       return json(500, {
         error: "Server misconfigured: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
       });
     }
-    if (!openaiApiKey) {
-      return json(500, { error: "Server misconfigured: missing OPENAI_API_KEY" });
+    if (!openaiApiKey && !geminiApiKey) {
+      return json(500, { error: "Server misconfigured: missing OPENAI_API_KEY or API_KEY" });
     }
 
     const body = BodySchema.parse(JSON.parse(event.body || "{}"));
@@ -168,7 +171,16 @@ export const handler: Handler = async (event) => {
     );
 
     const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
-    const mergedContext = mergeContext(body.context, knowledgeContext);
+    const mergedContext = mergeContext(
+      body.context,
+      {
+        ...knowledgeContext,
+        runtime: {
+          approval_mode: body.approval_mode,
+          client_id: body.client_id || null,
+        },
+      }
+    );
 
     // Cache key includes employee, mode, model, agent version, normalized message, and merged context.
     const msgNorm = norm(body.user_message || "");
@@ -187,15 +199,37 @@ export const handler: Handler = async (event) => {
       return json(200, { ...hit, cached: true });
     }
 
-    const out = await callOpenAI({
-      apiKey: openaiApiKey,
-      model,
-      systemPrompt: String(agent.system_prompt || ""),
-      userMessage: body.user_message,
-      context: mergedContext,
-      mode: body.mode,
-    });
+    let out: AgentJson;
 
+    if (openaiApiKey) {
+      try {
+        out = await callOpenAI({
+          apiKey: openaiApiKey,
+          model,
+          systemPrompt: String(agent.system_prompt || ""),
+          userMessage: body.user_message,
+          context: mergedContext,
+          mode: body.mode,
+        });
+      } catch (openaiErr: any) {
+        if (!geminiApiKey) throw openaiErr;
+        out = await callGeminiFallback({
+          apiKey: geminiApiKey,
+          systemPrompt: String(agent.system_prompt || ""),
+          userMessage: body.user_message,
+          context: mergedContext,
+          mode: body.mode,
+        });
+      }
+    } else {
+      out = await callGeminiFallback({
+        apiKey: String(geminiApiKey),
+        systemPrompt: String(agent.system_prompt || ""),
+        userMessage: body.user_message,
+        context: mergedContext,
+        mode: body.mode,
+      });
+    }
     const responsePayload = {
       employee: agent.name,
       version: agent.version ?? 1,
@@ -278,6 +312,80 @@ async function callOpenAI(args: {
     const data = await openaiPost(args.apiKey, payloadJsonObject);
     return parseAgentJsonFromResponse(data);
   }
+}
+
+async function callGeminiFallback(args: {
+  apiKey: string;
+  systemPrompt: string;
+  userMessage: string;
+  context?: unknown;
+  mode: "simulated" | "live";
+}): Promise<AgentJson> {
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const instructions = `${args.systemPrompt}\n\nCURRENT_MODE: ${args.mode}`;
+  const userText = buildUserContent(args.userMessage, args.context);
+
+  const payload = {
+    system_instruction: {
+      parts: [
+        {
+          text:
+            `${instructions}\n\n` +
+            "Return ONLY valid JSON with this exact shape: {\"tool_requests\":[],\"final_answer\":\"...\"}",
+        },
+      ],
+    },
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: userText }],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      responseMimeType: "application/json",
+    },
+  };
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${args.apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || `Gemini error (${res.status})`);
+
+  let data: any = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("Gemini returned non-JSON response");
+  }
+
+  const outText = extractGeminiText(data);
+  const parsed = safeJsonParse(outText);
+  const validated = AgentJsonSchemaZ.safeParse(parsed);
+
+  if (validated.success) return validated.data;
+
+  return {
+    tool_requests: [],
+    final_answer: String(outText || "Unable to parse Gemini response.").slice(0, 4000),
+  };
+}
+
+function extractGeminiText(data: any): string {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return "";
+
+  return parts
+    .map((p: any) => (typeof p?.text === "string" ? p.text : ""))
+    .join("\n")
+    .trim();
 }
 
 async function openaiPost(apiKey: string, payload: any) {

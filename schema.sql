@@ -216,3 +216,147 @@ DROP POLICY IF EXISTS logs_delete ON public.audit_logs;
 CREATE POLICY logs_delete ON public.audit_logs
 FOR DELETE
 USING (public.nexus_is_master_admin());
+
+-- 9. Task orchestration primitives (portal task board + AI assignee routing)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+DO $$
+BEGIN
+  CREATE TYPE public.task_status AS ENUM ('red', 'yellow', 'green');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE TYPE public.task_progress AS ENUM ('not_started', 'in_progress', 'completed');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.task_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT 'general',
+  default_assignee_agent TEXT NOT NULL DEFAULT 'Nexus Analyst',
+  prerequisites JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.client_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
+  template_id UUID REFERENCES public.task_templates(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  assignee_agent TEXT NOT NULL,
+  status public.task_status NOT NULL DEFAULT 'red',
+  progress public.task_progress NOT NULL DEFAULT 'not_started',
+  due_at TIMESTAMP WITH TIME ZONE NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS client_tasks_tenant_idx ON public.client_tasks(tenant_id);
+CREATE INDEX IF NOT EXISTS client_tasks_user_idx ON public.client_tasks(user_id);
+CREATE INDEX IF NOT EXISTS client_tasks_status_idx ON public.client_tasks(status);
+CREATE UNIQUE INDEX IF NOT EXISTS task_templates_title_unique ON public.task_templates(title);
+
+CREATE OR REPLACE FUNCTION public.touch_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_touch_client_tasks ON public.client_tasks;
+CREATE TRIGGER trg_touch_client_tasks
+BEFORE UPDATE ON public.client_tasks
+FOR EACH ROW
+EXECUTE FUNCTION public.touch_updated_at();
+
+-- Secure task access in browser while preserving service-role writes from functions.
+ALTER TABLE public.task_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.client_tasks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS task_templates_select ON public.task_templates;
+CREATE POLICY task_templates_select ON public.task_templates
+FOR SELECT
+USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS task_templates_insert ON public.task_templates;
+CREATE POLICY task_templates_insert ON public.task_templates
+FOR INSERT
+WITH CHECK (public.nexus_is_master_admin());
+
+DROP POLICY IF EXISTS task_templates_update ON public.task_templates;
+CREATE POLICY task_templates_update ON public.task_templates
+FOR UPDATE
+USING (public.nexus_is_master_admin())
+WITH CHECK (public.nexus_is_master_admin());
+
+DROP POLICY IF EXISTS task_templates_delete ON public.task_templates;
+CREATE POLICY task_templates_delete ON public.task_templates
+FOR DELETE
+USING (public.nexus_is_master_admin());
+
+DROP POLICY IF EXISTS client_tasks_select ON public.client_tasks;
+CREATE POLICY client_tasks_select ON public.client_tasks
+FOR SELECT
+USING (
+  public.nexus_is_master_admin()
+  OR (
+    user_id = auth.uid()
+    AND public.nexus_can_access_tenant(tenant_id)
+  )
+);
+
+DROP POLICY IF EXISTS client_tasks_insert ON public.client_tasks;
+CREATE POLICY client_tasks_insert ON public.client_tasks
+FOR INSERT
+WITH CHECK (
+  public.nexus_is_master_admin()
+  OR (
+    user_id = auth.uid()
+    AND public.nexus_can_access_tenant(tenant_id)
+  )
+);
+
+DROP POLICY IF EXISTS client_tasks_update ON public.client_tasks;
+CREATE POLICY client_tasks_update ON public.client_tasks
+FOR UPDATE
+USING (
+  public.nexus_is_master_admin()
+  OR (
+    user_id = auth.uid()
+    AND public.nexus_can_access_tenant(tenant_id)
+  )
+)
+WITH CHECK (
+  public.nexus_is_master_admin()
+  OR (
+    user_id = auth.uid()
+    AND public.nexus_can_access_tenant(tenant_id)
+  )
+);
+
+DROP POLICY IF EXISTS client_tasks_delete ON public.client_tasks;
+CREATE POLICY client_tasks_delete ON public.client_tasks
+FOR DELETE
+USING (public.nexus_is_master_admin());
+
+-- Starter templates (idempotent)
+INSERT INTO public.task_templates (title, description, category, default_assignee_agent)
+VALUES
+  ('Form a fundable business', 'Register entity, EIN, bank account, NAICS alignment, professional contact stack.', 'foundation', 'Nexus Founder'),
+  ('Upload credit reports', 'Upload reports from AnnualCreditReport.com and confirm all bureaus.', 'credit', 'Lex Ledger'),
+  ('Credit optimization plan', 'Educational review of utilization/derogatories + dispute education resources.', 'credit', 'Lex Ledger'),
+  ('Grant match shortlist', 'Find grants aligned to entity eligibility and prepare docs checklist.', 'grants', 'Nova Grant'),
+  ('Re-engage stale leads', 'Ethical follow-up sequences and next-step scheduling.', 'sales', 'Ghost Hunter')
+ON CONFLICT (title) DO NOTHING;

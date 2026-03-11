@@ -121,6 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           <SidebarSection label="Infrastructure">
             <SidebarItem id={ViewMode.KNOWLEDGE_HUB} label="Neural Training" icon={Brain} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.TRAINING_BUNDLE} label="Bundle Import" icon={FileText} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.SCENARIO_RUNNER} label="Scenario Runner" icon={FlaskConical} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.INFRA_MONITOR} label="Engine Room" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.SITEMAP} label="Core Sitemap" icon={List} currentView={currentView} onViewChange={handleNav} />
