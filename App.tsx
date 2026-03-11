@@ -64,6 +64,7 @@ import SupervisorTriage from './components/SupervisorTriage';
 import AgenticHUD from './components/AgenticHUD';
 import NeuralStrategySandbox from './components/NeuralStrategySandbox';
 import UserHeader from './components/UserHeader';
+import TrainingBundleAdmin from './components/TrainingBundleAdmin';
 import { ViewMode, Contact, AgencyBranding, Course, Notification, ClientTask } from './types';
 // Added RefreshCw to imports
 import { Search, Bell, Zap, Command, Info, X, CreditCard, ShieldAlert, RefreshCw } from 'lucide-react';
@@ -243,6 +244,7 @@ export const App = () => {
                     case ViewMode.LEAD_SCOUT: return <LeadScout onAddLead={addContact} />;
                     case ViewMode.LENDER_ROOM: return <LenderRoom contacts={contacts} />;
                     case ViewMode.KNOWLEDGE_HUB: return <KnowledgeHub />;
+                    case ViewMode.TRAINING_BUNDLE: return <TrainingBundleAdmin />;
                     case ViewMode.SCENARIO_RUNNER: return <ScenarioRunner />;
                     case ViewMode.PARTNER_MARKETPLACE: return <AffiliateMarketplace />;
                     case ViewMode.FORENSIC_HUB: return <ForensicHub contacts={contacts} onUpdateContact={updateContact} />;

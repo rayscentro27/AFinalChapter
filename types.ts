@@ -262,7 +262,8 @@ export enum ViewMode {
   SYNDICATION = 'SYNDICATION',
   PARTNERS = 'PARTNERS',
   LANDING = 'LANDING',
-  ADMIN_CMS = 'ADMIN_CMS'
+  ADMIN_CMS = 'ADMIN_CMS',
+  TRAINING_BUNDLE = 'TRAINING_BUNDLE'
 }
 
 export interface FundingOffer {

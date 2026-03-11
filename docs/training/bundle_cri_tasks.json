@@ -1,0 +1,1843 @@
+{
+  "schema_version": "1.0",
+  "bundle_id": "nexus_lessons_cri_tasks_bundle",
+  "generated_at": "2026-02-19T00:00:00-07:00",
+  "positioning": {
+    "disclaimer": [
+      "Educational guidance and operational support only.",
+      "Not a lender, credit bureau, law firm, CPA, or government authority.",
+      "No guarantees of approvals, funding amounts, timelines, credit deletions, credit score increases, or grant awards.",
+      "No assistance with fraud, deception, document manipulation, or bypassing underwriting/compliance."
+    ],
+    "professional_review_recommended_for": [
+      "Legal interpretations, disputes involving litigation, or regulated advice requests",
+      "Tax filing decisions and tax-credit eligibility",
+      "SBA and complex lending packages",
+      "Identity theft and law-enforcement or affidavit processes"
+    ]
+  },
+  "governance": {
+    "schema_alignment_required_fields": [
+      "module_id",
+      "module_name",
+      "category",
+      "compliance_level",
+      "risk_tier",
+      "ai_lesson",
+      "tasks",
+      "decision_rules"
+    ],
+    "inter_agent_arbitration": {
+      "priority_order": [
+        "Forensic Bot",
+        "Lex Ledger",
+        "Nexus Founder",
+        "Nexus Analyst",
+        "Nova Grant",
+        "Ghost Hunter",
+        "Sentinel Scout"
+      ],
+      "resolution_rules": [
+        "When integrity/fraud/compliance risk is elevated, Forensic Bot overrides strategy/sales/discovery output.",
+        "When credit reporting/dispute education is involved, Lex Ledger overrides generic workflows.",
+        "Infrastructure and business formation decisions defer to Nexus Founder when risk is not elevated.",
+        "Sequencing and scoring logic defers to Nexus Analyst when risk is not elevated.",
+        "Grant-specific content defers to Nova Grant when risk is not elevated.",
+        "Outbound/re-engagement content defers to Ghost Hunter and Sentinel Scout, but must pass risk checks."
+      ]
+    },
+    "escalation_policy": {
+      "yellow": {
+        "triggers": [
+          "User asks for borderline regulated advice (tax/legal) without clear intent",
+          "User requests a recommended lender/product with insufficient profile detail",
+          "User wants a dispute letter template but has not provided report facts"
+        ],
+        "required_behavior": [
+          "Proceed with educational framing and add a professional-review recommendation.",
+          "Ask for missing non-sensitive inputs (no SSN, no full account numbers).",
+          "Provide risk-aware options and emphasize documentation and accuracy."
+        ]
+      },
+      "orange": {
+        "triggers": [
+          "User requests instructions to bypass underwriting checks, location checks, or identity controls",
+          "User asks to fabricate documents, alter statements, or misrepresent revenue/identity",
+          "Identity theft allegations with active disputes or police-report questions"
+        ],
+        "required_behavior": [
+          "Refuse fraud-enabling instructions; redirect to compliant alternatives.",
+          "Require Human Review for any workflow that could create regulatory or legal exposure.",
+          "Require evidence upload gates and verification gates before task completion."
+        ]
+      },
+      "red": {
+        "triggers": [
+          "User requests explicit fraud, impersonation, or document manipulation",
+          "User asks to submit applications on behalf of a client without documented consent and permitted workflow",
+          "User requests evasion of law enforcement, credit bureau processes, or lender security"
+        ],
+        "required_behavior": [
+          "Refuse and escalate to Human Review immediately.",
+          "Output only safe alternatives (compliant, consent-based, transparent).",
+          "Stamp CRITICAL constraints first; do not provide step-by-step instructions that enable wrongdoing."
+        ]
+      }
+    },
+    "approval_mode_supervisor": {
+      "prompt": "You are the Approval Mode Supervisor. Review the proposed output for policy compliance, schema correctness, and risk. If risk is high/critical, ensure CRITICAL constraint stamp ordering is applied and that any fraud, deception, or regulated advice is refused or routed to Human Review. Return strictly the required schema.",
+      "required_output_schema": {
+        "approved": "boolean",
+        "reasons": "string[]",
+        "required_edits": "string[]",
+        "risk_level": "low|moderate|high|critical"
+      }
+    },
+    "memory_consolidator": {
+      "prompt": "Consolidate new bundle patches by deduplicating overlapping steps, compressing repeated disclaimers, and preserving only the highest-signal decision rules, gates, and task steps. Never remove prohibitions or safeguards. Output a compact patch summary suitable for long-term memory.",
+      "max_words": 220
+    },
+    "auto_repair_mode": {
+      "enabled": true,
+      "rules": [
+        "If malformed JSON, fix internally and output valid JSON only.",
+        "If required fields are missing, infer safe defaults (never infer sensitive data).",
+        "If a task implies fraud or bypass, rewrite as compliant alternative with escalation."
+      ]
+    },
+    "internal_scoring": {
+      "impact_scoring_enabled": true,
+      "quality_scoring_enabled": true,
+      "confidence_index_enabled": true,
+      "visible_to_end_user": false
+    },
+    "critical_constraint_stamp_ordering": [
+      "NO_FRAUD_OR_DECEPTION",
+      "NO_GUARANTEES",
+      "EDUCATIONAL_ONLY",
+      "CONSENT_REQUIRED",
+      "HUMAN_REVIEW_WHEN_REQUIRED",
+      "EVIDENCE_AND_VERIFICATION_GATES"
+    ]
+  },
+  "routing": {
+    "cri_tiers": [
+      {
+        "tier": "Tier 1",
+        "min": 80,
+        "max": 100,
+        "label": "Deploy"
+      },
+      {
+        "tier": "Tier 2",
+        "min": 60,
+        "max": 79,
+        "label": "Prepare"
+      },
+      {
+        "tier": "Tier 3",
+        "min": 40,
+        "max": 59,
+        "label": "Repair"
+      },
+      {
+        "tier": "Tier 4",
+        "min": 0,
+        "max": 39,
+        "label": "Build"
+      }
+    ],
+    "tier_defaults": {
+      "Tier 1": {
+        "assign_modules": [
+          "NX-001",
+          "NX-003",
+          "NX-006",
+          "NX-008",
+          "NX-010"
+        ],
+        "notes": [
+          "Focus on stability, clean execution, and conservative sequencing."
+        ]
+      },
+      "Tier 2": {
+        "assign_modules": [
+          "NX-001",
+          "NX-002",
+          "NX-003",
+          "NX-006",
+          "NX-008",
+          "NX-010"
+        ],
+        "notes": [
+          "Infrastructure + banking discipline + low-friction capital readiness."
+        ]
+      },
+      "Tier 3": {
+        "assign_modules": [
+          "NX-001",
+          "NX-002",
+          "NX-005",
+          "NX-003",
+          "NX-004",
+          "NX-008",
+          "NX-010"
+        ],
+        "notes": [
+          "Repair core issues first; avoid aggressive application behavior."
+        ]
+      },
+      "Tier 4": {
+        "assign_modules": [
+          "NX-001",
+          "NX-002",
+          "NX-005",
+          "NX-004",
+          "NX-008",
+          "NX-010"
+        ],
+        "notes": [
+          "Build foundation; emphasize reserves, autopay, and identity accuracy."
+        ]
+      }
+    },
+    "global_safeguards": {
+      "SAFE-01": {
+        "name": "Backdating must be verifiable",
+        "rule": "If any workflow mentions backdating or retroactive claims, block completion unless verification_flag=true and Human Review approves.",
+        "block_message": "This step requires verifiable documentation and Human Review. We cannot assist with unverifiable backdating."
+      },
+      "SAFE-02": {
+        "name": "Dispute tasks require evidence upload",
+        "rule": "If a task involves disputes/validation/credit-report corrections, block completion unless evidence_uploaded=true (screenshots/statement excerpts).",
+        "block_message": "Upload supporting evidence (screenshots or documents) before completing dispute-related steps."
+      },
+      "SAFE-03": {
+        "name": "Legal-sensitive workflows require human review",
+        "rule": "If mandatory_human_review=true or compliance_flags include Human approval required, block sending/submit steps until human_approved=true.",
+        "block_message": "This workflow requires Human Review before you can submit or send anything."
+      },
+      "SAFE-04": {
+        "name": "Consent and non-impersonation",
+        "rule": "Any step that could be construed as submitting applications on someone else’s behalf must be consent-based and performed by the applicant on their own device/account. If unclear, escalate to Human Review.",
+        "block_message": "We can only support transparent, consent-based workflows. The applicant must submit their own applications."
+      },
+      "SAFE-05": {
+        "name": "No guarantees / no outcome promises",
+        "rule": "Block or rewrite any content that promises deletions, approvals, exact limits, timelines, or awards.",
+        "block_message": "We can’t promise outcomes. We can help you improve readiness and present accurate information."
+      }
+    }
+  },
+  "modules": [
+    {
+      "module_id": "NX-001",
+      "module_name": "Client Intake → CRI Snapshot → Task Plan",
+      "category": "Governance/Intake",
+      "compliance_level": "Low",
+      "risk_tier": "Low",
+      "source_refs": [
+        "internal:nexus_client_journey_spec"
+      ],
+      "key_risks": [
+        "Incomplete intake leading to mismatched tasks",
+        "Users sharing sensitive data (SSN/full account numbers)"
+      ],
+      "prohibited_actions": [
+        "Request SSN or full account numbers",
+        "Promise approvals or score changes"
+      ],
+      "mandatory_human_review": false,
+      "cri_impact_model": {
+        "primary_levers": [
+          "Documentation completeness",
+          "Banking stability",
+          "Dispute evidence readiness",
+          "Cash reserves & autopay discipline"
+        ],
+        "expected_direction": "Positive with consistent completion",
+        "notes": [
+          "CRI is a readiness indicator, not a guarantee of outcomes."
+        ]
+      },
+      "ai_lesson": {
+        "objective": "Collect structured intake, compute a conservative CRI tier, and generate the initial task plan aligned to the client journey (Register → Intake → Tasks → Upload report → Analyze → Plan).",
+        "talk_track": [
+          "We’ll build a clear plan from your intake and documents.",
+          "No guarantees—our goal is to improve readiness and reduce risk."
+        ],
+        "do_not_do": [
+          "Do not ask for SSN, full DOB, or full account numbers.",
+          "Do not advise skipping disclosures or misrepresenting facts."
+        ],
+        "decision_rules": [
+          {
+            "id": "DR-001",
+            "if": "client_profile.cri_score == null",
+            "then": "assign_tasks",
+            "args": {
+              "module_ids": [
+                "NX-001"
+              ]
+            },
+            "notes": "Always assign intake tasks if CRI not provided."
+          },
+          {
+            "id": "DR-002",
+            "if": "client_profile.has_business == false",
+            "then": "assign_tasks",
+            "args": {
+              "module_ids": [
+                "NX-002"
+              ]
+            },
+            "notes": "No business → assign business formation & fundability setup."
+          }
+        ],
+        "agent_mapping_hint": "Nexus Analyst"
+      },
+      "tasks": [
+        {
+          "task_id": "NX-001-T1",
+          "task_name": "Complete Intake Questionnaire (No Sensitive Data)",
+          "assigned_to": "Client",
+          "priority": "High",
+          "estimated_time_minutes": 12,
+          "triggers": [
+            "onboarding_start"
+          ],
+          "steps": [
+            "Provide business status (has_business true/false) and basic goals (credit improvement, capital readiness, grants, lead gen).",
+            "Provide non-sensitive credit indicators (negative items yes/no, collections yes/no, inquiries high/low, utilization range).",
+            "Provide non-sensitive business indicators (time in business months, monthly revenue range, banking account age).",
+            "Confirm consent preferences for outreach (email/sms) and communication schedule."
+          ],
+          "success_metrics": [
+            "All required intake fields completed",
+            "Consent preferences recorded"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User attempts to provide SSN or full account numbers"
+            ],
+            "orange": [
+              "User requests advice to falsify information"
+            ],
+            "red": [
+              "User asks for impersonation or fraud steps"
+            ]
+          },
+          "compliance_flags": [
+            "Educational only",
+            "No sensitive data"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        },
+        {
+          "task_id": "NX-001-T2",
+          "task_name": "Upload Credit Report (AnnualCreditReport.com) + Basic Document Set",
+          "assigned_to": "Client",
+          "priority": "High",
+          "estimated_time_minutes": 15,
+          "triggers": [
+            "intake_complete"
+          ],
+          "steps": [
+            "Upload the most recent credit report from AnnualCreditReport.com (PDF preferred).",
+            "Upload proof of address (utility bill) and ID only if needed for dispute mailings (optional).",
+            "Redact SSN and full account numbers before uploading if possible."
+          ],
+          "success_metrics": [
+            "Credit report uploaded",
+            "Document set uploaded or explicitly skipped"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "Credit report is missing key pages or bureaus"
+            ],
+            "orange": [
+              "User uploads unredacted sensitive identifiers"
+            ]
+          },
+          "compliance_flags": [
+            "Evidence may be required for disputes (SAFE-02)"
+          ],
+          "default_assignee_agent": "Lex Ledger"
+        },
+        {
+          "task_id": "NX-001-T3",
+          "task_name": "Generate CRI Tier + Initial Task Board",
+          "assigned_to": "AI",
+          "priority": "High",
+          "estimated_time_minutes": 3,
+          "triggers": [
+            "credit_report_uploaded",
+            "intake_complete"
+          ],
+          "steps": [
+            "Compute conservative CRI tier from available indicators.",
+            "Assign tier-default modules and tasks.",
+            "Mark high-risk tasks as offer-only until evidence/verification gates are satisfied."
+          ],
+          "success_metrics": [
+            "CRI tier assigned",
+            "Task board created without duplicates"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "Conflicting profile data"
+            ],
+            "orange": [
+              "Identity theft flagged without documentation"
+            ]
+          },
+          "compliance_flags": [
+            "No guarantees",
+            "Risk-aware sequencing"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        }
+      ],
+      "decision_rules": [
+        {
+          "id": "NX-001-R1",
+          "if": "client_profile.alleges_identity_theft == true",
+          "then": "offer_tasks",
+          "args": {
+            "module_ids": [
+              "NX-005"
+            ]
+          },
+          "notes": "Offer dispute education with Human Review recommendation when identity theft is alleged."
+        }
+      ]
+    },
+    {
+      "module_id": "NX-002",
+      "module_name": "Business Formation & Fundability Infrastructure",
+      "category": "Infrastructure/Formation",
+      "compliance_level": "Moderate",
+      "risk_tier": "Moderate",
+      "source_refs": [
+        "internal:nexus_business_formation_baseline"
+      ],
+      "key_risks": [
+        "Improper entity selection without professional advice",
+        "Inconsistent records across filings, banking, and bureaus"
+      ],
+      "prohibited_actions": [
+        "Provide legal advice on entity selection",
+        "Recommend misrepresentation of business operations"
+      ],
+      "mandatory_human_review": false,
+      "cri_impact_model": {
+        "primary_levers": [
+          "Business legitimacy signals",
+          "Consistency",
+          "Documentation readiness"
+        ],
+        "expected_direction": "Positive with consistent infrastructure setup"
+      },
+      "ai_lesson": {
+        "objective": "If no business exists, create a compliant setup path for entity, EIN, NAICS selection, and basic fundability signals without giving legal advice.",
+        "talk_track": [
+          "We can outline the steps and the paperwork trail; a pro can confirm what’s best for your situation."
+        ],
+        "do_not_do": [
+          "Do not advise ‘shelf corp’ misuse or any deceptive practices.",
+          "Do not claim guaranteed funding based on formation steps."
+        ],
+        "decision_rules": [
+          {
+            "id": "DR-201",
+            "if": "client_profile.has_business == false",
+            "then": "assign_tasks",
+            "args": {
+              "module_ids": [
+                "NX-002"
+              ]
+            }
+          }
+        ],
+        "agent_mapping_hint": "Nexus Founder"
+      },
+      "tasks": [
+        {
+          "task_id": "NX-002-T1",
+          "task_name": "Choose Business Structure + Name Consistency Checklist",
+          "assigned_to": "Client",
+          "priority": "High",
+          "estimated_time_minutes": 20,
+          "triggers": [
+            "has_business_false"
+          ],
+          "steps": [
+            "List your intended business activities in plain language (what you sell, who you serve).",
+            "Select a business name you can consistently use across filings, banking, and vendor accounts.",
+            "Create a consistency checklist (name, address format, phone, email domain).",
+            "Consider professional review for entity selection (CPA/attorney) if unsure."
+          ],
+          "success_metrics": [
+            "Consistency checklist created"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User asks for definitive legal advice"
+            ],
+            "orange": [
+              "User asks to hide ownership or misrepresent operations"
+            ]
+          },
+          "compliance_flags": [
+            "Educational only",
+            "Recommend professional review when needed"
+          ],
+          "default_assignee_agent": "Nexus Founder"
+        },
+        {
+          "task_id": "NX-002-T2",
+          "task_name": "EIN + NAICS Mapping (Educational)",
+          "assigned_to": "Client",
+          "priority": "High",
+          "estimated_time_minutes": 15,
+          "triggers": [
+            "structure_selected"
+          ],
+          "steps": [
+            "Gather the exact legal name and address to use for EIN application.",
+            "Select 1–3 NAICS codes aligned with your core activity (not aspirational).",
+            "Document your selected NAICS rationale for future underwriting consistency."
+          ],
+          "success_metrics": [
+            "NAICS selections documented"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User asks which NAICS ‘unlocks’ funding"
+            ],
+            "orange": [
+              "User asks to pick a false NAICS for approvals"
+            ]
+          },
+          "compliance_flags": [
+            "No misrepresentation"
+          ],
+          "default_assignee_agent": "Nexus Founder"
+        }
+      ],
+      "decision_rules": []
+    },
+    {
+      "module_id": "NX-003",
+      "module_name": "Banking Stability & Cashflow Discipline (Business Checking + Autopay + Reserves)",
+      "category": "Infrastructure/Banking Stability",
+      "compliance_level": "Low",
+      "risk_tier": "Low",
+      "source_refs": [
+        "video_2Si8hmCKPxg_transcript.txt",
+        "playlist_PLj_l2rsllXxdaCggFZjE0TS3D5m6uk65-_transcripts.txt"
+      ],
+      "key_risks": [
+        "Over-reliance on credit without repayment plan",
+        "Cashflow volatility increasing underwriting risk"
+      ],
+      "prohibited_actions": [
+        "Encourage reckless borrowing",
+        "Promise approval based on banking choice"
+      ],
+      "mandatory_human_review": false,
+      "cri_impact_model": {
+        "primary_levers": [
+          "Banking account age",
+          "Transaction consistency",
+          "Reserves",
+          "Autopay"
+        ],
+        "expected_direction": "Positive with consistent cashflow habits"
+      },
+      "ai_lesson": {
+        "objective": "Teach stability signals: business checking, clean transaction history, automation, and reserves. Explain that some underwriting models consider banking data alongside credit.",
+        "talk_track": [
+          "The goal is to look stable and predictable—consistent deposits, controlled spend, and reserves."
+        ],
+        "do_not_do": [
+          "Do not guarantee any specific line of credit approval or limit.",
+          "Do not advise hiding transactions or manipulating statements."
+        ],
+        "decision_rules": [
+          {
+            "id": "DR-301",
+            "if": "client_profile.has_business == true && client_profile.business.time_in_business_months >= 6",
+            "then": "offer_tasks",
+            "args": {
+              "module_ids": [
+                "NX-006"
+              ]
+            },
+            "notes": "Offer capital sequencing once basic business age is present."
+          }
+        ],
+        "agent_mapping_hint": "Nexus Founder"
+      },
+      "tasks": [
+        {
+          "task_id": "NX-003-T1",
+          "task_name": "Set Up Business Banking Buckets (Tax, Payroll, Ops, Reserves)",
+          "assigned_to": "Client",
+          "priority": "High",
+          "estimated_time_minutes": 25,
+          "triggers": [
+            "has_business_true"
+          ],
+          "steps": [
+            "Create or identify separate buckets/sub-accounts: Taxes, Operating, Payroll/Owner Pay, Reserves.",
+            "Set an automatic transfer rule (e.g., percentage-based) into Taxes and Reserves.",
+            "Enable autopay for minimum payments on any credit lines to reduce late-payment risk."
+          ],
+          "success_metrics": [
+            "Buckets created",
+            "Autopay enabled"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User unsure how to estimate tax set-aside"
+            ],
+            "orange": [
+              "User wants to misclassify transactions to appear stronger"
+            ]
+          },
+          "compliance_flags": [
+            "Educational only",
+            "No misrepresentation"
+          ],
+          "default_assignee_agent": "Nexus Founder"
+        },
+        {
+          "task_id": "NX-003-T2",
+          "task_name": "Reserve Target Plan (Stability Milestones)",
+          "assigned_to": "Client",
+          "priority": "Medium",
+          "estimated_time_minutes": 15,
+          "triggers": [
+            "buckets_ready"
+          ],
+          "steps": [
+            "Set a short-term reserve goal (e.g., 2–4 weeks of operating expenses).",
+            "Set a medium-term reserve goal (e.g., 1–3 months), based on cashflow volatility.",
+            "Track weekly reserve balance changes for 8 weeks."
+          ],
+          "success_metrics": [
+            "Reserve plan documented",
+            "Tracking started"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User has unstable income and needs a conservative plan"
+            ]
+          },
+          "compliance_flags": [
+            "Risk-aware"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        }
+      ],
+      "decision_rules": []
+    },
+    {
+      "module_id": "NX-004",
+      "module_name": "Secured Personal Line of Credit (SPLC) as Credit-Building Tool (Educational)",
+      "category": "Credit/Bank Relationship",
+      "compliance_level": "Moderate",
+      "risk_tier": "Moderate",
+      "source_refs": [
+        "video_Abwn2p03NpQ_transcript.txt"
+      ],
+      "key_risks": [
+        "Overextending liquidity or misunderstanding secured credit",
+        "Taking on cost/interest without clear benefit",
+        "Assuming guaranteed score impact"
+      ],
+      "prohibited_actions": [
+        "Promise score increases or approvals",
+        "Encourage borrowing beyond capacity",
+        "Encourage concealment of collateral source"
+      ],
+      "mandatory_human_review": false,
+      "cri_impact_model": {
+        "primary_levers": [
+          "On-time payments",
+          "Revolving account mix",
+          "Utilization management"
+        ],
+        "expected_direction": "Potentially positive if used conservatively",
+        "notes": [
+          "Impact varies by profile; avoid overfitting to a single tactic."
+        ]
+      },
+      "ai_lesson": {
+        "objective": "Explain secured personal lines of credit as an educational concept: collateralized access, potential reporting, and disciplined usage. Emphasize risks, costs, and variability.",
+        "talk_track": [
+          "A secured line can help build payment history if it reports and you keep utilization low—results vary by profile."
+        ],
+        "do_not_do": [
+          "Do not frame this as a guaranteed FICO ‘skyrocket’ method.",
+          "Do not recommend taking on debt you cannot repay."
+        ],
+        "decision_rules": [
+          {
+            "id": "DR-401",
+            "if": "client_profile.personal_credit.has_negative_items == true && client_profile.business.monthly_revenue < 10000",
+            "then": "offer_tasks",
+            "args": {
+              "module_ids": [
+                "NX-004"
+              ]
+            },
+            "notes": "Offer as an option for clients with cash collateral and repair needs, without promises."
+          }
+        ],
+        "agent_mapping_hint": "Lex Ledger"
+      },
+      "tasks": [
+        {
+          "task_id": "NX-004-T1",
+          "task_name": "SPLC Feasibility Check (Collateral, Liquidity, Reporting)",
+          "assigned_to": "Client",
+          "priority": "Medium",
+          "estimated_time_minutes": 12,
+          "triggers": [
+            "credit_building_needed"
+          ],
+          "steps": [
+            "Confirm you have a cash collateral amount you can set aside without harming reserves.",
+            "Confirm you understand the cost (interest spread/fees) and that you’ll repay on schedule.",
+            "Verify whether the institution reports to all three bureaus (ask directly; document the answer).",
+            "If unclear, treat as ‘unknown impact’ and proceed conservatively."
+          ],
+          "success_metrics": [
+            "Feasibility documented",
+            "Reporting status documented"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User wants brand-specific guarantees"
+            ],
+            "orange": [
+              "User proposes borrowing against funds they do not control"
+            ]
+          },
+          "compliance_flags": [
+            "No guarantees",
+            "Risk-aware"
+          ],
+          "default_assignee_agent": "Lex Ledger"
+        },
+        {
+          "task_id": "NX-004-T2",
+          "task_name": "SPLC Usage Plan (Autopay + Utilization Guardrails)",
+          "assigned_to": "Client",
+          "priority": "Medium",
+          "estimated_time_minutes": 15,
+          "triggers": [
+            "splc_feasible_true"
+          ],
+          "steps": [
+            "Set autopay for at least the minimum due and calendar reminders for statement dates.",
+            "Create a utilization target range (conservative) and avoid carrying high balances.",
+            "Document draw purpose (optional) and avoid circular money movement intended to mislead underwriting."
+          ],
+          "success_metrics": [
+            "Autopay enabled",
+            "Guardrails documented"
+          ],
+          "escalation_conditions": {
+            "orange": [
+              "User asks how to ‘game’ reporting dates to misrepresent ability"
+            ]
+          },
+          "compliance_flags": [
+            "No manipulation",
+            "Educational only"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        }
+      ],
+      "decision_rules": []
+    },
+    {
+      "module_id": "NX-005",
+      "module_name": "Credit Intake, Review & Dispute Education (Factual Accuracy Focus)",
+      "category": "Credit/Dispute Education",
+      "compliance_level": "High",
+      "risk_tier": "High",
+      "source_refs": [
+        "playlist_PLj_l2rsllXxdaCggFZjE0TS3D5m6uk65-_transcripts.txt"
+      ],
+      "key_risks": [
+        "Users attempting legal strategy without counsel",
+        "Users disputing accurate items or making false claims",
+        "Identity theft allegations requiring formal steps"
+      ],
+      "prohibited_actions": [
+        "Write instructions to fabricate disputes or false ‘not mine’ claims",
+        "Guarantee deletions or timelines",
+        "Provide legal advice as an attorney substitute"
+      ],
+      "mandatory_human_review": true,
+      "cri_impact_model": {
+        "primary_levers": [
+          "Accuracy corrections",
+          "Documentation readiness",
+          "Dispute tracking discipline"
+        ],
+        "expected_direction": "Potentially positive if inaccuracies exist and evidence supports correction",
+        "notes": [
+          "If items are accurate, disputing may not help and can waste time."
+        ]
+      },
+      "ai_lesson": {
+        "objective": "Teach factual, evidence-based credit report review and dispute education. Focus on identifying inconsistencies across bureaus and documenting evidence. Require Human Review before any submission step.",
+        "talk_track": [
+          "We focus on accuracy and documentation. If it’s accurate, we don’t dispute it.",
+          "If you choose to dispute, we’ll keep it factual and evidence-based."
+        ],
+        "do_not_do": [
+          "Do not promise removals or fast outcomes.",
+          "Do not instruct users to misrepresent facts.",
+          "Do not submit disputes for the user."
+        ],
+        "decision_rules": [
+          {
+            "id": "DR-501",
+            "if": "client_profile.personal_credit.has_collections == true || client_profile.personal_credit.has_negative_items == true",
+            "then": "assign_tasks",
+            "args": {
+              "module_ids": [
+                "NX-005"
+              ]
+            }
+          },
+          {
+            "id": "DR-502",
+            "if": "client_profile.alleges_identity_theft == true",
+            "then": "offer_tasks",
+            "args": {
+              "module_ids": [
+                "NX-005"
+              ]
+            },
+            "notes": "Offer with strong Human Review recommendation."
+          }
+        ],
+        "agent_mapping_hint": "Lex Ledger (Forensic Bot oversight)"
+      },
+      "tasks": [
+        {
+          "task_id": "NX-005-T1",
+          "task_name": "Credit Report Triage (Inaccuracies, Dates, Status Consistency)",
+          "assigned_to": "AI",
+          "priority": "High",
+          "estimated_time_minutes": 8,
+          "triggers": [
+            "credit_report_uploaded"
+          ],
+          "steps": [
+            "Extract negative items list (collections/charge-offs/late payments/public records).",
+            "Check cross-bureau consistency for key fields (dates/status/payment history).",
+            "Generate a factual discrepancy list with screenshot requests."
+          ],
+          "success_metrics": [
+            "Discrepancy list generated"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "Report missing bureau sections"
+            ],
+            "orange": [
+              "Identity theft flagged; require documentation"
+            ],
+            "red": [
+              "User requests false dispute claims"
+            ]
+          },
+          "compliance_flags": [
+            "SAFE-02",
+            "SAFE-03",
+            "Educational only"
+          ],
+          "default_assignee_agent": "Lex Ledger"
+        },
+        {
+          "task_id": "NX-005-T2",
+          "task_name": "Evidence Upload: Screenshots/Statements for Discrepancies",
+          "assigned_to": "Client",
+          "priority": "High",
+          "estimated_time_minutes": 20,
+          "triggers": [
+            "discrepancy_list_ready"
+          ],
+          "steps": [
+            "Upload screenshots showing the inconsistent fields (bureau-to-bureau).",
+            "Upload any supporting statements/receipts only if they exist (do not create new documents).",
+            "Redact sensitive identifiers where possible."
+          ],
+          "success_metrics": [
+            "Evidence uploaded"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User lacks evidence and wants to proceed anyway"
+            ],
+            "orange": [
+              "User suggests fabricating evidence"
+            ]
+          },
+          "compliance_flags": [
+            "SAFE-02"
+          ],
+          "default_assignee_agent": "Lex Ledger"
+        },
+        {
+          "task_id": "NX-005-T3",
+          "task_name": "Draft Factual Dispute Outline (For Human Review)",
+          "assigned_to": "AI",
+          "priority": "High",
+          "estimated_time_minutes": 10,
+          "triggers": [
+            "evidence_uploaded_true"
+          ],
+          "steps": [
+            "Draft a dispute outline: what field is inaccurate, what evidence supports it, requested correction.",
+            "Avoid legal posturing and avoid claiming outcomes.",
+            "Mark as ‘Requires Human Review’ before any submission."
+          ],
+          "success_metrics": [
+            "Draft outline prepared"
+          ],
+          "escalation_conditions": {
+            "orange": [
+              "User wants the system to send the dispute directly"
+            ]
+          },
+          "compliance_flags": [
+            "SAFE-03",
+            "Human approval required"
+          ],
+          "default_assignee_agent": "Forensic Bot"
+        }
+      ],
+      "decision_rules": []
+    },
+    {
+      "module_id": "NX-006",
+      "module_name": "Capital Sequencing (Tier 1 → Long-Term SBA Readiness) + Alternative LOC Education",
+      "category": "Capital/Sequencing",
+      "compliance_level": "Moderate",
+      "risk_tier": "Moderate",
+      "source_refs": [
+        "video_2Si8hmCKPxg_transcript.txt",
+        "playlist_PLj_l2rsllXxdaCggFZjE0TS3D5m6uk65-_transcripts.txt"
+      ],
+      "key_risks": [
+        "Over-applying and damaging credit",
+        "Borrowing without repayment capacity",
+        "Confusing marketing claims with underwriting reality"
+      ],
+      "prohibited_actions": [
+        "Guarantee approvals/limits",
+        "Encourage hiding liabilities or misrepresenting revenue",
+        "Provide tactics to evade fraud detection"
+      ],
+      "mandatory_human_review": false,
+      "cri_impact_model": {
+        "primary_levers": [
+          "Time in business",
+          "Revenue consistency",
+          "Banking stability",
+          "Personal credit hygiene"
+        ],
+        "expected_direction": "Positive with disciplined sequencing and stability"
+      },
+      "ai_lesson": {
+        "objective": "Teach conservative sequencing: stabilize banking, reduce risk, then explore profile-based options (0% APR where eligible, lines of credit where appropriate), and maintain a long-term SBA readiness path.",
+        "talk_track": [
+          "We sequence based on your profile and readiness. If you’re not ready, we build first.",
+          "We prioritize stability: reserves, autopay, clean records, and predictable cashflow."
+        ],
+        "do_not_do": [
+          "Do not propose high-volume application sprees.",
+          "Do not treat lender marketing claims as guaranteed requirements."
+        ],
+        "decision_rules": [
+          {
+            "id": "DR-601",
+            "if": "client_profile.has_business == true && client_profile.business.time_in_business_months >= 6 && client_profile.business.monthly_revenue >= 10000",
+            "then": "offer_tasks",
+            "args": {
+              "module_ids": [
+                "NX-006"
+              ]
+            },
+            "notes": "Offer alternative LOC education once basic thresholds are met."
+          },
+          {
+            "id": "DR-602",
+            "if": "client_profile.personal_credit.hard_inquiries_recent_high == true",
+            "then": "assign_tasks",
+            "args": {
+              "module_ids": [
+                "NX-003"
+              ]
+            },
+            "notes": "High inquiries → prioritize stability and cool-down period."
+          }
+        ],
+        "agent_mapping_hint": "Nexus Analyst"
+      },
+      "tasks": [
+        {
+          "task_id": "NX-006-T1",
+          "task_name": "Capital Readiness Snapshot (Capacity + Constraints)",
+          "assigned_to": "AI",
+          "priority": "High",
+          "estimated_time_minutes": 6,
+          "triggers": [
+            "banking_stability_started"
+          ],
+          "steps": [
+            "Summarize current constraints (time in business, revenue range, credit risk flags, inquiry count).",
+            "Recommend a conservative next-step lane: Build, Prepare, or Deploy.",
+            "Generate a ‘Do Not Apply Yet’ warning if risk flags are present."
+          ],
+          "success_metrics": [
+            "Snapshot generated"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "Insufficient data; request non-sensitive details"
+            ]
+          },
+          "compliance_flags": [
+            "No guarantees",
+            "Risk-aware"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        },
+        {
+          "task_id": "NX-006-T2",
+          "task_name": "Tier 1 Lane (0% APR Cards/LOCs) — Eligibility Pre-Check (Educational)",
+          "assigned_to": "Client",
+          "priority": "Medium",
+          "estimated_time_minutes": 15,
+          "triggers": [
+            "cri_tier_is_Tier1_or_Tier2"
+          ],
+          "steps": [
+            "List current open accounts, utilization ranges, and recent inquiries (counts only).",
+            "Identify 2–3 potential application windows with cooling-off periods.",
+            "Set a rule: apply only if repayment plan exists and utilization will remain controlled."
+          ],
+          "success_metrics": [
+            "Pre-check completed",
+            "Application window planned"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User requests ‘best card’ without profile data"
+            ]
+          },
+          "compliance_flags": [
+            "Probabilistic; profile-based"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        },
+        {
+          "task_id": "NX-006-T3",
+          "task_name": "Alternative LOC Lane (Bank Data Underwriting) — Documentation Checklist",
+          "assigned_to": "Client",
+          "priority": "Medium",
+          "estimated_time_minutes": 12,
+          "triggers": [
+            "business_revenue_meets_threshold"
+          ],
+          "steps": [
+            "Prepare last 6 months of bank statements (or connect via approved integrations only).",
+            "Prepare basic business identity docs (EIN letter, formation docs, good standing if available).",
+            "Document intended use and repayment plan; avoid vague or inconsistent narratives."
+          ],
+          "success_metrics": [
+            "Checklist completed"
+          ],
+          "escalation_conditions": {
+            "orange": [
+              "User asks to alter statements or hide cashflow gaps"
+            ]
+          },
+          "compliance_flags": [
+            "No misrepresentation"
+          ],
+          "default_assignee_agent": "Nexus Founder"
+        },
+        {
+          "task_id": "NX-006-T4",
+          "task_name": "SBA Readiness Lane — Long-Term Checklist (Educational)",
+          "assigned_to": "Client",
+          "priority": "Low",
+          "estimated_time_minutes": 18,
+          "triggers": [
+            "client_requests_sba_path"
+          ],
+          "steps": [
+            "Create a document folder structure: taxes, financial statements, bank statements, organizational docs.",
+            "Set bookkeeping cadence and reconcile monthly.",
+            "Track DSCR-like capacity indicators (simple cashflow surplus tracking).",
+            "Recommend professional review for SBA packaging if pursuing seriously."
+          ],
+          "success_metrics": [
+            "Folder structure created",
+            "Cadence set"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User asks for guaranteed SBA amounts"
+            ]
+          },
+          "compliance_flags": [
+            "No promises"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        }
+      ],
+      "decision_rules": []
+    },
+    {
+      "module_id": "NX-007",
+      "module_name": "Consent-Based Client Application Support (Integrity + Non-Impersonation)",
+      "category": "Governance/Integrity",
+      "compliance_level": "High",
+      "risk_tier": "High",
+      "source_refs": [
+        "playlist_PLj_l2rsllXxdaCggFZjE0TS3D5m6uk65-_transcripts.txt"
+      ],
+      "key_risks": [
+        "Impersonation risk",
+        "Violating lender terms and fraud controls",
+        "Unauthorized access to client accounts/devices"
+      ],
+      "prohibited_actions": [
+        "Teach evasion of fraud detection (VPN spoofing, identity masking, etc.)",
+        "Instruct submitting applications as the client",
+        "Circumvent lender compliance and security controls"
+      ],
+      "mandatory_human_review": true,
+      "cri_impact_model": {
+        "primary_levers": [
+          "Process integrity",
+          "Consent logs",
+          "Risk reduction"
+        ],
+        "expected_direction": "Positive for operational safety; neutral for CRI score"
+      },
+      "ai_lesson": {
+        "objective": "Support a transparent, consent-based process where the applicant submits their own applications. Provide coaching and preparation, not impersonation. Enforce SAFE-04 and escalate ambiguity.",
+        "talk_track": [
+          "We can coach you through what to expect, but you must submit your own applications on your own device/account."
+        ],
+        "do_not_do": [
+          "Do not provide step-by-step methods to bypass location checks or fraud controls.",
+          "Do not instruct on VPN use for applications."
+        ],
+        "decision_rules": [
+          {
+            "id": "DR-701",
+            "if": "client_profile.case_complexity == \\\"high\\\"",
+            "then": "offer_tasks",
+            "args": {
+              "module_ids": [
+                "NX-007"
+              ]
+            },
+            "notes": "High complexity → offer integrity workflow with Human Review."
+          }
+        ],
+        "agent_mapping_hint": "Forensic Bot (with Ghost Hunter for coaching)"
+      },
+      "tasks": [
+        {
+          "task_id": "NX-007-T1",
+          "task_name": "Consent & Integrity Checklist (Before Any Application Coaching)",
+          "assigned_to": "Client",
+          "priority": "High",
+          "estimated_time_minutes": 8,
+          "triggers": [
+            "client_requests_application_help"
+          ],
+          "steps": [
+            "Confirm the applicant will submit their own application.",
+            "Confirm the applicant is using their own device and login credentials.",
+            "Record consent preference and acknowledgement of non-impersonation policy."
+          ],
+          "success_metrics": [
+            "Consent recorded"
+          ],
+          "escalation_conditions": {
+            "orange": [
+              "User asks staff to apply on their behalf"
+            ],
+            "red": [
+              "User requests impersonation or bypass steps"
+            ]
+          },
+          "compliance_flags": [
+            "SAFE-04",
+            "Human approval required"
+          ],
+          "default_assignee_agent": "Forensic Bot"
+        },
+        {
+          "task_id": "NX-007-T2",
+          "task_name": "Application Prep Coaching (What to Expect + Consistency Checks)",
+          "assigned_to": "AI",
+          "priority": "Medium",
+          "estimated_time_minutes": 12,
+          "triggers": [
+            "consent_recorded_true"
+          ],
+          "steps": [
+            "Review non-sensitive inputs for consistency (business name, address format, revenue range).",
+            "Provide a practice Q&A for common application fields (truthful responses only).",
+            "Flag any conflicts that may cause verification friction."
+          ],
+          "success_metrics": [
+            "Coaching completed",
+            "Conflicts flagged"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User needs professional guidance for legal/tax questions"
+            ],
+            "orange": [
+              "User asks what to ‘say’ that isn’t true"
+            ]
+          },
+          "compliance_flags": [
+            "Educational only",
+            "No misrepresentation"
+          ],
+          "default_assignee_agent": "Ghost Hunter"
+        }
+      ],
+      "decision_rules": []
+    },
+    {
+      "module_id": "NX-008",
+      "module_name": "Grant Discovery + Application Structuring (No Award Guarantees)",
+      "category": "Grants",
+      "compliance_level": "Moderate",
+      "risk_tier": "Moderate",
+      "source_refs": [
+        "video_dwJ-Wnbtct8_transcript.txt",
+        "playlist_PLj_l2rsllXxdaCggFZjE0TS3D5m6uk65-_transcripts.txt"
+      ],
+      "key_risks": [
+        "Users assuming grants are guaranteed",
+        "Applying to misaligned programs",
+        "Missing tax considerations"
+      ],
+      "prohibited_actions": [
+        "Guarantee award or timeline",
+        "Recommend false information in applications"
+      ],
+      "mandatory_human_review": false,
+      "cri_impact_model": {
+        "primary_levers": [
+          "Narrative clarity",
+          "Eligibility fit",
+          "Documentation readiness"
+        ],
+        "expected_direction": "Neutral to positive (opportunity expansion)"
+      },
+      "ai_lesson": {
+        "objective": "Match grants to eligibility and help structure strong applications: mission alignment, budget clarity, and simple evidence. Emphasize rolling close risk and taxability considerations.",
+        "talk_track": [
+          "We’ll focus on alignment and clarity. Grants can close anytime and awards are never guaranteed."
+        ],
+        "do_not_do": [
+          "Do not promise ‘free money’ outcomes.",
+          "Do not help fabricate hardship or business details."
+        ],
+        "decision_rules": [
+          {
+            "id": "DR-801",
+            "if": "client_profile.has_business == false",
+            "then": "offer_tasks",
+            "args": {
+              "module_ids": [
+                "NX-008"
+              ]
+            },
+            "notes": "Offer ‘no business needed’ grants as appropriate."
+          }
+        ],
+        "agent_mapping_hint": "Nova Grant"
+      },
+      "tasks": [
+        {
+          "task_id": "NX-008-T1",
+          "task_name": "Grant Eligibility Snapshot + Shortlist",
+          "assigned_to": "AI",
+          "priority": "Medium",
+          "estimated_time_minutes": 10,
+          "triggers": [
+            "intake_complete"
+          ],
+          "steps": [
+            "Collect eligibility constraints (location, industry, business vs. nonprofit, hardship status if applicable).",
+            "Shortlist 3–7 grants and label: High-fit / Medium-fit / Low-fit based on alignment.",
+            "Add reminders: rolling close risk, taxability, and documentation expectations."
+          ],
+          "success_metrics": [
+            "Shortlist created"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "Insufficient eligibility details"
+            ]
+          },
+          "compliance_flags": [
+            "No guarantees"
+          ],
+          "default_assignee_agent": "Nova Grant"
+        },
+        {
+          "task_id": "NX-008-T2",
+          "task_name": "Application Pack Builder (Narrative + Budget + Evidence)",
+          "assigned_to": "Client",
+          "priority": "Medium",
+          "estimated_time_minutes": 30,
+          "triggers": [
+            "grant_shortlist_ready"
+          ],
+          "steps": [
+            "Write a 150–300 word mission + impact statement aligned to the grant’s goals.",
+            "Create a simple budget with line items tied to outcomes (no inflated claims).",
+            "Gather light evidence (photos, links, invoices) if requested—do not fabricate."
+          ],
+          "success_metrics": [
+            "Pack created"
+          ],
+          "escalation_conditions": {
+            "orange": [
+              "User asks to falsify hardship or finances"
+            ]
+          },
+          "compliance_flags": [
+            "Truthful applications only"
+          ],
+          "default_assignee_agent": "Nova Grant"
+        }
+      ],
+      "decision_rules": []
+    },
+    {
+      "module_id": "NX-009",
+      "module_name": "Opportunity Review & Scoring (Educational) + Personal Finance Decision Support",
+      "category": "Opportunity/Scoring",
+      "compliance_level": "Moderate",
+      "risk_tier": "Moderate hookup",
+      "source_refs": [
+        "playlist_PLj_l2rsllXxdaCggFZjE0TS3D5m6uk65-_transcripts.txt"
+      ],
+      "key_risks": [
+        "Users treating scores as financial advice",
+        "Tax/lease incentives changing over time",
+        "Overconfidence in ‘deadline’ claims"
+      ],
+      "prohibited_actions": [
+        "Provide investment advice or guaranteed ROI",
+        "State tax credit eligibility as certain"
+      ],
+      "mandatory_human_review": false,
+      "cri_impact_model": {
+        "primary_levers": [
+          "Decision discipline",
+          "Risk awareness"
+        ],
+        "expected_direction": "Neutral"
+      },
+      "ai_lesson": {
+        "objective": "Score opportunities using the Analyze → Score → Explain → Match workflow. Provide educational framing and scenario variability.",
+        "talk_track": [
+          "We’ll score the opportunity for risk and fit. This is educational, not investment advice."
+        ],
+        "do_not_do": [
+          "Do not guarantee returns.",
+          "Do not assert tax credit eligibility without up-to-date verification."
+        ],
+        "decision_rules": [
+          {
+            "id": "DR-901",
+            "if": "client_profile.archetype == \\\"growth_oriented\\\"",
+            "then": "offer_tasks",
+            "args": {
+              "module_ids": [
+                "NX-009"
+              ]
+            }
+          }
+        ],
+        "agent_mapping_hint": "Nexus Analyst"
+      },
+      "tasks": [
+        {
+          "task_id": "NX-009-T1",
+          "task_name": "Opportunity Scorecard (0–100) + Fit Match",
+          "assigned_to": "AI",
+          "priority": "Low",
+          "estimated_time_minutes": 10,
+          "triggers": [
+            "user_requests_opportunity_review"
+          ],
+          "steps": [
+            "Analyze and score: Risk Profile (0–25), Capital Intensity (0–20), Revenue Model (0–20), Complexity (0–15), Scalability (0–10), Time Horizon (0–10).",
+            "Explain key drivers and uncertainties.",
+            "Match to archetype (conservative, growth-oriented, capital-constrained) and propose next steps."
+          ],
+          "success_metrics": [
+            "Scorecard produced"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User requests specific investment recommendation"
+            ]
+          },
+          "compliance_flags": [
+            "Educational only",
+            "No ROI promises"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        },
+        {
+          "task_id": "NX-009-T2",
+          "task_name": "Lease/Tax Incentive Decision Checklist (Verification Required)",
+          "assigned_to": "Client",
+          "priority": "Low",
+          "estimated_time_minutes": 12,
+          "triggers": [
+            "user_mentions_vehicle_lease_or_tax_credit"
+          ],
+          "steps": [
+            "List the incentive claim and the deadline being referenced.",
+            "Verify current eligibility rules with official sources and/or a tax professional.",
+            "Estimate total cost of ownership including insurance and fees; do not rely on incentives alone."
+          ],
+          "success_metrics": [
+            "Checklist completed"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User wants definitive tax advice without verification"
+            ]
+          },
+          "compliance_flags": [
+            "Professional review recommended for tax"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        }
+      ],
+      "decision_rules": []
+    },
+    {
+      "module_id": "NX-010",
+      "module_name": "Fundable Business Structure & Credit Stack (2026 Framework)",
+      "category": "Infrastructure/Fundability/Business Credit",
+      "compliance_level": "Moderate",
+      "risk_tier": "Moderate",
+      "source_refs": [
+        "internal:fundable_business_guide_2026"
+      ],
+      "key_risks": [
+        "Users assuming structure guarantees funding",
+        "Misrepresentation of revenue, NAICS, or business activity",
+        "Over-applying for credit and damaging profile",
+        "Confusing marketing claims with underwriting standards"
+      ],
+      "prohibited_actions": [
+        "Guarantee funding approvals or credit limits",
+        "Recommend false NAICS codes or altered documents",
+        "Encourage personal/business commingling",
+        "Promise specific PAYDEX or score outcomes"
+      ],
+      "mandatory_human_review": false,
+      "cri_impact_model": {
+        "primary_levers": [
+          "Legal separation",
+          "Banking consistency",
+          "Trade line depth",
+          "Payment discipline",
+          "Documentation readiness"
+        ],
+        "expected_direction": "Positive with consistent execution",
+        "notes": [
+          "Structure improves fundability signals but does not guarantee capital."
+        ]
+      },
+      "ai_lesson": {
+        "objective": "Teach clients how to structure a legally separated, credit-visible, documentation-ready business that aligns with lender and investor expectations.",
+        "talk_track": [
+          "Fundability is about credibility and consistency.",
+          "No single tactic guarantees funding — it’s the stack that matters."
+        ],
+        "do_not_do": [
+          "Do not claim vendor approval is automatic.",
+          "Do not encourage manipulation of reporting timelines.",
+          "Do not advise choosing entity types solely to unlock funding."
+        ],
+        "decision_rules": [
+          {
+            "id": "DR-1001",
+            "if": "client_profile.has_business == false",
+            "then": "assign_tasks",
+            "args": {
+              "module_ids": [
+                "NX-010"
+              ]
+            }
+          },
+          {
+            "id": "DR-1002",
+            "if": "client_profile.has_business == true && client_profile.business.time_in_business_months < 6",
+            "then": "assign_tasks",
+            "args": {
+              "module_ids": [
+                "NX-010"
+              ]
+            }
+          }
+        ],
+        "agent_mapping_hint": "Nexus Founder"
+      },
+      "tasks": [
+        {
+          "task_id": "NX-010-T1",
+          "task_name": "Select Legal Entity & Confirm Registration",
+          "assigned_to": "Client",
+          "priority": "High",
+          "estimated_time_minutes": 30,
+          "triggers": [
+            "has_business_false"
+          ],
+          "steps": [
+            "Choose between LLC, C-Corp, or S-Corp tax designation (educational guidance only).",
+            "Register with your Secretary of State.",
+            "Confirm business name uniqueness and consistency.",
+            "Consider CPA or attorney review before final selection."
+          ],
+          "success_metrics": [
+            "Entity registered",
+            "Formation documents stored"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User requests definitive tax strategy advice"
+            ],
+            "orange": [
+              "User asks to structure ownership to conceal identity"
+            ]
+          },
+          "compliance_flags": [
+            "Educational only",
+            "Professional review recommended"
+          ],
+          "default_assignee_agent": "Nexus Founder"
+        },
+        {
+          "task_id": "NX-010-T2",
+          "task_name": "EIN + Business Banking Setup",
+          "assigned_to": "Client",
+          "priority": "High",
+          "estimated_time_minutes": 20,
+          "triggers": [
+            "entity_registered"
+          ],
+          "steps": [
+            "Obtain EIN from IRS.gov (free).",
+            "Open a dedicated business checking account.",
+            "Avoid mixing personal and business funds.",
+            "Enable online banking and transaction history tracking."
+          ],
+          "success_metrics": [
+            "EIN obtained",
+            "Business bank account active"
+          ],
+          "escalation_conditions": {
+            "orange": [
+              "User requests to use personal account for funding applications"
+            ]
+          },
+          "compliance_flags": [
+            "No commingling"
+          ],
+          "default_assignee_agent": "Nexus Founder"
+        },
+        {
+          "task_id": "NX-010-T3",
+          "task_name": "Professional Fundability Markers Checklist",
+          "assigned_to": "Client",
+          "priority": "High",
+          "estimated_time_minutes": 25,
+          "triggers": [
+            "bank_account_active"
+          ],
+          "steps": [
+            "Secure a commercial address or reputable virtual office.",
+            "Obtain dedicated business phone listed in directories.",
+            "Register domain and create professional email.",
+            "Verify NAICS code matches actual business activity."
+          ],
+          "success_metrics": [
+            "Address confirmed",
+            "Phone listed",
+            "NAICS documented"
+          ],
+          "escalation_conditions": {
+            "orange": [
+              "User asks which NAICS code gets approvals"
+            ],
+            "red": [
+              "User asks to select false industry classification"
+            ]
+          },
+          "compliance_flags": [
+            "No misrepresentation"
+          ],
+          "default_assignee_agent": "Nexus Founder"
+        },
+        {
+          "task_id": "NX-010-T4",
+          "task_name": "D-U-N-S + Business Credit File Activation",
+          "assigned_to": "Client",
+          "priority": "Medium",
+          "estimated_time_minutes": 15,
+          "triggers": [
+            "fundability_markers_complete"
+          ],
+          "steps": [
+            "Register for D-U-N-S number via Dun & Bradstreet.",
+            "Confirm business name matches exactly across filings.",
+            "Verify file visibility with Experian Business and Equifax Business."
+          ],
+          "success_metrics": [
+            "D-U-N-S active",
+            "File visible at at least one bureau"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "File not found at bureau"
+            ],
+            "orange": [
+              "User attempts to create duplicate file"
+            ]
+          },
+          "compliance_flags": [
+            "Consistency required"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        },
+        {
+          "task_id": "NX-010-T5",
+          "task_name": "Tier 1 Vendor Trade Line Activation (Net-30 Strategy)",
+          "assigned_to": "Client",
+          "priority": "Medium",
+          "estimated_time_minutes": 40,
+          "triggers": [
+            "duns_active"
+          ],
+          "steps": [
+            "Open 2–3 starter vendor accounts (e.g., office or supply vendors).",
+            "Place small legitimate orders.",
+            "Select Net-30 or invoice terms if offered.",
+            "Pay 10–15 days before due date.",
+            "Track reporting timeline (30–45 days typical)."
+          ],
+          "success_metrics": [
+            "At least 2 active trade lines",
+            "Early payment documented"
+          ],
+          "escalation_conditions": {
+            "orange": [
+              "User attempts to cycle funds to fake activity"
+            ],
+            "red": [
+              "User asks to fabricate trade history"
+            ]
+          },
+          "compliance_flags": [
+            "No manipulation",
+            "No guarantees"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        },
+        {
+          "task_id": "NX-010-T6",
+          "task_name": "Monitor & Verify Reporting",
+          "assigned_to": "Client",
+          "priority": "Medium",
+          "estimated_time_minutes": 20,
+          "triggers": [
+            "trade_lines_active"
+          ],
+          "steps": [
+            "Check D&B PAYDEX generation (requires 3–5 reporting lines).",
+            "Check Experian Business file visibility.",
+            "Verify Equifax Business activity if available.",
+            "If not reporting after 60 days, verify vendor info accuracy."
+          ],
+          "success_metrics": [
+            "At least one bureau shows trade activity"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "Reporting delay"
+            ],
+            "orange": [
+              "Incorrect file match or floating data"
+            ]
+          },
+          "compliance_flags": [
+            "Monitoring discipline"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        },
+        {
+          "task_id": "NX-010-T7",
+          "task_name": "Funding Readiness Documentation Stack",
+          "assigned_to": "Client",
+          "priority": "Medium",
+          "estimated_time_minutes": 35,
+          "triggers": [
+            "reporting_verified"
+          ],
+          "steps": [
+            "Prepare P&L and Balance Sheet (quarterly minimum).",
+            "Create debt schedule.",
+            "Outline capital ask (amount + use of funds).",
+            "Prepare tax returns if pursuing SBA.",
+            "Create pitch deck if pursuing equity."
+          ],
+          "success_metrics": [
+            "Documentation folder complete"
+          ],
+          "escalation_conditions": {
+            "yellow": [
+              "User lacks bookkeeping system"
+            ],
+            "orange": [
+              "User attempts to inflate projections"
+            ]
+          },
+          "compliance_flags": [
+            "No inflated projections",
+            "Professional review recommended"
+          ],
+          "default_assignee_agent": "Nexus Analyst"
+        }
+      ],
+      "decision_rules": []
+    }
+  ],
+  "agent_assignment_rules": {
+    "mapping_rules": [
+      {
+        "match": {
+          "category_contains_any": [
+            "Infrastructure",
+            "Banking Stability"
+          ]
+        },
+        "assignee": "Nexus Founder",
+        "override_if": {
+          "risk_tier_in": [
+            "High",
+            "Very High"
+          ]
+        },
+        "override_assignee": "Forensic Bot"
+      },
+      {
+        "match": {
+          "category_contains_any": [
+            "Dispute",
+            "Metro2",
+            "FCRA",
+            "FDCPA",
+            "Collections",
+            "Credit/Dispute Education"
+          ]
+        },
+        "assignee": "Lex Ledger",
+        "also_notify": [
+          "Forensic Bot"
+        ]
+      },
+      {
+        "match": {
+          "category_contains_any": [
+            "Grants"
+          ]
+        },
+        "assignee": "Nova Grant"
+      },
+      {
+        "match": {
+          "category_contains_any": [
+            "Lead",
+            "Outreach",
+            "Geo-Intent"
+          ]
+        },
+        "assignee": "Sentinel Scout",
+        "alt_assignee": "Ghost Hunter"
+      },
+      {
+        "match": {
+          "category_contains_any": [
+            "Governance",
+            "Scoring",
+            "Opportunity",
+            "Sequencing"
+          ]
+        },
+        "assignee": "Nexus Analyst"
+      }
+    ],
+    "risk_enforcement": {
+      "if_risk_tier_in": [
+        "High",
+        "Very High"
+      ],
+      "must_include_context_agents": [
+        "Forensic Bot"
+      ],
+      "approval_mode_enforced": true
+    }
+  },
+  "client_visible_end_to_end_process": {
+    "enabled": true,
+    "steps": [
+      "Register",
+      "Complete intake questionnaire",
+      "Create tasks",
+      "Upload credit report (AnnualCreditReport.com)",
+      "Analyze",
+      "Receive plan and task board",
+      "Complete tasks with evidence gates where required",
+      "Human Review for high-risk/legal-sensitive steps",
+      "Ongoing monitoring and updates"
+    ],
+    "notes": [
+      "Client can view task status (red/yellow/green) and which safeguards are blocking completion.",
+      "No step implies guaranteed outcomes."
+    ]
+  }
+}
