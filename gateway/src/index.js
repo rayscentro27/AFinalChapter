@@ -7,6 +7,7 @@ import multipart from '@fastify/multipart';
 
 import { ENV } from './env.js';
 import { isOriginAllowed } from './config/aiGatewayConfig.js';
+import { validateGatewayEnv } from './config/envValidation.js';
 import { healthRoutes } from './routes/health.js';
 import { aiGatewayRoutes } from './routes/ai_gateway.js';
 import { twilioRoutes } from './routes/twilio.js';
@@ -26,6 +27,7 @@ import { aiWorkflowRoutes } from './routes/ai_workflow.js';
 import { platformMaturityRoutes } from './routes/platform_maturity.js';
 import { adminSreRoutes } from './routes/admin_sre.js';
 import { enterpriseRoutes } from './routes/enterprise.js';
+import { systemHealthRoutes } from './routes/system_health.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -78,6 +80,16 @@ const fastify = Fastify({
   trustProxy: ENV.TRUST_PROXY,
   bodyLimit: 2 * 1024 * 1024,
 });
+
+const envValidation = validateGatewayEnv({
+  env: process.env,
+  strict: ENV.ENV_VALIDATE_STRICT,
+  logger: fastify.log,
+});
+
+if (!envValidation.ok) {
+  fastify.log.warn({ env_validation: envValidation }, 'gateway_env_validation_incomplete');
+}
 
 // Capture raw JSON body for signature hashing while preserving parsed JSON body.
 fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
@@ -132,6 +144,7 @@ await fastify.register(multipart, {
 });
 
 await fastify.register(healthRoutes);
+await fastify.register(systemHealthRoutes);
 await fastify.register(aiGatewayRoutes);
 await fastify.register(twilioRoutes);
 await fastify.register(metaRoutes);

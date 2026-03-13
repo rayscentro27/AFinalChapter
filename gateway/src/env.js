@@ -57,4 +57,16 @@ export const ENV = {
   AI_API_KEY: process.env.AI_API_KEY || '',
   AI_MASK_PII: String(process.env.AI_MASK_PII || 'true').toLowerCase() !== 'false',
   SAFE_MODE: String(process.env.SAFE_MODE || 'false').toLowerCase() === 'true',
+
+  SYSTEM_MODE: process.env.SYSTEM_MODE || 'development',
+  QUEUE_ENABLED: String(process.env.QUEUE_ENABLED || 'false').toLowerCase() === 'true',
+  AI_JOBS_ENABLED: String(process.env.AI_JOBS_ENABLED || 'true').toLowerCase() !== 'false',
+  RESEARCH_JOBS_ENABLED: String(process.env.RESEARCH_JOBS_ENABLED || 'true').toLowerCase() !== 'false',
+  NOTIFICATIONS_ENABLED: String(process.env.NOTIFICATIONS_ENABLED || 'true').toLowerCase() !== 'false',
+  JOB_MAX_RUNTIME_SECONDS: Number(process.env.JOB_MAX_RUNTIME_SECONDS || 300),
+  WORKER_MAX_CONCURRENCY: Number(process.env.WORKER_MAX_CONCURRENCY || 4),
+  TENANT_JOB_LIMIT_ACTIVE: Number(process.env.TENANT_JOB_LIMIT_ACTIVE || 20),
+  WORKER_HEARTBEAT_SECONDS: Number(process.env.WORKER_HEARTBEAT_SECONDS || 60),
+
+  ENV_VALIDATE_STRICT: String(process.env.ENV_VALIDATE_STRICT || 'false').toLowerCase() === 'true',
 };
