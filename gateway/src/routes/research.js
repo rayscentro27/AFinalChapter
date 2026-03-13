@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../supabase.js';
+import { ENV } from '../env.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -28,6 +29,23 @@ function normalizeLimit(value, fallback = 20, max = 200) {
 function normalizeTenantId(req) {
   return asText(req.query?.tenant_id || req.params?.tenant_id || '');
 }
+
+function requireTenantScopeForInternalKey(req, reply) {
+  const internalApiKey = asText(req.headers?.['x-api-key']);
+  if (!internalApiKey) return undefined;
+
+  if (internalApiKey !== ENV.INTERNAL_API_KEY) {
+    return reply.code(401).send({ ok: false, error: 'unauthorized' });
+  }
+
+  const tenantId = normalizeTenantId(req);
+  if (!tenantId) {
+    return reply.code(400).send({ ok: false, error: 'missing_tenant_id' });
+  }
+
+  return undefined;
+}
+
 
 function applyTenantFilter(query, tenantId) {
   if (!tenantId) return query;
@@ -171,7 +189,7 @@ function buildReplayPerformance(rows) {
 }
 
 export async function researchRoutes(fastify) {
-  fastify.get('/api/research/strategy-rankings', async (req, reply) => {
+  fastify.get('/api/research/strategy-rankings', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
     const limit = normalizeLimit(req.query?.limit, 20);
     const status = asText(req.query?.status);
@@ -195,7 +213,7 @@ export async function researchRoutes(fastify) {
     return reply.send({ ok: true, count: (data || []).length, items: data || [] });
   });
 
-  fastify.get('/api/research/options-rankings', async (req, reply) => {
+  fastify.get('/api/research/options-rankings', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
     const limit = normalizeLimit(req.query?.limit, 20);
     const status = asText(req.query?.status);
@@ -219,7 +237,7 @@ export async function researchRoutes(fastify) {
     return reply.send({ ok: true, count: (data || []).length, items: data || [] });
   });
 
-  fastify.get('/api/research/agent-scorecards', async (req, reply) => {
+  fastify.get('/api/research/agent-scorecards', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
     const limit = normalizeLimit(req.query?.limit, 50);
     const role = asText(req.query?.agent_role);
@@ -241,7 +259,7 @@ export async function researchRoutes(fastify) {
     return reply.send({ ok: true, count: (data || []).length, items: data || [] });
   });
 
-  fastify.get('/api/research/recent-hypotheses', async (req, reply) => {
+  fastify.get('/api/research/recent-hypotheses', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
     const limit = normalizeLimit(req.query?.limit, 25);
 
@@ -259,7 +277,7 @@ export async function researchRoutes(fastify) {
     return reply.send({ ok: true, count: (data || []).length, items: data || [] });
   });
 
-  fastify.get('/api/research/coverage-gaps', async (req, reply) => {
+  fastify.get('/api/research/coverage-gaps', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
     const limit = normalizeLimit(req.query?.limit, 25);
     const status = asText(req.query?.status);
@@ -281,7 +299,7 @@ export async function researchRoutes(fastify) {
     return reply.send({ ok: true, count: (data || []).length, items: data || [] });
   });
 
-  fastify.get('/api/research/recent-replay-results', async (req, reply) => {
+  fastify.get('/api/research/recent-replay-results', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
     const limit = normalizeLimit(req.query?.limit, 25);
 
@@ -347,7 +365,7 @@ export async function researchRoutes(fastify) {
     });
   });
 
-  fastify.get('/api/research/replay-performance', async (req, reply) => {
+  fastify.get('/api/research/replay-performance', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const symbol = asText(req.query?.symbol);
     const strategyId = asText(req.query?.strategy_id);
     const limit = normalizeLimit(req.query?.limit, 200, 500);
@@ -387,7 +405,7 @@ export async function researchRoutes(fastify) {
     });
   });
 
-  fastify.get('/api/research/agent-leaderboard', async (req, reply) => {
+  fastify.get('/api/research/agent-leaderboard', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const limit = normalizeLimit(req.query?.limit, 20, 100);
 
     let { data, error } = await supabaseAdmin
@@ -485,7 +503,7 @@ export async function researchRoutes(fastify) {
     });
   });
 
-  fastify.get('/api/research/summary', async (req, reply) => {
+  fastify.get('/api/research/summary', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
 
     const strategyQ = applyTenantFilter(
