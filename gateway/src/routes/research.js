@@ -30,7 +30,7 @@ function normalizeTenantId(req) {
   return asText(req.query?.tenant_id || req.params?.tenant_id || '');
 }
 
-function requireTenantScopeForInternalKey(req, reply) {
+async function requireTenantScopeForInternalKey(req, reply) {
   const internalApiKey = asText(req.headers?.['x-api-key']);
   if (!internalApiKey) return undefined;
 

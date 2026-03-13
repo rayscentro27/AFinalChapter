@@ -36,6 +36,12 @@ function isMissingSchema(error) {
   );
 }
 
+function isUniqueViolation(error) {
+  const code = asText(error?.code);
+  const msg = String(error?.message || '').toLowerCase();
+  return code === '23505' || msg.includes('duplicate key value') || msg.includes('unique constraint');
+}
+
 function hashText(value) {
   return createHash('sha256').update(asText(value)).digest('hex');
 }
@@ -205,24 +211,94 @@ export async function storeCachedResponse({
     return { ok: false, reason: 'invalid_store_input' };
   }
 
-  const { data, error } = await supabaseAdmin
+  const findActiveRow = async () => supabaseAdmin
     .from('ai_cache')
-    .upsert(row, { onConflict: 'provider,model,task_type,request_fingerprint' })
+    .select('id,cache_key,created_at,expires_at')
+    .eq('provider', row.provider)
+    .eq('model', row.model)
+    .eq('task_type', row.task_type)
+    .eq('request_fingerprint', row.request_fingerprint)
+    .is('invalidated_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const existing = await findActiveRow();
+  if (existing.error) {
+    if (isMissingSchema(existing.error)) return { ok: false, schemaMissing: true };
+    METRICS.cache_error += 1;
+    logger.warn({ event: 'ai_cache_lookup_before_write_failed', error: String(existing.error.message || existing.error) }, 'ai_cache_lookup_before_write_failed');
+    return { ok: false, error: existing.error };
+  }
+
+  if (existing.data?.id) {
+    const updatePayload = { ...row };
+    delete updatePayload.hit_count;
+
+    const { data, error } = await supabaseAdmin
+      .from('ai_cache')
+      .update(updatePayload)
+      .eq('id', existing.data.id)
+      .select('id,cache_key,created_at,expires_at')
+      .maybeSingle();
+
+    if (error) {
+      if (isMissingSchema(error)) return { ok: false, schemaMissing: true };
+      METRICS.cache_error += 1;
+      logger.warn({ event: 'ai_cache_write_failed', error: String(error.message || error) }, 'ai_cache_write_failed');
+      return { ok: false, error };
+    }
+
+    METRICS.cache_write += 1;
+    return { ok: true, row: data || null };
+  }
+
+  const inserted = await supabaseAdmin
+    .from('ai_cache')
+    .insert(row)
     .select('id,cache_key,created_at,expires_at')
     .maybeSingle();
 
-  if (error) {
-    if (isMissingSchema(error)) {
-      return { ok: false, schemaMissing: true };
+  if (inserted.error) {
+    if (isMissingSchema(inserted.error)) return { ok: false, schemaMissing: true };
+
+    if (isUniqueViolation(inserted.error)) {
+      const raced = await findActiveRow();
+      if (raced.error) {
+        METRICS.cache_error += 1;
+        logger.warn({ event: 'ai_cache_race_recovery_lookup_failed', error: String(raced.error.message || raced.error) }, 'ai_cache_race_recovery_lookup_failed');
+        return { ok: false, error: raced.error };
+      }
+
+      if (raced.data?.id) {
+        const updatePayload = { ...row };
+        delete updatePayload.hit_count;
+
+        const recovered = await supabaseAdmin
+          .from('ai_cache')
+          .update(updatePayload)
+          .eq('id', raced.data.id)
+          .select('id,cache_key,created_at,expires_at')
+          .maybeSingle();
+
+        if (recovered.error) {
+          METRICS.cache_error += 1;
+          logger.warn({ event: 'ai_cache_race_recovery_update_failed', error: String(recovered.error.message || recovered.error) }, 'ai_cache_race_recovery_update_failed');
+          return { ok: false, error: recovered.error };
+        }
+
+        METRICS.cache_write += 1;
+        return { ok: true, row: recovered.data || null };
+      }
     }
 
     METRICS.cache_error += 1;
-    logger.warn({ event: 'ai_cache_write_failed', error: String(error.message || error) }, 'ai_cache_write_failed');
-    return { ok: false, error };
+    logger.warn({ event: 'ai_cache_write_failed', error: String(inserted.error.message || inserted.error) }, 'ai_cache_write_failed');
+    return { ok: false, error: inserted.error };
   }
 
   METRICS.cache_write += 1;
-  return { ok: true, row: data || null };
+  return { ok: true, row: inserted.data || null };
 }
 
 export async function invalidateCache({ cacheKey, logger = console } = {}) {
