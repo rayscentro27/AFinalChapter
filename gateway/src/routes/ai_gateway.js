@@ -1,5 +1,6 @@
 import { ENV } from '../env.js';
 import { AI_GATEWAY_CONFIG } from '../config/aiGatewayConfig.js';
+import { executeAiRequest } from '../ai/router.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -22,21 +23,20 @@ export async function aiGatewayRoutes(fastify) {
 
     const body = req.body && typeof req.body === 'object' ? req.body : {};
 
-    // Do not echo secrets or full request payloads.
+    const result = await executeAiRequest({
+      traceId: req.id,
+      body,
+      logger: req.log,
+    });
+
     return reply.send({
-      ok: true,
-      status: 'stub',
-      message: 'AI gateway foundation route is live. Provider execution is not enabled in this stub.',
-      request_id: req.id,
+      ...result,
+      requested_model: asText(body.model) || null,
       providers_configured: {
         gemini: Boolean(AI_GATEWAY_CONFIG.GEMINI_API_KEY),
         openrouter: Boolean(AI_GATEWAY_CONFIG.OPENROUTER_API_KEY),
         nvidia_nim: Boolean(AI_GATEWAY_CONFIG.NVIDIA_NIM_API_KEY),
         enable_nim_dev: AI_GATEWAY_CONFIG.ENABLE_NIM_DEV,
-      },
-      input_meta: {
-        has_prompt: typeof body.prompt === 'string' && body.prompt.trim().length > 0,
-        model: asText(body.model) || null,
       },
       educational_only: true,
       no_guarantees: true,

@@ -1,5 +1,6 @@
 import { ENV } from '../env.js';
 import { supabaseAdmin } from '../supabase.js';
+import { getAiCacheMetrics } from '../ai/cache.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -110,6 +111,46 @@ function summarizeErrors(checks) {
   return out;
 }
 
+function normalizeErrorRow(row = {}) {
+  const source = asText(row.source);
+  const sourceParts = source.split(':').filter(Boolean);
+  const details = (row.details && typeof row.details === 'object') ? row.details : {};
+  const metadata = (row.metadata && typeof row.metadata === 'object') ? row.metadata : details;
+
+  const service = asText(row.service) || asText(sourceParts[0]) || 'unknown_service';
+  const component = asText(row.component) || asText(sourceParts[1]) || 'unknown_component';
+  const errorType = asText(row.error_type) || asText(row.error_code) || asText(row.severity) || 'error';
+  const errorMessage = asText(row.error_message) || asText(row.message) || 'unknown_error';
+  const errorStack = asText(row.error_stack) || asText(details.error_stack) || null;
+
+  return {
+    id: row.id || null,
+    service,
+    component,
+    error_type: errorType,
+    error_message: errorMessage,
+    error_stack: errorStack,
+    metadata,
+    created_at: row.created_at || null,
+  };
+}
+
+function groupCounts(items, keyFn) {
+  const out = {};
+  for (const item of items) {
+    const key = asText(keyFn(item)) || 'unknown';
+    out[key] = Number(out[key] || 0) + 1;
+  }
+  return out;
+}
+
+function topEntries(countMap, max = 5) {
+  return Object.entries(countMap)
+    .map(([key, count]) => ({ key, count: Number(count || 0) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, Math.max(1, max));
+}
+
 export async function systemHealthRoutes(fastify) {
   fastify.get('/api/system/health', {
     preHandler: [requireApiKey],
@@ -134,13 +175,17 @@ export async function systemHealthRoutes(fastify) {
       if (value?.missing) missing_tables.push(key);
     }
 
-    const errors = summarizeErrors(checks);
-
     return reply.send({
       ok: true,
       service: 'nexus-gateway',
       timestamp: nowIso,
+      version: process.env.npm_package_version || null,
+      uptime_seconds: Number(process.uptime().toFixed(3)),
       system_mode: ENV.SYSTEM_MODE,
+      queue_enabled: ENV.QUEUE_ENABLED,
+      ai_jobs_enabled: ENV.AI_JOBS_ENABLED,
+      research_jobs_enabled: ENV.RESEARCH_JOBS_ENABLED,
+      notifications_enabled: ENV.NOTIFICATIONS_ENABLED,
       safety_flags: {
         queue_enabled: ENV.QUEUE_ENABLED,
         ai_jobs_enabled: ENV.AI_JOBS_ENABLED,
@@ -162,12 +207,13 @@ export async function systemHealthRoutes(fastify) {
       ai: {
         cache_hit_rate_24h: checks.cacheHitRate.hit_rate,
         provider: ENV.AI_PROVIDER,
+        metrics: getAiCacheMetrics(),
       },
       errors: {
         recent_24h: checks.errors24h.count,
       },
       missing_tables,
-      warnings: errors,
+      warnings: summarizeErrors(checks),
     });
   });
 
@@ -181,7 +227,7 @@ export async function systemHealthRoutes(fastify) {
 
     let workersQuery = supabaseAdmin
       .from('worker_heartbeats')
-      .select('worker_id,worker_type,status,last_seen_at,updated_at,in_flight_jobs,max_concurrency,meta')
+      .select('worker_id,worker_type,status,system_mode,current_job_id,last_heartbeat_at,last_seen_at,updated_at,in_flight_jobs,max_concurrency,metadata,meta')
       .order('last_seen_at', { ascending: false })
       .limit(limit);
 
@@ -205,6 +251,9 @@ export async function systemHealthRoutes(fastify) {
       if (value?.missing) missing_tables.push(key);
     }
 
+    const freshness = freshCount.count + staleCount.count;
+    const freshnessRatio = freshness > 0 ? Number((freshCount.count / freshness).toFixed(4)) : 0;
+
     return reply.send({
       ok: true,
       timestamp: new Date().toISOString(),
@@ -216,6 +265,7 @@ export async function systemHealthRoutes(fastify) {
       summary: {
         fresh_count: freshCount.count,
         stale_count: staleCount.count,
+        freshness_ratio: freshnessRatio,
         total_returned: workers.rows.length,
       },
       stale_cutoff: staleCutoff,
@@ -272,6 +322,8 @@ export async function systemHealthRoutes(fastify) {
       if (value?.missing) missing_tables.push(key);
     }
 
+    const queueDepthTotal = statuses.reduce((acc, key) => acc + Number(status_counts[key] || 0), 0);
+
     return reply.send({
       ok: true,
       timestamp: new Date().toISOString(),
@@ -283,7 +335,12 @@ export async function systemHealthRoutes(fastify) {
       },
       summary: {
         total_returned: jobs.rows.length,
+        queue_depth_total: queueDepthTotal,
+        pending_count: Number(status_counts.pending || 0),
+        running_count: Number(status_counts.running || 0) + Number(status_counts.leased || 0),
+        dead_letter_count: Number(status_counts.dead_letter || 0),
         status_counts,
+        oldest_pending_timestamp: oldestPending.row?.created_at || null,
         oldest_pending_job: oldestPending.row,
       },
       jobs: jobs.rows,
@@ -296,42 +353,42 @@ export async function systemHealthRoutes(fastify) {
     preHandler: [requireApiKey],
   }, async (req, reply) => {
     const limit = clampInt(req?.query?.limit, 50, 200);
+    const analysisLimit = clampInt(req?.query?.analysis_limit, Math.max(limit, 100), 500);
     const hours = clampInt(req?.query?.hours, 24, 720);
-    const severity = asText(req?.query?.severity);
-    const source = asText(req?.query?.source);
-    const tenantId = asText(req?.query?.tenant_id);
+    const serviceFilter = asText(req?.query?.service).toLowerCase();
+    const componentFilter = asText(req?.query?.component).toLowerCase();
+    const errorTypeFilter = asText(req?.query?.error_type).toLowerCase();
     const sinceIso = new Date(Date.now() - (hours * 60 * 60 * 1000)).toISOString();
 
-    const applyFilters = (query) => {
-      let out = query.gte('created_at', sinceIso);
-      if (severity) out = out.eq('severity', severity);
-      if (source) out = out.eq('source', source);
-      if (tenantId) out = out.eq('tenant_id', tenantId);
-      return out;
-    };
-
-    const errorsRows = await safeRows(
-      applyFilters(
-        supabaseAdmin
-          .from('system_errors')
-          .select('id,source,worker_id,tenant_id,severity,error_code,message,created_at')
-          .order('created_at', { ascending: false })
-          .limit(limit),
-      ),
+    const rawRows = await safeRows(
+      supabaseAdmin
+        .from('system_errors')
+        .select('*')
+        .gte('created_at', sinceIso)
+        .order('created_at', { ascending: false })
+        .limit(analysisLimit),
     );
 
-    const totalCount = await safeCount('system_errors', applyFilters);
-    const warnCount = await safeCount('system_errors', (q) => applyFilters(q).eq('severity', 'warn'));
-    const errorCount = await safeCount('system_errors', (q) => applyFilters(q).eq('severity', 'error'));
-    const criticalCount = await safeCount('system_errors', (q) => applyFilters(q).eq('severity', 'critical'));
+    const normalized = rawRows.rows.map(normalizeErrorRow);
+    const filtered = normalized.filter((row) => {
+      if (serviceFilter && asText(row.service).toLowerCase() !== serviceFilter) return false;
+      if (componentFilter && asText(row.component).toLowerCase() !== componentFilter) return false;
+      if (errorTypeFilter && asText(row.error_type).toLowerCase() !== errorTypeFilter) return false;
+      return true;
+    });
 
-    const checks = {
-      errorsRows,
-      totalCount,
-      warnCount,
-      errorCount,
-      criticalCount,
-    };
+    const errorTypeCounts = groupCounts(filtered, (row) => row.error_type);
+    const jobTypeCounts = groupCounts(
+      filtered.filter((row) => asText(row?.metadata?.job_type || row?.metadata?.jobType)),
+      (row) => row?.metadata?.job_type || row?.metadata?.jobType,
+    );
+
+    const recentTimestamps = filtered
+      .map((row) => row.created_at)
+      .filter(Boolean)
+      .slice(0, 10);
+
+    const checks = { rawRows };
     const missing_tables = [];
     for (const [key, value] of Object.entries(checks)) {
       if (value?.missing) missing_tables.push(key);
@@ -342,21 +399,19 @@ export async function systemHealthRoutes(fastify) {
       timestamp: new Date().toISOString(),
       filters: {
         hours,
-        severity: severity || null,
-        source: source || null,
-        tenant_id: tenantId || null,
+        service: serviceFilter || null,
+        component: componentFilter || null,
+        error_type: errorTypeFilter || null,
         limit,
       },
       summary: {
-        total_count: totalCount.count,
-        severity_counts: {
-          warn: warnCount.count,
-          error: errorCount.count,
-          critical: criticalCount.count,
-        },
-        total_returned: errorsRows.rows.length,
+        total_errors: filtered.length,
+        returned_errors: Math.min(filtered.length, limit),
+        error_counts: errorTypeCounts,
+        top_failing_job_types: topEntries(jobTypeCounts, 5).map((row) => ({ job_type: row.key, count: row.count })),
+        recent_timestamps: recentTimestamps,
       },
-      errors: errorsRows.rows,
+      errors: filtered.slice(0, limit),
       missing_tables,
       warnings: summarizeErrors(checks),
     });

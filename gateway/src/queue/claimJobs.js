@@ -5,6 +5,12 @@ function asText(value) {
   return String(value || '').trim();
 }
 
+function asInt(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.trunc(n);
+}
+
 function isMissingSchema(error) {
   const msg = String(error?.message || '').toLowerCase();
   return (
@@ -14,27 +20,57 @@ function isMissingSchema(error) {
   );
 }
 
+async function leaseSingleJob({ row, workerId, nowIso, leaseExpiresAt }) {
+  const { data, error } = await supabaseAdmin
+    .from('job_queue')
+    .update({
+      status: 'leased',
+      leased_at: nowIso,
+      lease_expires_at: leaseExpiresAt,
+      worker_id: workerId,
+      updated_at: nowIso,
+    })
+    .eq('id', row.id)
+    .in('status', ['pending', 'retry_wait'])
+    .select('id,job_type,tenant_id,payload,status,priority,available_at,attempt_count,max_attempts,dedupe_key,created_at,worker_id,leased_at,lease_expires_at')
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingSchema(error)) return { row: null, schemaMissing: true };
+    throw new Error(`job_queue lease update failed: ${error.message}`);
+  }
+
+  if (!data) return { row: null, schemaMissing: false };
+  return { row: data, schemaMissing: false };
+}
+
 export async function claimAvailableJobs({
   workerId,
   jobTypes = [],
   leaseSeconds = 90,
   maxJobs = 5,
+  logger = console,
 } = {}) {
   const wid = asText(workerId);
   if (!wid) throw new Error('missing_worker_id');
+
+  const normalizedTypes = Array.isArray(jobTypes)
+    ? jobTypes.map((v) => asText(v)).filter(Boolean)
+    : [];
+
+  if (!normalizedTypes.length) {
+    return { jobs: [], schemaMissing: false };
+  }
 
   let query = supabaseAdmin
     .from('job_queue')
     .select('id,job_type,tenant_id,payload,status,priority,available_at,attempt_count,max_attempts,dedupe_key,created_at')
     .in('status', ['pending', 'retry_wait'])
     .lte('available_at', new Date().toISOString())
+    .in('job_type', normalizedTypes)
     .order('priority', { ascending: false })
     .order('created_at', { ascending: true })
-    .limit(Math.max(1, Math.min(20, Number(maxJobs || 5))));
-
-  if (Array.isArray(jobTypes) && jobTypes.length > 0) {
-    query = query.in('job_type', jobTypes.map((v) => asText(v)).filter(Boolean));
-  }
+    .limit(Math.max(1, Math.min(20, asInt(maxJobs, 5))));
 
   const { data, error } = await query;
   if (error) {
@@ -46,27 +82,35 @@ export async function claimAvailableJobs({
   if (!jobs.length) return { jobs: [], schemaMissing: false };
 
   const nowIso = new Date().toISOString();
-  const leaseExpiresAt = new Date(Date.now() + (Math.max(15, Number(leaseSeconds || 90)) * 1000)).toISOString();
+  const leaseExpiresAt = new Date(Date.now() + (Math.max(15, asInt(leaseSeconds, 90)) * 1000)).toISOString();
 
-  const ids = jobs.map((row) => row.id);
-  const { error: leaseError } = await supabaseAdmin
-    .from('job_queue')
-    .update({
-      status: 'leased',
-      leased_at: nowIso,
-      lease_expires_at: leaseExpiresAt,
-      worker_id: wid,
-      updated_at: nowIso,
-    })
-    .in('id', ids)
-    .in('status', ['pending', 'retry_wait']);
+  const claimed = [];
+  for (const row of jobs) {
+    const leased = await leaseSingleJob({
+      row,
+      workerId: wid,
+      nowIso,
+      leaseExpiresAt,
+    });
 
-  if (leaseError && !isMissingSchema(leaseError)) {
-    throw new Error(`job_queue lease update failed: ${leaseError.message}`);
+    if (leased.schemaMissing) {
+      return { jobs: [], schemaMissing: true };
+    }
+
+    if (leased.row) {
+      claimed.push(leased.row);
+      logger.info({
+        event: 'job_claimed',
+        job_id: leased.row.id,
+        job_type: leased.row.job_type,
+        worker_id: wid,
+        lease_expires_at: leased.row.lease_expires_at,
+      }, 'job_claimed');
+    }
   }
 
   return {
-    jobs: jobs.map((row) => ({ ...row, status: 'leased', worker_id: wid, leased_at: nowIso, lease_expires_at: leaseExpiresAt })),
+    jobs: claimed,
     schemaMissing: false,
   };
 }

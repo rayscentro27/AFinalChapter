@@ -12,7 +12,8 @@
     "test": "node --test ./test",
     "tradingview:enrich": "node src/workers/tradingview_enricher.js",
     "data:validate": "node scripts/validate_nexus_tables.js",
-    "data:integrity": "node scripts/data_integrity_check.js"
+    "data:integrity": "node scripts/data_integrity_check.js",
+    "queue:worker": "node src/workers/queue_worker.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
