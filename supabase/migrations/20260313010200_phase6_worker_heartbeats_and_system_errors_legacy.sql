@@ -1,5 +1,4 @@
--- PHASE 1 DRAFT ONLY (do not apply without explicit approval)
--- Purpose: worker liveness tracking + lightweight system error stream.
+-- Phase 6: worker heartbeats + legacy-compatible system errors
 
 begin;
 
