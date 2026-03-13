@@ -1,0 +1,25 @@
+{
+  "version": "1",
+  "prompts": {
+    "ops.system.v1": {
+      "path": "system/ops.system.v1.md",
+      "task_type": "operations",
+      "risk_class": "low"
+    },
+    "compliance.copy.v1": {
+      "path": "system/compliance.copy.v1.md",
+      "task_type": "compliance",
+      "risk_class": "high"
+    },
+    "research.summary.v1": {
+      "path": "system/research.summary.v1.md",
+      "task_type": "research",
+      "risk_class": "medium"
+    },
+    "customer.reply.v1": {
+      "path": "system/customer.reply.v1.md",
+      "task_type": "support",
+      "risk_class": "medium"
+    }
+  }
+}

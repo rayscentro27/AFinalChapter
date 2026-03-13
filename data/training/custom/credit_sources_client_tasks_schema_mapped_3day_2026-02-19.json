@@ -1,0 +1,304 @@
+{
+  "title": "Credit Sources CRM + Training Task Pack (3-Day, Schema Mapped)",
+  "version": "2026-02-19-3day",
+  "target_table": "public.client_tasks",
+  "notes": [
+    "3-day compressed execution variant. Replace <TENANT_UUID> and <YYYY-MM-DD> before import.",
+    "task_id uses crsrc3d:* to keep this set separate from the standard pack.",
+    "meta.required_attachments is used by UI as requiredAttachments."
+  ],
+  "tasks": [
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:intake-source-packet",
+      "title": "Complete Multi-Source Intake Packet",
+      "description": "Capture all provided source notes, links, and duplicates into one normalized packet for analysis.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "review",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 0,
+        "required_attachments": [
+          "Source packet",
+          "Duplicate-source map",
+          "Intake summary"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:source1-tradeline-verification",
+      "title": "Validate Source 1 Tradeline Claims",
+      "description": "Convert Source 1 into taskable steps while marking backdating and score-impact claims as unverified until documented.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "education",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 1,
+        "required_attachments": [
+          "Source 1 claim table",
+          "Verification plan"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:source2-3-funding-prescreen",
+      "title": "Run Source 2/3 Funding Pre-Screen Workflow",
+      "description": "Map low-credit funding options using revenue/time-in-business checks and compliant no-guarantee messaging.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "review",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 1,
+        "required_attachments": [
+          "Eligibility checklist",
+          "Lender matching notes",
+          "Risk disclosure draft"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:source4-tools-claim-qa",
+      "title": "QA Source 4 App and Score-Boost Claims",
+      "description": "Review rent/tool/dispute app claims and remove deterministic score promises from all client-facing content.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "education",
+      "signal": "red",
+      "assigned_employee": "Forensic Bot",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 1,
+        "required_attachments": [
+          "Claim risk annotations",
+          "Compliant replacement copy"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:source5-chex-evidence-intake",
+      "title": "Source 5 ChexSystems/EWS Evidence Intake",
+      "description": "Collect dispute-support evidence package and ensure no guaranteed-removal language appears in workflow docs.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "legal",
+      "signal": "red",
+      "assigned_employee": "Lex Ledger",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 1,
+        "required_attachments": [
+          "ID and address proofs",
+          "Account records",
+          "Dispute evidence index"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:source6-fdcpa-violation-log",
+      "title": "Source 6 FDCPA Violation Logging",
+      "description": "Build a fact-based collector-contact timeline and draft non-deterministic escalation notes for compliance/legal review.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "legal",
+      "signal": "red",
+      "assigned_employee": "Lex Ledger",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 2,
+        "required_attachments": [
+          "Violation timeline",
+          "Call/email evidence",
+          "Escalation recommendation"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:source7-8-credit-structure-baseline",
+      "title": "Source 7/8 Credit Structure Baseline",
+      "description": "Calculate account count, average age, utilization context, and inquiry-aging profile before sequencing actions.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "review",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 2,
+        "required_attachments": [
+          "Baseline scorecard",
+          "Action sequencing draft"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:source9-bankruptcy-legal-escalation",
+      "title": "Source 9 Bankruptcy Workflow Legal Escalation",
+      "description": "Route bankruptcy-removal workflows to legal/compliance review and restrict coercive legal language.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "legal",
+      "signal": "red",
+      "assigned_employee": "Lex Ledger",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 2,
+        "required_attachments": [
+          "Court document checklist",
+          "Legal review handoff note"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:global-compliance-gate",
+      "title": "Run Global Compliance Gate",
+      "description": "Check all tasks and outputs for no-guarantee language, no illegal instructions, and escalation tags where required.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "review",
+      "signal": "red",
+      "assigned_employee": "Forensic Bot",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 2,
+        "required_attachments": [
+          "Compliance checklist",
+          "Risk-tag report"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:publish-source-summaries",
+      "title": "Publish Per-Source Bullet Summaries",
+      "description": "Release one bullet summary per source with confidence and risk tags for internal training visibility.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "action",
+      "signal": "green",
+      "assigned_employee": "Nexus Founder",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 3,
+        "required_attachments": [
+          "Source summaries",
+          "Confidence/risk tags"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:create-escalation-queue",
+      "title": "Create Legal and Compliance Escalation Queue",
+      "description": "Open escalated queue entries for all legal-sensitive source workflows and assign reviewers.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "action",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Founder",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 3,
+        "required_attachments": [
+          "Escalation roster",
+          "Reviewer assignment log"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    },
+    {
+      "tenant_id": "<TENANT_UUID>",
+      "task_id": "crsrc3d:weekly-quality-review",
+      "title": "Run Weekly Quality and Drift Review",
+      "description": "Review outcomes, drift, and compliance issues from this training pack and schedule prompt adjustments.",
+      "status": "pending",
+      "due_date": "<YYYY-MM-DD>",
+      "type": "meeting",
+      "signal": "green",
+      "assigned_employee": "Nexus Founder",
+      "group_key": "credit_sources_training_3day",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 3,
+        "required_attachments": [
+          "Weekly KPI snapshot",
+          "Prompt adjustment queue"
+        ],
+        "source": "credit_sources_task_pack_3day_v1"
+      }
+    }
+  ]
+}

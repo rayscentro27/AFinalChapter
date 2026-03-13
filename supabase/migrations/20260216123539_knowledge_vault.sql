@@ -2,7 +2,6 @@
 -- Safe to re-run (uses IF NOT EXISTS + ADD COLUMN IF NOT EXISTS).
 
 create extension if not exists pgcrypto;
-
 -- ------------------------
 -- knowledge_docs
 -- ------------------------
@@ -15,16 +14,13 @@ create table if not exists public.knowledge_docs (
   tags text[] not null default '{}'::text[],
   created_at timestamptz not null default now()
 );
-
 -- Social media support (also used for private video uploads)
 alter table public.knowledge_docs
   add column if not exists source_platform text not null default 'youtube',
   add column if not exists media_path text null,
   add column if not exists media_mime text null;
-
 create index if not exists knowledge_docs_created_at_idx
 on public.knowledge_docs (created_at desc);
-
 -- ------------------------
 -- playbooks
 -- ------------------------
@@ -38,10 +34,8 @@ create table if not exists public.playbooks (
   templates jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists playbooks_doc_id_idx
 on public.playbooks (doc_id);
-
 -- ------------------------
 -- prompt_patches
 -- ------------------------
@@ -53,13 +47,10 @@ create table if not exists public.prompt_patches (
   patch_text text not null,
   created_at timestamptz not null default now()
 );
-
 create index if not exists prompt_patches_agent_name_idx
 on public.prompt_patches (agent_name);
-
 create index if not exists prompt_patches_doc_id_idx
 on public.prompt_patches (doc_id);
-
 -- ------------------------
 -- scenario_packs
 -- ------------------------
@@ -70,10 +61,8 @@ create table if not exists public.scenario_packs (
   scenarios jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists scenario_packs_doc_id_idx
 on public.scenario_packs (doc_id);
-
 -- ------------------------
 -- RLS (enabled; no policies by default)
 -- Server-side access is via service role key.

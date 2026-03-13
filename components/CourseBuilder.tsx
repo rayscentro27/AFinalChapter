@@ -111,7 +111,7 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ courses, onUpdateCourses 
                 </div>
 
                 <div className="space-y-6">
-                    {activeCourse.modules.map((mod, mIdx) => (
+                    {activeCourse.modules.map((mod: any, mIdx: number) => (
                         <div key={mod.id} className="border border-slate-200 rounded-xl overflow-hidden">
                             <div className="bg-slate-50 p-4 border-b border-slate-100 flex gap-4 items-center">
                                 <span className="bg-slate-200 text-slate-600 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">{mIdx + 1}</span>
@@ -126,7 +126,7 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ courses, onUpdateCourses 
                                 />
                                 <button 
                                     onClick={() => {
-                                        const newMods = activeCourse.modules.filter((_, i) => i !== mIdx);
+                                        const newMods = activeCourse.modules.filter((_: any, i: number) => i !== mIdx);
                                         setActiveCourse({ ...activeCourse, modules: newMods });
                                     }}
                                     className="text-slate-400 hover:text-red-500"
@@ -135,7 +135,7 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ courses, onUpdateCourses 
                                 </button>
                             </div>
                             <div className="p-4 space-y-3">
-                                {mod.lessons.map((les, lIdx) => (
+                                {mod.lessons.map((les: any, lIdx: number) => (
                                     <div key={les.id} className="flex gap-4 items-center p-3 bg-white border border-slate-100 rounded-lg group">
                                         <PlayCircle size={18} className="text-slate-400" />
                                         <div className="flex-1">
@@ -173,7 +173,7 @@ const CourseBuilder: React.FC<CourseBuilderProps> = ({ courses, onUpdateCourses 
                                             <button 
                                                 onClick={() => {
                                                     const newMods = [...activeCourse.modules];
-                                                    newMods[mIdx].lessons = newMods[mIdx].lessons.filter((_, i) => i !== lIdx);
+                                                    newMods[mIdx].lessons = newMods[mIdx].lessons.filter((_: any, i: number) => i !== lIdx);
                                                     setActiveCourse({ ...activeCourse, modules: newMods });
                                                 }}
                                                 className="text-red-400 hover:bg-red-50 p-1 rounded"

@@ -1,6 +1,7 @@
 import type { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { requireStaffUser } from './_shared/staff_auth';
 import crypto from "crypto";
 
 const ImportSchema = z.object({
@@ -57,6 +58,8 @@ type PatchIn = {
 export const handler: Handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
+
+    await requireStaffUser(event);
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -134,12 +137,13 @@ export const handler: Handler = async (event) => {
       failed: applyResults.failed,
     });
   } catch (e: any) {
+    const statusCode = Number(e?.statusCode) || 400;
     const msg = typeof e?.message === "string" ? e.message : "Bad Request";
-    return json(400, { error: msg });
+    return json(statusCode, { error: msg });
   }
 };
 
-async function safeInsertImportRun(supabase: ReturnType<typeof createClient>, body: any) {
+async function safeInsertImportRun(supabase: any, body: any) {
   try {
     await supabase.from("import_runs").insert({
       doc_id: body.doc_id ?? null,
@@ -152,7 +156,7 @@ async function safeInsertImportRun(supabase: ReturnType<typeof createClient>, bo
 }
 
 
-async function ensureHistory(supabase: ReturnType<typeof createClient>, agentId: string, promptVersion: number, systemPrompt: string) {
+async function ensureHistory(supabase: any, agentId: string, promptVersion: number, systemPrompt: string) {
   try {
     await supabase.from('agent_prompt_history').insert({
       agent_id: agentId,
@@ -164,7 +168,7 @@ async function ensureHistory(supabase: ReturnType<typeof createClient>, agentId:
   }
 }
 
-async function applyPatchesToAgents(supabase: ReturnType<typeof createClient>, patches: PatchIn[]) {
+async function applyPatchesToAgents(supabase: any, patches: PatchIn[]) {
   const applied: Array<{ agent_name: string; patch_title: string; new_version: number }> = [];
   const skipped: Array<{ agent_name: string; patch_title: string; reason: string }> = [];
   const failed: Array<{ agent_name: string; patch_title: string; error: string }> = [];

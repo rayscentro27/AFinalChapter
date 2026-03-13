@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Nexus Assignment Runner every 2 minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/2:00
+AccuracySec=1s
+RandomizedDelaySec=7s
+Persistent=true
+Unit=nexus-assignment-runner.service
+
+[Install]
+WantedBy=timers.target

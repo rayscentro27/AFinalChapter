@@ -1,0 +1,232 @@
+{
+  "title": "LightStream Used Auto Loan - Client Task Pack (Schema Mapped)",
+  "version": "2026-02-18",
+  "target_table": "public.client_tasks",
+  "notes": [
+    "Replace <TENANT_UUID> and <YYYY-MM-DD> values before insert/upsert.",
+    "task_id must remain stable per tenant for idempotent upserts.",
+    "meta.required_attachments is used by UI as requiredAttachments."
+  ],
+  "tasks": [
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "ls:intake-readiness",
+      "title": "Complete LightStream Intake Readiness Review",
+      "description": "Collect current obligations, target budget, and verified borrower profile before any application action.",
+      "status": "pending",
+      "due_date": "2026-02-18",
+      "type": "review",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "auto_loan_lightstream",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 0,
+        "required_attachments": [
+          "Borrower intake form",
+          "Current debt summary",
+          "Target vehicle budget"
+        ],
+        "source": "lightstream_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "ls:verify-current-terms",
+      "title": "Verify Current Lender Terms and Product Fit",
+      "description": "Confirm current public lender terms/disclosures before advising next step. Historical thresholds are reference only.",
+      "status": "pending",
+      "due_date": "2026-02-18",
+      "type": "education",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "auto_loan_lightstream",
+      "template_key": null,
+      "link": "https://www.lightstream.com/apply?product=auto",
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 0,
+        "required_attachments": [
+          "Current lender terms snapshot",
+          "Product-fit note"
+        ],
+        "source": "lightstream_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "ls:upload-core-docs",
+      "title": "Upload Identity and Income Support Documents",
+      "description": "Collect core documents in secure storage for conditional underwriting requests.",
+      "status": "pending",
+      "due_date": "2026-02-19",
+      "type": "upload",
+      "signal": "red",
+      "assigned_employee": "Lex Ledger",
+      "group_key": "auto_loan_lightstream",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 1,
+        "required_attachments": [
+          "Government photo ID",
+          "Recent income documentation",
+          "Bank account verification"
+        ],
+        "source": "lightstream_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "ls:run-affordability-check",
+      "title": "Run Affordability and Debt-Ratio Estimate",
+      "description": "Estimate payment fit and debt ratio using verified monthly obligations and target loan scenario.",
+      "status": "pending",
+      "due_date": "2026-02-19",
+      "type": "review",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "auto_loan_lightstream",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 1,
+        "required_attachments": [
+          "Debt-ratio worksheet",
+          "Payment-fit estimate"
+        ],
+        "source": "lightstream_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "ls:resolve-blockers",
+      "title": "Resolve Pre-Submission Blockers",
+      "description": "Resolve known blockers (missing docs, data mismatches, bureau freeze issues, or unresolved liabilities) before submit.",
+      "status": "pending",
+      "due_date": "2026-02-20",
+      "type": "action",
+      "signal": "red",
+      "assigned_employee": "Lex Ledger",
+      "group_key": "auto_loan_lightstream",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 2,
+        "required_attachments": [
+          "Blocker resolution notes",
+          "Updated borrower profile"
+        ],
+        "source": "lightstream_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "ls:submit-application",
+      "title": "Submit LightStream Application",
+      "description": "Submit the online application using verified borrower information only.",
+      "status": "pending",
+      "due_date": "2026-02-20",
+      "type": "action",
+      "signal": "yellow",
+      "assigned_employee": "Nexus Founder",
+      "group_key": "auto_loan_lightstream",
+      "template_key": null,
+      "link": "https://www.lightstream.com/apply?product=auto",
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 2,
+        "required_attachments": [
+          "Submission confirmation screenshot",
+          "Application timestamp"
+        ],
+        "source": "lightstream_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "ls:underwriting-followup",
+      "title": "Handle Underwriting Follow-Up Requests",
+      "description": "If conditional review is triggered, respond with requested documents and track SLA.",
+      "status": "pending",
+      "due_date": "2026-02-21",
+      "type": "upload",
+      "signal": "yellow",
+      "assigned_employee": "Lex Ledger",
+      "group_key": "auto_loan_lightstream",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 3,
+        "required_attachments": [
+          "Requested underwriting docs",
+          "Submission receipt"
+        ],
+        "source": "lightstream_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "ls:confirm-funding",
+      "title": "Confirm Funding and Disbursement Path",
+      "description": "Verify funding status and document approved disbursement flow for vehicle purchase execution.",
+      "status": "pending",
+      "due_date": "2026-02-22",
+      "type": "review",
+      "signal": "green",
+      "assigned_employee": "Nexus Analyst",
+      "group_key": "auto_loan_lightstream",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 4,
+        "required_attachments": [
+          "Funding confirmation",
+          "Disbursement tracking note"
+        ],
+        "source": "lightstream_task_pack_v1"
+      }
+    },
+    {
+      "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+      "task_id": "ls:autopay-retention",
+      "title": "Set Autopay and Retain Final Loan Records",
+      "description": "Set repayment controls and archive borrower-facing compliance records for support continuity.",
+      "status": "pending",
+      "due_date": "2026-02-23",
+      "type": "action",
+      "signal": "green",
+      "assigned_employee": "Nexus Founder",
+      "group_key": "auto_loan_lightstream",
+      "template_key": null,
+      "link": null,
+      "meeting_time": null,
+      "linked_to_goal": true,
+      "meta": {
+        "due_offset_days": 5,
+        "required_attachments": [
+          "Autopay confirmation",
+          "Final loan record package"
+        ],
+        "source": "lightstream_task_pack_v1"
+      }
+    }
+  ],
+  "tenant_id": "ff88f4f5-1e15-4773-8093-ff0e95cfa9d6",
+  "start_date": "2026-02-18"
+}

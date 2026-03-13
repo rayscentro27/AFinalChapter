@@ -10,7 +10,7 @@ import {
   Target, Terminal
 } from 'lucide-react';
 import * as geminiService from '../services/geminiService';
-import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from '../services/clientAiBridge';
 
 // --- Audio Utils ---
 function decode(base64: string) {
@@ -119,7 +119,7 @@ const PowerDialer: React.FC<PowerDialerProps> = ({ queue, onUpdateContact, onClo
       audioContextRef.current = new AudioContextClass({ sampleRate: 24000 });
       nextStartTimeRef.current = audioContextRef.current.currentTime;
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000 } });
       streamRef.current = stream;
 

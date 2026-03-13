@@ -13,7 +13,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onBack }) => {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signInWithGoogle, signUp } = useAuth();
   const [isSystemEmpty, setIsSystemEmpty] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,17 +23,22 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
 
   useEffect(() => {
     const checkGenesis = async () => {
-      // Avoid relying on `tenants` reads before auth (RLS will block). Use a cheap RPC instead.
-      try {
-        if (isSupabaseConfigured) {
+      // Avoid relying on `tenants` reads before auth (RLS will block). Use RPC first.
+      if (isSupabaseConfigured) {
+        try {
           const { data: initialized, error } = await supabase.rpc('nexus_is_system_initialized');
           if (!error && typeof initialized === 'boolean') {
             setIsSystemEmpty(!initialized);
             return;
           }
+        } catch (e) {
+          // Continue to safe fallback below
         }
-      } catch (e) {
-        // Fall back to legacy check
+
+        // If Supabase is configured but check fails transiently, default to normal login
+        // so existing admins are not incorrectly blocked behind Genesis.
+        setIsSystemEmpty(false);
+        return;
       }
 
       const contacts = await data.getContacts();
@@ -54,6 +59,21 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
       const msg = err.message || 'Authentication failed';
       setError(msg);
       setNotify({ show: true, title: 'Auth Failed', message: msg, type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await signInWithGoogle();
+      setNotify({ show: true, title: 'Redirecting', message: 'Continue with Google in the popup/redirect flow.', type: 'info' });
+    } catch (err: any) {
+      const msg = err?.message || 'Google sign-in failed';
+      setError(msg);
+      setNotify({ show: true, title: 'Google SSO Failed', message: msg, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -142,6 +162,15 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
 
               <button type="submit" disabled={loading} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-[2rem] transition-all flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/10 disabled:opacity-70 mt-8 uppercase tracking-[0.2em] text-xs transform active:scale-95">
                 {loading ? <RefreshCw className="animate-spin" size={18}/> : <>Resume Session <ArrowRight size={18} /></>}
+              </button>
+
+              <button
+                type="button"
+                disabled={loading || !isSupabaseConfigured}
+                onClick={() => void handleGoogleSignIn()}
+                className="w-full bg-white/10 hover:bg-white/20 text-white font-black py-4 rounded-2xl transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-xs"
+              >
+                Continue with Google
               </button>
 
               <div className="mt-10 text-center flex flex-col gap-4">

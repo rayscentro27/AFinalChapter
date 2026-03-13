@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 // Fixed: Removed non-existent Type export from ../types
 import { Contact } from '../types';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from '../services/clientAiBridge';
 
 interface NeuralStrategySandboxProps {
   contacts: Contact[];
@@ -33,7 +33,7 @@ const NeuralStrategySandbox: React.FC<NeuralStrategySandboxProps> = ({ contacts 
     setSimulationResult(null);
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI();
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview',
             contents: `As the Nexus Strategic CFO, run a simulation on this pipeline: ${JSON.stringify(contacts.map(c=>({company:c.company, status:c.status, val:c.value})))}

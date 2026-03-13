@@ -13,7 +13,8 @@ export interface UserProfile {
 }
 
 export interface AuthAdapter {
-  signIn: (email: string, password?: string) => Promise<{ user: UserProfile | null, error: any }>;
+  signIn: (email: string, password?: string) => Promise<{ user: UserProfile | null, error: any }> ;
+  signInWithGoogle?: () => Promise<{ user: UserProfile | null, error: any }>;
   signUp: (data: { 
     email: string;
     name: string;

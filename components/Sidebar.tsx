@@ -6,7 +6,7 @@ import {
   Store, Shield, ShieldCheck, TrendingUp, Scale, Briefcase, 
   FileText, Fingerprint, Brain, Cpu, List, Box, ShieldAlert,
   ChevronRight, Facebook, Instagram, Linkedin, MessageCircle, 
-  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone, FlaskConical
+  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone, FlaskConical, CreditCard
 } from 'lucide-react';
 import { ViewMode, AgencyBranding, Contact } from '../types';
 
@@ -18,6 +18,7 @@ interface SidebarProps {
   branding?: AgencyBranding;
   contacts?: Contact[];
   onOpenVoiceAssistant?: () => void;
+  userRole?: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -27,7 +28,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout, 
   branding,
   contacts = [],
-  onOpenVoiceAssistant
+  onOpenVoiceAssistant,
+  userRole
 }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -115,7 +117,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.FORENSIC_HUB} label="Forensic Hub" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.WEALTH_MANAGER} label="Wealth Alpha" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.LENDER_ROOM} label="Lender Room" icon={Scale} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.SBA_PREP} label="SBA Prep" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.FUNDING_RESEARCH} label="Funding Research" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.FUNDING_OUTCOMES} label="Funding Outcomes" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.GRANTS} label="Grants Engine" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.DOC_GENERATOR} label="Doc Draftsman" icon={FileText} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.UPLOAD_CREDIT_REPORT} label="Credit Upload" icon={FileText} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.REVIEW_QUEUE} label="Review Queue" icon={Fingerprint} currentView={currentView} onViewChange={handleNav} badge={derivedPendingDocCount || undefined} badgeColor="bg-amber-600" />
           </SidebarSection>
 
@@ -124,6 +131,37 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.SCENARIO_RUNNER} label="Scenario Runner" icon={FlaskConical} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.INFRA_MONITOR} label="Engine Room" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.SITEMAP} label="Core Sitemap" icon={List} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.CHANNEL_MAPPER} label="Channel Mapper" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.CONTACT_MERGE} label="Contact Merge" icon={Users} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.MERGE_JOBS} label="Merge Jobs" icon={List} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.MERGE_QUEUE} label="Merge Queue" icon={List} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.TEAM_MEMBERS} label="Team Members" icon={Users} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.ON_CALL} label="On-Call" icon={Calendar} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.CHANNEL_POOLS} label="Channel Pools" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.DEAD_LETTERS} label="Dead Letters" icon={AlertCircle} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.ADMIN_HEALTH} label="Gateway Health" icon={Shield} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.SRE_DASHBOARD} label="SRE Dashboard" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.OUTBOX} label="Outbox" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.BILLING} label="Billing" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.BILLING_COMMISSIONS} label="Commission Billing" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
+            {userRole === 'admin' && (
+              <>
+                <SidebarItem id={ViewMode.ADMIN_SUBSCRIPTIONS} label="Subscriptions" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_CONSENTS} label="Consent Ledger" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_SMS_TEMPLATES} label="SMS Templates" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_MAILING_QUEUE} label="Mailing Queue" icon={FileText} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_MAILING_DASHBOARD} label="Mailing Dashboard" icon={FileText} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_LEGAL_DOCS} label="Legal Publisher" icon={FileText} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_EMAIL_PROVIDERS} label="Email Providers" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_EMAIL_ROUTING} label="Email Routing" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_EMAIL_LOGS} label="Email Logs" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_FUNDING_CATALOG} label="Funding Catalog" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_GRANTS_CATALOG} label="Grants Catalog" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_GRANTS_TRACKING} label="Grants Tracking" icon={FileText} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_SBA} label="SBA Prep Admin" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_COMMISSIONS} label="Commission Admin" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
+              </>
+            )}
             <SidebarItem id={ViewMode.SETTINGS} label="OS Settings" icon={Settings} currentView={currentView} onViewChange={handleNav} />
           </SidebarSection>
         </nav>

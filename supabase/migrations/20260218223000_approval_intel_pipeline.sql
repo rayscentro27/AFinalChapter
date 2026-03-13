@@ -2,7 +2,6 @@
 -- Includes: intel ingestion storage, matching engine, overdue alerts, attachment metadata support.
 
 create extension if not exists pgcrypto;
-
 -- -------------------------------------------------
 -- Role helper: staff check (admin/supervisor/sales)
 -- -------------------------------------------------
@@ -20,9 +19,7 @@ as $$
       and tm.role in ('admin', 'supervisor', 'sales', 'salesperson')
   );
 $$;
-
 grant execute on function public.nexus_is_staff() to authenticated;
-
 -- -------------------------------------------------
 -- Profile fields needed for approval-intel matching
 -- -------------------------------------------------
@@ -34,13 +31,11 @@ alter table public.tenant_profiles
   add column if not exists total_income_annual int,
   add column if not exists business_age_days int,
   add column if not exists prequal_stage text not null default 'Pre-Qual Check';
-
 -- -------------------------------------------------
 -- Task templates: required attachments metadata
 -- -------------------------------------------------
 alter table public.task_templates
   add column if not exists required_attachments jsonb not null default '[]'::jsonb;
-
 update public.task_templates
 set required_attachments = jsonb_build_array(
   'Personal 1040 tax returns (last 2 years) with schedules',
@@ -52,7 +47,6 @@ set required_attachments = jsonb_build_array(
 )
 where key = 'upload_credit_report'
   and coalesce(required_attachments, '[]'::jsonb) = '[]'::jsonb;
-
 update public.task_templates
 set required_attachments = jsonb_build_array(
   'All bureau credit report files uploaded',
@@ -60,7 +54,6 @@ set required_attachments = jsonb_build_array(
 )
 where key = 'review_credit_report'
   and coalesce(required_attachments, '[]'::jsonb) = '[]'::jsonb;
-
 update public.task_templates
 set required_attachments = jsonb_build_array(
   'Articles of incorporation/organization',
@@ -69,7 +62,6 @@ set required_attachments = jsonb_build_array(
 )
 where key = 'form_entity'
   and coalesce(required_attachments, '[]'::jsonb) = '[]'::jsonb;
-
 create or replace function public.sync_task_required_attachments(p_tenant_id uuid)
 returns int
 language plpgsql
@@ -101,18 +93,14 @@ begin
   get diagnostics v_count = row_count;
   return v_count;
 end $$;
-
 grant execute on function public.sync_task_required_attachments(uuid) to authenticated;
-
 -- -------------------------------------------------
 -- Notifications metadata (for dedupe/context)
 -- -------------------------------------------------
 alter table public.tenant_notifications
   add column if not exists meta jsonb not null default '{}'::jsonb;
-
 create index if not exists tenant_notifications_tenant_type_created_idx
 on public.tenant_notifications (tenant_id, type, created_at desc);
-
 -- -------------------------------------------------
 -- Approval Intel posts (manually/partner-fed)
 -- -------------------------------------------------
@@ -159,40 +147,31 @@ create table if not exists public.approval_intel_posts (
   constraint approval_intel_posts_fico_chk
     check (fico_score is null or (fico_score >= 300 and fico_score <= 900))
 );
-
 create unique index if not exists approval_intel_posts_source_post_uidx
 on public.approval_intel_posts (source, source_post_id)
 where source_post_id is not null;
-
 create index if not exists approval_intel_posts_recent_idx
 on public.approval_intel_posts (captured_at desc);
-
 create index if not exists approval_intel_posts_card_recent_idx
 on public.approval_intel_posts (card_name, captured_at desc);
-
 alter table public.approval_intel_posts enable row level security;
-
 drop policy if exists approval_intel_posts_select on public.approval_intel_posts;
 create policy approval_intel_posts_select on public.approval_intel_posts
 for select
 using (public.nexus_is_staff());
-
 drop policy if exists approval_intel_posts_insert on public.approval_intel_posts;
 create policy approval_intel_posts_insert on public.approval_intel_posts
 for insert
 with check (auth.role() = 'authenticated' and public.nexus_is_staff());
-
 drop policy if exists approval_intel_posts_update on public.approval_intel_posts;
 create policy approval_intel_posts_update on public.approval_intel_posts
 for update
 using (auth.role() = 'authenticated' and public.nexus_is_staff())
 with check (auth.role() = 'authenticated' and public.nexus_is_staff());
-
 drop policy if exists approval_intel_posts_delete on public.approval_intel_posts;
 create policy approval_intel_posts_delete on public.approval_intel_posts
 for delete
 using (public.nexus_is_master_admin());
-
 -- -------------------------------------------------
 -- Matches between tenant profile and approval posts
 -- -------------------------------------------------
@@ -212,31 +191,24 @@ create table if not exists public.approval_intel_matches (
 
   unique (tenant_id, intel_post_id)
 );
-
 create index if not exists approval_intel_matches_tenant_idx
 on public.approval_intel_matches (tenant_id, matched_at desc);
-
 create index if not exists approval_intel_matches_post_idx
 on public.approval_intel_matches (intel_post_id);
-
 alter table public.approval_intel_matches enable row level security;
-
 drop policy if exists approval_intel_matches_select on public.approval_intel_matches;
 create policy approval_intel_matches_select on public.approval_intel_matches
 for select
 using (public.nexus_is_staff() or public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists approval_intel_matches_insert on public.approval_intel_matches;
 create policy approval_intel_matches_insert on public.approval_intel_matches
 for insert
 with check (auth.role() = 'authenticated' and public.nexus_is_staff());
-
 drop policy if exists approval_intel_matches_update on public.approval_intel_matches;
 create policy approval_intel_matches_update on public.approval_intel_matches
 for update
 using (auth.role() = 'authenticated' and public.nexus_is_staff())
 with check (auth.role() = 'authenticated' and public.nexus_is_staff());
-
 -- -------------------------------------------------
 -- Overdue alert event ledger (dedupe)
 -- -------------------------------------------------
@@ -257,22 +229,17 @@ create table if not exists public.task_alert_events (
   constraint task_alert_events_uniq
     unique (tenant_id, task_id, alert_type, alert_date)
 );
-
 create index if not exists task_alert_events_tenant_created_idx
 on public.task_alert_events (tenant_id, created_at desc);
-
 alter table public.task_alert_events enable row level security;
-
 drop policy if exists task_alert_events_select on public.task_alert_events;
 create policy task_alert_events_select on public.task_alert_events
 for select
 using (public.nexus_is_staff() or public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists task_alert_events_insert on public.task_alert_events;
 create policy task_alert_events_insert on public.task_alert_events
 for insert
 with check (auth.role() = 'authenticated' and public.nexus_is_staff());
-
 -- -------------------------------------------------
 -- Helper scoring function
 -- -------------------------------------------------
@@ -333,7 +300,6 @@ begin
 
   return greatest(0, least(100, v));
 end $$;
-
 -- -------------------------------------------------
 -- Match for one tenant
 -- -------------------------------------------------
@@ -544,9 +510,7 @@ begin
     'updated', v_updated
   );
 end $$;
-
 grant execute on function public.match_approval_intel_for_tenant(uuid, int) to authenticated;
-
 -- -------------------------------------------------
 -- Batch match for all ready tenants
 -- -------------------------------------------------
@@ -591,9 +555,7 @@ begin
     'updated', v_updated
   );
 end $$;
-
 grant execute on function public.match_approval_intel_recent(int) to authenticated;
-
 -- -------------------------------------------------
 -- Overdue task alerts (deduped daily)
 -- -------------------------------------------------
@@ -680,9 +642,7 @@ begin
     'signals_set_red', v_signal_updates
   );
 end $$;
-
 grant execute on function public.emit_overdue_task_alerts(int) to authenticated;
-
 -- -------------------------------------------------
 -- updated_at trigger for approval_intel_posts
 -- -------------------------------------------------

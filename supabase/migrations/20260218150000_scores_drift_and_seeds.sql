@@ -2,7 +2,6 @@
 -- Idempotent (safe to re-run).
 
 create extension if not exists pgcrypto;
-
 -- ------------------------
 -- client_scores
 -- ------------------------
@@ -15,21 +14,17 @@ create table if not exists public.client_scores (
   underwriting_readiness int not null default 0,
   updated_at timestamptz not null default now()
 );
-
 alter table public.client_scores enable row level security;
-
 drop policy if exists client_scores_select on public.client_scores;
 create policy client_scores_select on public.client_scores
 for select
 using (public.nexus_is_master_admin() or public.nexus_can_access_tenant(client_id));
-
 -- Only admins may update directly (normal writes should go through compute_client_scores).
 drop policy if exists client_scores_update on public.client_scores;
 create policy client_scores_update on public.client_scores
 for update
 using (public.nexus_is_master_admin())
 with check (public.nexus_is_master_admin());
-
 -- ------------------------
 -- compute_client_scores
 -- ------------------------
@@ -141,11 +136,9 @@ begin
     updated_at = now();
 end;
 $$;
-
 grant execute on function public.compute_client_scores(
   uuid, boolean, boolean, boolean, boolean, boolean, boolean, int, boolean, int, int, boolean
 ) to authenticated;
-
 -- ------------------------
 -- drift_alerts
 -- ------------------------
@@ -158,17 +151,13 @@ create table if not exists public.drift_alerts (
   detected_at timestamptz not null default now(),
   resolved_at timestamptz
 );
-
 create index if not exists drift_alerts_client_detected_idx
 on public.drift_alerts (client_id, detected_at desc);
-
 alter table public.drift_alerts enable row level security;
-
 drop policy if exists drift_alerts_select on public.drift_alerts;
 create policy drift_alerts_select on public.drift_alerts
 for select
 using (public.nexus_is_master_admin() or public.nexus_can_access_tenant(client_id));
-
 -- ------------------------
 -- Seed: scenario packs
 -- ------------------------
@@ -191,7 +180,6 @@ select
 where not exists (
   select 1 from public.scenario_packs where title = 'Starter Pack - Ghost Hunter'
 );
-
 insert into public.scenario_packs (doc_id, title, scenarios)
 select
   null,
@@ -211,7 +199,6 @@ select
 where not exists (
   select 1 from public.scenario_packs where title = 'Starter Pack - Lex Ledger'
 );
-
 -- ------------------------
 -- Seed: default playbook
 -- ------------------------
@@ -242,7 +229,6 @@ select
 where not exists (
   select 1 from public.playbooks where title = 'Default - Client Intake & Fundability Setup'
 );
-
 -- ------------------------
 -- Seed: arbiter/supervisor/consolidator prompts (agents table)
 -- ------------------------
@@ -254,7 +240,6 @@ values (
   'testing',
   $$ROLE:\nYou are Nexus Arbiter (Inter-Agent Arbitration Layer).\n\nMISSION:\nCombine outputs from Nexus employees into one unified, safe, and actionable response without contradictions.\n\nPRIORITY ORDER (highest wins):\n1) Compliance & Integrity: Forensic Bot, Lex Ledger\n2) Structural Readiness: Nexus Founder\n3) Strategy & Sequencing: Nexus Analyst\n4) Non-Dilutive: Nova Grant\n5) Pipeline Velocity: Ghost Hunter\n6) Discovery: Sentinel Scout\n\nARBITRATION RULES:\n- If a lower-priority agent recommends something that increases risk, override it.\n- If there is any compliance uncertainty, default to verify + educational framing.\n- Resolve conflicts by selecting the safest path that still makes forward progress.\n- Output one unified plan: What to do now (1-3), what next (3-7), what not to do, and why (brief).\n\nCONSTRAINT STAMP (mandatory):\n- No guarantees of approvals, funding, deletions, awards, or timelines.\n- No legal/tax/regulated advice framing; recommend professional review when needed.\n- No deception or bypassing underwriting/compliance.\n\nTONE:\nClear, calm, decisive, professional.$$ 
 ) on conflict (name) do nothing;
-
 insert into public.agents (name, division, role, status, system_prompt)
 values (
   'Approval Mode Supervisor',
@@ -263,7 +248,6 @@ values (
   'testing',
   $$ROLE:\nYou are Approval Mode Supervisor.\n\nMISSION:\nReview proposed outputs (patches, playbooks, templates, scenarios, client guidance) before they are applied or shown.\n\nAPPROVAL CHECKS:\n1) Compliance: no guarantees; no regulated advice framing; no deception/bypass guidance\n2) Accuracy: no invented facts; claims are conditional\n3) Safety: no unsafe financial instruction\n4) Clarity: next steps are concrete\n5) Minimalism: no prompt bloat; nano patches only\n\nOUTPUT:\nReturn JSON only:\n{\n  "approved": true/false,\n  "reasons": ["..."],\n  "required_edits": ["..."],\n  "risk_level": "low|moderate|high|critical"\n}$$
 ) on conflict (name) do nothing;
-
 insert into public.agents (name, division, role, status, system_prompt)
 values (
   'Memory Consolidator',

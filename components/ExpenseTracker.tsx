@@ -10,7 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, Cell, AreaChart, Area, Legend 
 } from 'recharts';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from '../services/clientAiBridge';
 
 const MOCK_ENTRIES: FinancialEntry[] = [
   { id: 'fe_1', type: 'Expense', entity: 'Twilio', amount: 45.50, category: 'Software', frequency: 'Monthly', date: '2023-10-01', status: 'Paid', description: 'Power Dialer Usage' },
@@ -82,7 +82,7 @@ const FinancialTracker: React.FC = () => {
   const handleRunForecast = async () => {
     setIsAnalyzing(true);
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI();
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: `Financial Audit: Revenue $${totalRevenue}, Expenses $${totalExpense}, Recurring Burn $${recurringBurn}. Monthly Recurring Revenue (Seat Subscriptions): $${recurringYield}. Based on this, give a 1-sentence forecast for the next quarter.`,

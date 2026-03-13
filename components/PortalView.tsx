@@ -79,6 +79,13 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
   useEffect(() => {
     let cancelled = false;
 
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) {
+        // Fail open after timeout so client can still access portal UI.
+        setProfileState('has_profile');
+      }
+    }, 6000);
+
     const check = async () => {
       try {
         // Admin preview should not be blocked by client onboarding gates.
@@ -104,12 +111,15 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
         setProfileState(data?.tenant_id ? 'has_profile' : 'missing_profile');
       } catch {
         if (!cancelled) setProfileState('has_profile');
+      } finally {
+        window.clearTimeout(timeout);
       }
     };
 
     check();
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
   }, [contact.id, isAdminPreview]);
 

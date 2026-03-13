@@ -1,0 +1,3 @@
+# deploy/netlify/_redirects.example
+# SPA fallback
+/* /index.html 200

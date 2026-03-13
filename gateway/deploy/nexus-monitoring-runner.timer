@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Nexus Monitoring Runner every 2 minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/2:45
+AccuracySec=1s
+RandomizedDelaySec=9s
+Persistent=true
+Unit=nexus-monitoring-runner.service
+
+[Install]
+WantedBy=timers.target

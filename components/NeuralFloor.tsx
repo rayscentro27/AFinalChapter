@@ -212,28 +212,33 @@ const NeuralFloor: React.FC<NeuralFloorProps> = ({ contacts, onUpdateContacts })
 
       if (error) throw error;
 
+      const evalCaseRaw = (data as any).eval_cases;
+      const evalCase = Array.isArray(evalCaseRaw) ? evalCaseRaw[0] : evalCaseRaw;
+      const evalAgent = Array.isArray(evalCase?.agents) ? evalCase.agents[0] : evalCase?.agents;
+      const evalScenario = Array.isArray(evalCase?.scenarios) ? evalCase.scenarios[0] : evalCase?.scenarios;
+
       const detail: ApprovalDetail = {
-        score_id: data.id,
-        case_id: data.eval_cases?.id ?? '',
+        score_id: (data as any).id,
+        case_id: evalCase?.id ?? '',
 
-        agent_name: data.eval_cases?.agents?.name ?? null,
-        scenario_title: data.eval_cases?.scenarios?.title ?? null,
+        agent_name: evalAgent?.name ?? null,
+        scenario_title: evalScenario?.title ?? null,
 
-        user_message: data.eval_cases?.scenarios?.user_message ?? null,
-        expected_behavior: data.eval_cases?.scenarios?.expected_behavior ?? null,
-        must_include: data.eval_cases?.scenarios?.must_include ?? null,
-        must_not_say: data.eval_cases?.scenarios?.must_not_say ?? null,
-        ideal_response: data.eval_cases?.scenarios?.ideal_response ?? null,
+        user_message: evalScenario?.user_message ?? null,
+        expected_behavior: evalScenario?.expected_behavior ?? null,
+        must_include: evalScenario?.must_include ?? null,
+        must_not_say: evalScenario?.must_not_say ?? null,
+        ideal_response: evalScenario?.ideal_response ?? null,
 
-        agent_output: data.eval_cases?.agent_output ?? '',
+        agent_output: evalCase?.agent_output ?? '',
 
-        ai_accuracy: data.ai_accuracy,
-        ai_compliance: data.ai_compliance,
-        ai_clarity: data.ai_clarity,
-        ai_routing: data.ai_routing,
-        ai_notes: data.ai_notes ?? '',
+        ai_accuracy: (data as any).ai_accuracy,
+        ai_compliance: (data as any).ai_compliance,
+        ai_clarity: (data as any).ai_clarity,
+        ai_routing: (data as any).ai_routing,
+        ai_notes: (data as any).ai_notes ?? '',
 
-        created_at: data.created_at,
+        created_at: (data as any).created_at,
       };
 
       setApprovalDetail(detail);

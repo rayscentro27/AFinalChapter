@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { Contact, BusinessProfile } from '../types';
+import type { Contact, BusinessProfile as BusinessProfileType } from '../types';
 import { Building2, Save, CheckCircle, AlertTriangle, RefreshCw, Sparkles, Wand2 } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from '../services/clientAiBridge';
 
 interface BusinessProfileProps {
   contact: Contact;
@@ -14,7 +14,7 @@ const BusinessProfile: React.FC<BusinessProfileProps> = ({ contact, onUpdateCont
   const [isGenerating, setIsGenerating] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  const defaultProfile: BusinessProfile = {
+  const defaultProfile: BusinessProfileType = {
     legalName: contact.company,
     taxId: '',
     structure: 'LLC',
@@ -31,13 +31,13 @@ const BusinessProfile: React.FC<BusinessProfileProps> = ({ contact, onUpdateCont
     impactSummary: ''
   };
 
-  const [formData, setFormData] = useState<BusinessProfile>(contact.businessProfile || defaultProfile);
+  const [formData, setFormData] = useState<BusinessProfileType>(contact.businessProfile || defaultProfile);
 
   const handleAiPolish = async () => {
     if (!formData.missionStatement && !formData.impactSummary) return;
     setIsGenerating(true);
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI();
         const res = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: `Improve this business mission and impact summary for a loan application. 

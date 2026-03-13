@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from './clientAiBridge';
 import type { Message } from '../types';
 
 type GenerateContentRequest = {
@@ -36,11 +36,9 @@ type PolicyOptions = {
 const MODEL_SMALL = 'gemini-3-flash-preview';
 
 let cachedAi: GoogleGenAI | null = null;
-let cachedKey = '';
-const getClient = (apiKey: string) => {
-  if (!cachedAi || cachedKey != apiKey) {
-    cachedAi = new GoogleGenAI({ apiKey });
-    cachedKey = apiKey;
+const getClient = () => {
+  if (!cachedAi) {
+    cachedAi = new GoogleGenAI();
   }
   return cachedAi;
 };
@@ -130,14 +128,6 @@ const CACHE_INDEX_KEY = `${CACHE_PREFIX}index`;
 
 type CacheEntry = { exp: number; text: string; sim?: string };
 
-const getApiKey = (): string | null => {
-  const override = lsGet('nexus_override_API_KEY');
-  if (override && override.trim().length > 0) return override.trim();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const envKey = (process as any)?.env?.API_KEY as string | undefined;
-  if (envKey && envKey.trim().length > 0) return envKey.trim();
-  return null;
-};
 
 const estimateTokens = (req: GenerateContentRequest): number => {
   const s = stableStringify({ model: req.model, contents: req.contents, config: req.config });
@@ -244,9 +234,6 @@ export const generateContentWithPolicy = async (
   req: GenerateContentRequest,
   opts: PolicyOptions = {}
 ): Promise<string> => {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error('Missing API key. Configure it in Settings -> API Matrix.');
-
   const cacheEnabled = opts.cache?.enabled ?? true;
   const semEnabled = opts.cache?.semantic ?? false;
   const ttlMs = opts.cache?.ttlMs ?? heuristicTtlMs(req);
@@ -273,7 +260,7 @@ export const generateContentWithPolicy = async (
   const tokenEst = estimateTokens(req);
   checkAndBumpLimits(opts, tokenEst);
 
-  const ai = getClient(apiKey);
+  const ai = getClient();
 
   const cascade = shouldCascade(req, opts);
   const attempts: GenerateContentRequest[] = cascade ? [{ ...req, model: MODEL_SMALL }, req] : [req];

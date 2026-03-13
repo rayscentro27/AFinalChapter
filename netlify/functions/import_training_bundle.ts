@@ -163,7 +163,7 @@ function readBundleFromFs(): unknown {
   return JSON.parse(s);
 }
 
-async function upsertConfig(supabase: ReturnType<typeof createClient>, bundle: Bundle) {
+async function upsertConfig(supabase: any, bundle: Bundle) {
   // Requires migration: public.nexus_config
   const rows = [
     { key: 'training_global', value: bundle.global, updated_at: new Date().toISOString() },
@@ -178,7 +178,7 @@ async function upsertConfig(supabase: ReturnType<typeof createClient>, bundle: B
   }
 }
 
-async function upsertAgents(supabase: ReturnType<typeof createClient>, bundle: Bundle) {
+async function upsertAgents(supabase: any, bundle: Bundle) {
   const employeeNames = bundle.employees.map((e) => e.agent_name);
   const systemNames = (bundle.system_agents || []).map((a) => a.name);
   const names = Array.from(new Set([...employeeNames, ...systemNames]));
@@ -338,7 +338,7 @@ function stableStringify(v: unknown): string {
   return JSON.stringify(v);
 }
 
-async function upsertPlaybooks(supabase: ReturnType<typeof createClient>, bundle: Bundle) {
+async function upsertPlaybooks(supabase: any, bundle: Bundle) {
   const slugCounts = new Map<string, number>();
   const desired = bundle.playbooks.map((pb) => {
     const base = slugify(pb.title);
@@ -402,7 +402,7 @@ async function upsertPlaybooks(supabase: ReturnType<typeof createClient>, bundle
   return { inserted, updated, unchanged };
 }
 
-async function upsertScenarioPacks(supabase: ReturnType<typeof createClient>, bundle: Bundle) {
+async function upsertScenarioPacks(supabase: any, bundle: Bundle) {
   const titles = bundle.scenario_packs.map((p) => p.title);
 
   // Fetch by title and filter locally (Supabase doesn't support composite IN nicely).

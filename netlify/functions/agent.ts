@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import { classifyDrift, type DriftSeverity } from './_shared/drift';
+import { requireAuthenticatedUser } from './_shared/staff_auth';
 
 const GLOBAL_GUARDRAILS = `
 ESCALATION & HUMAN OVERRIDE:
@@ -212,7 +213,7 @@ async function cacheStore(
 }
 
 async function persistDrift(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   clientId: string,
   severity: Exclude<DriftSeverity, 'none'>,
   category: string,
@@ -333,6 +334,8 @@ export const handler: Handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
+    await requireAuthenticatedUser(event);
+
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const openaiApiKey = process.env.OPENAI_API_KEY;
@@ -452,6 +455,7 @@ export const handler: Handler = async (event) => {
       const outputs = await Promise.all(
         targetEmployees.map(async (emp) => {
           const agent = await loadAgent(supabase, emp);
+          if (!agent) throw new Error(`Agent not found: ${emp}`);
           const out = await callOpenAIWithSchema<AgentJson>({
             apiKey: openaiApiKey,
             model,
@@ -501,6 +505,7 @@ export const handler: Handler = async (event) => {
     } else {
       const employee = targetEmployees[0];
       const agent = await loadAgent(supabase, employee);
+      if (!agent) throw new Error(`Agent not found: ${employee}`);
 
       const out = await callOpenAIWithSchema<AgentJson>({
         apiKey: openaiApiKey,
@@ -701,7 +706,7 @@ function mergeContext(original: unknown, injected: Record<string, unknown>) {
 }
 
 async function loadAgent(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   name: string,
   opts: { allowMissing?: boolean } = {}
 ): Promise<{ id: string; name: string; system_prompt: string; version: number } | null> {
@@ -720,7 +725,7 @@ async function loadAgent(
 }
 
 async function loadKnowledgeContext(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   employeeName: string,
   userMessage: string,
   context?: unknown

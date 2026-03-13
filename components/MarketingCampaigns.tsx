@@ -82,11 +82,81 @@ const MarketingCampaigns: React.FC<MarketingCampaignsProps> = ({ contacts, brand
     checkKey();
   }, []);
 
+  const handleCaptureTrainingFromSync = async (syncSummary: mailerliteService.MailerLiteBulkSyncResult) => {
+    const additionalInfo = window.prompt('Add additional information to train AI employees (required):', 'Focus on failed sync contacts, compliance-safe outreach language, and retry sequencing.');
+    if (!additionalInfo || !additionalInfo.trim()) return;
+
+    const employeesRaw = window.prompt('Target AI employees (comma-separated):', 'Nexus Founder,Nexus Analyst,Sentinel Scout') || '';
+    const employeeTargets = employeesRaw
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+    const tenantIdRaw = window.prompt('Tenant UUID for task creation (required if you manage multiple tenants):', '') || '';
+    const tenantId = tenantIdRaw.trim() || undefined;
+
+    const taskTitle =
+      window.prompt(
+        'Task title:',
+        'Review MailerLite sync outcomes and apply new employee training patch'
+      ) || 'Review MailerLite sync outcomes and apply new employee training patch';
+
+    const result = await mailerliteService.createTaskAndTrainingFromMailerLite({
+      trainingTitle: `MailerLite Sync Training ${new Date().toISOString().slice(0, 10)}`,
+      additionalInfo: additionalInfo.trim(),
+      tenantId,
+      employeeTargets,
+      createTask: true,
+      autoApplyPatches: true,
+      task: {
+        title: taskTitle,
+        type: 'education',
+        signal: 'yellow',
+      },
+      syncSummary: {
+        total: syncSummary.total,
+        successful: syncSummary.successful,
+        failed: syncSummary.failed || 0,
+        error: syncSummary.error,
+      },
+    });
+
+    if (result.error) {
+      alert(`Training/task creation failed: ${result.error}`);
+      return;
+    }
+
+    alert(
+      `Training captured. Task: ${result.task_id || 'not created'}. ` +
+        `Patches applied: ${result.patches_applied || 0}, skipped: ${result.patches_skipped || 0}, failed: ${result.patches_failed || 0}.`
+    );
+  };
+
   const handleSyncMailerLite = async () => {
+      if (!branding.mailerLite?.groupId?.trim()) {
+        alert('MailerLite Group ID is missing. Set it in Settings -> Marketing Nodes.');
+        return;
+      }
+
       setIsSyncingMailerLite(true);
       const res = await mailerliteService.bulkSyncLeads(contacts, branding);
       setIsSyncingMailerLite(false);
-      alert(`MailerLite protocol execution: ${res.successful} entities synchronized out of ${res.total}.`);
+
+      if (res.error) {
+        const firstIssue = res.errors?.[0]?.error ? ` First issue: ${res.errors[0].error}` : '';
+        alert(`MailerLite sync failed: ${res.error}.${firstIssue}`);
+        return;
+      }
+
+      const failedCount = res.failed || 0;
+      const summary = `MailerLite protocol execution: ${res.successful} synchronized out of ${res.total}${failedCount ? ` (${failedCount} failed)` : ''}.`;
+      const createTraining = window.confirm(`${summary}\n\nCreate a follow-up task + training update for AI employees now?`);
+      if (createTraining) {
+        await handleCaptureTrainingFromSync(res);
+        return;
+      }
+
+      alert(summary);
   };
 
   const handleRunSEO = async () => {
@@ -291,10 +361,13 @@ const MarketingCampaigns: React.FC<MarketingCampaignsProps> = ({ contacts, brand
                     </button>
                  </div>
 
-                 {branding.mailerLite?.apiKey && (
+                 {branding.mailerLite?.groupId && (
                    <div className="mt-6 p-6 bg-emerald-50 border border-emerald-200 rounded-[1.5rem] shadow-sm animate-fade-in">
                       <p className="text-xs text-emerald-800 font-black uppercase tracking-widest flex items-center gap-2 mb-3">
                         <MailIcon size={16} /> MailerLite Sync Node
+                      </p>
+                      <p className="text-[10px] text-emerald-700 mb-4 font-medium">
+                        Uses server-side key storage via <span className="font-mono">MAILERLITE_API_KEY</span>.
                       </p>
                       <button 
                         onClick={handleSyncMailerLite} 

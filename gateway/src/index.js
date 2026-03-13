@@ -1,0 +1,190 @@
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import formbody from '@fastify/formbody';
+import multipart from '@fastify/multipart';
+
+import { ENV } from './env.js';
+import { isOriginAllowed } from './config/aiGatewayConfig.js';
+import { validateGatewayEnv } from './config/envValidation.js';
+import { healthRoutes } from './routes/health.js';
+import { aiGatewayRoutes } from './routes/ai_gateway.js';
+import { twilioRoutes } from './routes/twilio.js';
+import { metaRoutes } from './routes/meta.js';
+import { whatsappRoutes } from './routes/whatsapp.js';
+import { matrixRoutes } from './routes/matrix.js';
+import { sendRoutes } from './routes/send.js';
+import { routingRoutes } from './routes/routing.js';
+import { outboxRoutes } from './routes/outbox.js';
+import { adminContactRoutes } from './routes/admin_contacts.js';
+import { adminHardeningRoutes } from './routes/admin_hardening.js';
+import { adminMonitoringRoutes } from './routes/admin_monitoring.js';
+import { adminMonitoringV2Routes } from './routes/admin_monitoring_v2.js';
+import { attachmentsRoutes } from './routes/attachments.js';
+import { assignmentRoutes } from './routes/assignment.js';
+import { aiWorkflowRoutes } from './routes/ai_workflow.js';
+import { platformMaturityRoutes } from './routes/platform_maturity.js';
+import { adminSreRoutes } from './routes/admin_sre.js';
+import { enterpriseRoutes } from './routes/enterprise.js';
+import { systemHealthRoutes } from './routes/system_health.js';
+
+function asText(value) {
+  if (Array.isArray(value)) return String(value[0] || '').trim();
+  return String(value || '').trim();
+}
+
+function requestTenantId(req) {
+  return (
+    asText(req?.tenant?.id)
+    || asText(req?.body?.tenant_id)
+    || asText(req?.query?.tenant_id)
+    || asText(req?.params?.tenant_id)
+    || null
+  );
+}
+
+function requestProvider(req) {
+  const path = asText(req?.routeOptions?.url || req?.routerPath || req?.raw?.url).toLowerCase();
+  if (path.includes('/webhooks/meta')) return 'meta';
+  if (path.includes('/webhooks/whatsapp')) return 'whatsapp';
+  if (path.includes('/webhooks/twilio')) return 'twilio';
+  if (path.includes('/webhooks/matrix')) return 'matrix';
+  return null;
+}
+
+const fastify = Fastify({
+  logger: {
+    level: ENV.LOG_LEVEL,
+    redact: {
+      paths: [
+        'req.headers.authorization',
+        'req.headers.Authorization',
+        'req.headers.x-api-key',
+        'headers.authorization',
+        'headers.Authorization',
+        'headers.x-api-key',
+        'authorization',
+        'x-api-key',
+        'access_token',
+        'app_secret',
+        'service_role_key',
+        'supabase_service_role_key',
+        'gemini_api_key',
+        'openrouter_api_key',
+        'nvidia_nim_api_key',
+      ],
+      censor: '[REDACTED]',
+    },
+  },
+  trustProxy: ENV.TRUST_PROXY,
+  bodyLimit: 2 * 1024 * 1024,
+});
+
+const envValidation = validateGatewayEnv({
+  env: process.env,
+  strict: ENV.ENV_VALIDATE_STRICT,
+  logger: fastify.log,
+});
+
+if (!envValidation.ok) {
+  fastify.log.warn({ env_validation: envValidation }, 'gateway_env_validation_incomplete');
+}
+
+// Capture raw JSON body for signature hashing while preserving parsed JSON body.
+fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
+  req.rawBody = body?.toString('utf8') || '';
+  try {
+    done(null, JSON.parse(req.rawBody || '{}'));
+  } catch (error) {
+    done(error);
+  }
+});
+
+fastify.addHook('onRequest', async (req) => {
+  req._startTimeNs = process.hrtime.bigint();
+});
+
+fastify.addHook('onResponse', async (req, reply) => {
+  const startedAt = typeof req._startTimeNs === 'bigint' ? req._startTimeNs : process.hrtime.bigint();
+  const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+
+  req.log.info({
+    request_id: req.id,
+    tenant_id: requestTenantId(req),
+    user_id: asText(req?.user?.id) || null,
+    route: asText(req?.routeOptions?.url || req?.routerPath || req?.raw?.url),
+    provider: requestProvider(req),
+    status_code: reply.statusCode,
+    ms: Number(elapsedMs.toFixed(2)),
+  }, 'request_completed');
+});
+
+await fastify.register(cors, {
+  origin: (origin, cb) => {
+    if (isOriginAllowed(origin)) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Origin not allowed by CORS policy'), false);
+  },
+  credentials: true,
+});
+await fastify.register(helmet);
+await fastify.register(rateLimit, {
+  max: 600,
+  timeWindow: '1 minute',
+});
+await fastify.register(formbody);
+await fastify.register(multipart, {
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 1,
+  },
+});
+
+await fastify.register(healthRoutes);
+await fastify.register(systemHealthRoutes);
+await fastify.register(aiGatewayRoutes);
+await fastify.register(twilioRoutes);
+await fastify.register(metaRoutes);
+await fastify.register(whatsappRoutes);
+await fastify.register(matrixRoutes);
+await fastify.register(sendRoutes);
+await fastify.register(outboxRoutes);
+await fastify.register(routingRoutes);
+await fastify.register(adminContactRoutes);
+await fastify.register(adminHardeningRoutes);
+await fastify.register(adminMonitoringRoutes);
+await fastify.register(adminMonitoringV2Routes);
+await fastify.register(attachmentsRoutes);
+await fastify.register(assignmentRoutes);
+await fastify.register(aiWorkflowRoutes);
+await fastify.register(platformMaturityRoutes);
+await fastify.register(adminSreRoutes);
+await fastify.register(enterpriseRoutes);
+
+fastify.setErrorHandler((error, req, reply) => {
+  req.log.error({
+    request_id: req.id,
+    tenant_id: requestTenantId(req),
+    user_id: asText(req?.user?.id) || null,
+    route: asText(req?.routeOptions?.url || req?.routerPath || req?.raw?.url),
+    err: {
+      message: String(error?.message || 'unknown_error'),
+      code: error?.code || null,
+      statusCode: Number(error?.statusCode) || null,
+    },
+  }, 'unhandled_request_error');
+
+  if (!reply.sent) {
+    reply.code(500).send({ ok: false, error: 'Internal server error' });
+  }
+});
+
+try {
+  await fastify.listen({ port: ENV.PORT, host: '0.0.0.0' });
+} catch (error) {
+  fastify.log.error(error);
+  process.exit(1);
+}

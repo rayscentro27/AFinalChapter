@@ -105,6 +105,23 @@ const OnboardingQuestionnaire: React.FC<OnboardingQuestionnaireProps> = ({ conta
         // ignore
       }
 
+      try {
+        await supabase.functions.invoke('email-orchestrator', {
+          body: {
+            message_type: 'reminders',
+            to: user.email || '',
+            subject: 'Your Nexus task plan is ready',
+            html: '<p>Your onboarding tasks are now available in your portal.</p><p>Educational only. No guarantees of outcomes.</p>',
+            text: 'Your onboarding tasks are now available in your portal. Educational only. No guarantees of outcomes.',
+            template_key: 'tasks_ready',
+            user_id: user.id,
+            data: { task_count: clientTasks.length },
+          },
+        });
+      } catch {
+        // non-fatal
+      }
+
       onComplete({
         ...contact,
         company: formData.companyName,

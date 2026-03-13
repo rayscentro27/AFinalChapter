@@ -1,0 +1,53 @@
+name: Deploy API to Oracle VM
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'gateway/**'
+      - 'deploy/oracle/**'
+      - '.github/workflows/deploy-api-oracle.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build SSH key
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ORACLE_SSH_PRIVATE_KEY }}" > ~/.ssh/oracle_key
+          chmod 600 ~/.ssh/oracle_key
+          ssh-keyscan -H "${{ secrets.ORACLE_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Rsync project
+        shell: bash
+        run: |
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            --exclude '.env.local' \
+            ./ "${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}:${{ secrets.ORACLE_APP_DIR }}"
+
+      - name: Install and restart API
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/oracle_key "${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}" <<'SSH'
+            set -euo pipefail
+            cd "${{ secrets.ORACLE_APP_DIR }}/gateway"
+            npm ci --omit=dev
+            sudo systemctl restart nexus-api
+            sudo systemctl status nexus-api --no-pager
+          SSH

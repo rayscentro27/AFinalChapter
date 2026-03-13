@@ -1,13 +1,24 @@
 
 import React from 'react';
-// Import Type from @google/genai to re-export it
-import { Type } from "@google/genai";
+// Import Type from ./services/clientAiBridge to re-export it
+import { Type } from "./services/clientAiBridge";
 
 export { Type };
 
 export type MerchantPersona = 'Visionary Scaler' | 'Skeptical Veteran' | 'First-Time Founder' | 'Conservative Operator';
 export type SentimentLevel = 'Positive' | 'Neutral' | 'Agitated' | 'Critical';
 export type AiIntensity = 'Ghost' | 'Concierge' | 'Hunter';
+
+export interface InboxRouting {
+  tenant_id?: string;
+  tenantId?: string;
+  conversation_id?: string;
+  conversationId?: string;
+  provider?: 'sms' | 'whatsapp' | 'meta' | 'twilio';
+  to?: string;
+  recipient_id?: string;
+  recipientId?: string;
+}
 
 export interface User {
   id: string;
@@ -103,6 +114,7 @@ export interface Contact {
   legalStanding?: string;
   callReady?: boolean;
   feesWaived?: boolean;
+  inboxRouting?: InboxRouting;
 }
 
 export interface ClientTask {
@@ -159,6 +171,10 @@ export interface Message {
   timestamp: string;
   read: boolean;
   actionRequired?: any;
+  deliveryStatus?: string;
+  provider?: string;
+  conversationId?: string;
+  providerMessageIdReal?: string;
 }
 
 export interface Invoice {
@@ -209,7 +225,6 @@ export interface AgencyBranding {
   };
   tierPrices?: { Bronze: number; Silver: number; Gold: number };
   mailerLite?: {
-    apiKey?: string;
     groupId?: string;
     autoSync: boolean;
   };
@@ -217,6 +232,7 @@ export interface AgencyBranding {
 
 export enum ViewMode {
   DASHBOARD = 'DASHBOARD',
+  WORKFLOW_DETAIL = 'WORKFLOW_DETAIL',
   CRM = 'CRM',
   INBOX = 'INBOX',
   PORTAL = 'PORTAL',
@@ -267,6 +283,69 @@ export enum ViewMode {
   SYNDICATION = 'SYNDICATION',
   PARTNERS = 'PARTNERS',
   LANDING = 'LANDING',
+  CHANNEL_MAPPER = 'CHANNEL_MAPPER',
+  CONTACT_MERGE = 'CONTACT_MERGE',
+  MERGE_JOBS = 'MERGE_JOBS',
+  MERGE_QUEUE = 'MERGE_QUEUE',
+  SUGGESTIONS = 'SUGGESTIONS',
+  TEAM_MEMBERS = 'TEAM_MEMBERS',
+  ON_CALL = 'ON_CALL',
+  CHANNEL_POOLS = 'CHANNEL_POOLS',
+  DEAD_LETTERS = 'DEAD_LETTERS',
+  CHANNEL_HEALTH = 'CHANNEL_HEALTH',
+  ADMIN_HEALTH = 'ADMIN_HEALTH',
+  SRE_DASHBOARD = 'SRE_DASHBOARD',
+  OUTBOX = 'OUTBOX',
+  PUBLIC_API = 'PUBLIC_API',
+  ADMIN_ROLES = 'ADMIN_ROLES',
+  ADMIN_MEMBERS = 'ADMIN_MEMBERS',
+  ADMIN_POLICIES = 'ADMIN_POLICIES',
+  ADMIN_CONSENTS = 'ADMIN_CONSENTS',
+  ADMIN_SUBSCRIPTIONS = 'ADMIN_SUBSCRIPTIONS',
+  ADMIN_DOCUMENTS = 'ADMIN_DOCUMENTS',
+  INVITE_ACCEPT = 'INVITE_ACCEPT',
+  PRICING = 'PRICING',
+  BILLING = 'BILLING',
+  DOCUMENTS = 'DOCUMENTS',
+  SBA_PREP = 'SBA_PREP',
+  FUNDING_RESEARCH = 'FUNDING_RESEARCH',
+  FUNDING_OUTCOMES = 'FUNDING_OUTCOMES',
+  BILLING_COMMISSIONS = 'BILLING_COMMISSIONS',
+  COMMUNICATION_PREFERENCES = 'COMMUNICATION_PREFERENCES',
+  SECURITY_SETTINGS = 'SECURITY_SETTINGS',
+  UPLOAD_CREDIT_REPORT = 'UPLOAD_CREDIT_REPORT',
+  DISPUTE_FACTS_REVIEW = 'DISPUTE_FACTS_REVIEW',
+  DRAFT_PREVIEW = 'DRAFT_PREVIEW',
+  FINAL_LETTER = 'FINAL_LETTER',
+  DISPUTE_LETTER_PREVIEW = 'DISPUTE_LETTER_PREVIEW',
+  MAILING_AUTHORIZATION = 'MAILING_AUTHORIZATION',
+  CLIENT_MAILING_APPROVALS = 'CLIENT_MAILING_APPROVALS',
+  TERMS = 'TERMS',
+  PRIVACY = 'PRIVACY',
+  AI_DISCLOSURE = 'AI_DISCLOSURE',
+  REFUND_POLICY = 'REFUND_POLICY',
+  DISCLAIMERS = 'DISCLAIMERS',
+  MEMBERSHIP_AGREEMENT = 'MEMBERSHIP_AGREEMENT',
+  SMS_TERMS = 'SMS_TERMS',
+  ADMIN_SMS_TEMPLATES = 'ADMIN_SMS_TEMPLATES',
+  ADMIN_MAILING_QUEUE = 'ADMIN_MAILING_QUEUE',
+  ADMIN_MAILING_DASHBOARD = 'ADMIN_MAILING_DASHBOARD',
+  ADMIN_LEGAL_DOCS = 'ADMIN_LEGAL_DOCS',
+  ADMIN_EMAIL_PROVIDERS = 'ADMIN_EMAIL_PROVIDERS',
+  ADMIN_EMAIL_ROUTING = 'ADMIN_EMAIL_ROUTING',
+  ADMIN_EMAIL_LOGS = 'ADMIN_EMAIL_LOGS',
+  ADMIN_WORKFLOWS = 'ADMIN_WORKFLOWS',
+  FREE_SCORE = 'FREE_SCORE',
+  FREE_CHECKLIST = 'FREE_CHECKLIST',
+  UNSUBSCRIBE = 'UNSUBSCRIBE',
+  ADMIN_FUNNEL_SEQUENCES = 'ADMIN_FUNNEL_SEQUENCES',
+  ADMIN_FUNNEL_LEADS = 'ADMIN_FUNNEL_LEADS',
+  ADMIN_FUNNEL_METRICS = 'ADMIN_FUNNEL_METRICS',
+  ADMIN_FUNDING_CATALOG = 'ADMIN_FUNDING_CATALOG',
+  ADMIN_GRANTS_CATALOG = 'ADMIN_GRANTS_CATALOG',
+  ADMIN_GRANTS_TRACKING = 'ADMIN_GRANTS_TRACKING',
+  ADMIN_SBA = 'ADMIN_SBA',
+  ADMIN_COMMISSIONS = 'ADMIN_COMMISSIONS',
   ADMIN_CMS = 'ADMIN_CMS'
 }
 

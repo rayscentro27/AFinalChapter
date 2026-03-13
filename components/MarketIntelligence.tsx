@@ -138,28 +138,28 @@ const MarketIntelligence: React.FC = () => {
                     <div>
                        <h4 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-1"><CheckCircle size={12}/> Strengths</h4>
                        <ul className="list-disc pl-4 text-sm text-slate-600 space-y-1">
-                          {report.swot.strengths.map((s, i) => <li key={i}>{s}</li>)}
+                          {report.swot.strengths.map((s: string, i: number) => <li key={i}>{s}</li>)}
                        </ul>
                     </div>
 
                     <div>
                        <h4 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-1"><AlertTriangle size={12}/> Weaknesses</h4>
                        <ul className="list-disc pl-4 text-sm text-slate-600 space-y-1">
-                          {report.swot.weaknesses.map((s, i) => <li key={i}>{s}</li>)}
+                          {report.swot.weaknesses.map((s: string, i: number) => <li key={i}>{s}</li>)}
                        </ul>
                     </div>
 
                     <div>
                        <h4 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-1"><Zap size={12}/> Opportunities</h4>
                        <ul className="list-disc pl-4 text-sm text-slate-600 space-y-1">
-                          {report.swot.opportunities.map((s, i) => <li key={i}>{s}</li>)}
+                          {report.swot.opportunities.map((s: string, i: number) => <li key={i}>{s}</li>)}
                        </ul>
                     </div>
 
                     <div>
                        <h4 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-1"><AlertTriangle size={12}/> Threats</h4>
                        <ul className="list-disc pl-4 text-sm text-slate-600 space-y-1">
-                          {report.swot.threats.map((s, i) => <li key={i}>{s}</li>)}
+                          {report.swot.threats.map((s: string, i: number) => <li key={i}>{s}</li>)}
                        </ul>
                     </div>
 

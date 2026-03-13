@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage, Modality } from '../services/clientAiBridge';
 import { 
   Mic, StopCircle, Play, Sparkles, Volume2, Award, AlertCircle, 
   BarChart3, Target, MessageSquare, Lightbulb, RefreshCw, 
@@ -185,8 +185,7 @@ const SalesTrainer: React.FC = () => {
       audioContextRef.current = ctx;
       nextStartTimeRef.current = ctx.currentTime;
 
-      // Exclusively use process.env.API_KEY
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000 } });
       streamRef.current = stream;
 
@@ -266,7 +265,7 @@ const SalesTrainer: React.FC = () => {
             }
           },
           onclose: () => setStatus('idle'),
-          onerror: (err) => { console.error(err); stopSession(); }
+          onerror: (err: any) => { console.error(err); stopSession(); }
         }
       });
 
@@ -312,7 +311,7 @@ const SalesTrainer: React.FC = () => {
     const fullText = transcript.map(t => `${t.role}: ${t.text}`).join('\n');
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI();
       const res = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Analyze this sales roleplay session. 

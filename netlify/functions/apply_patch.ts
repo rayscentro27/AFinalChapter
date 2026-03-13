@@ -1,6 +1,7 @@
 import type { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { requireStaffUser } from './_shared/staff_auth';
 import crypto from "crypto";
 
 const BodySchema = z.object({
@@ -9,7 +10,7 @@ const BodySchema = z.object({
 });
 
 
-const ensureHistory = async (agentId: string, promptVersion: number, systemPrompt: string) => {
+const ensureHistory = async (supabase: any, agentId: string, promptVersion: number, systemPrompt: string) => {
   try {
     await supabase.from('agent_prompt_history').insert({
       agent_id: agentId,
@@ -24,6 +25,8 @@ const ensureHistory = async (agentId: string, promptVersion: number, systemPromp
 export const handler: Handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
+
+    const actor = await requireStaffUser(event);
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -55,7 +58,7 @@ export const handler: Handler = async (event) => {
 
     if (agentErr || !agent) return json(404, { error: "Agent not found" });
 
-    await ensureHistory(agent.id, agent.version ?? 1, String(agent.system_prompt || ''));
+    await ensureHistory(supabase, agent.id, agent.version ?? 1, String(agent.system_prompt || ''));
 
     const patchHash = sha256(`${patch.agent_name}||${patch.patch_title || ''}||${patch.patch_text || ''}`);
 
@@ -88,7 +91,7 @@ export const handler: Handler = async (event) => {
     if (upErr) throw upErr;
 
     const newVersion = (agent.version ?? 1) + 1;
-    await ensureHistory(agent.id, newVersion, newPrompt);
+    await ensureHistory(supabase, agent.id, newVersion, newPrompt);
 
     // Best-effort bookkeeping
     try {
@@ -98,9 +101,10 @@ export const handler: Handler = async (event) => {
     }
 
     return json(200, { ok: true, agent: patch.agent_name, version: newVersion });
-  } catch (e: any) {
-    const msg = typeof e?.message === "string" ? e.message : "Bad Request";
-    return json(400, { error: msg });
+   } catch (e: any) {
+    const statusCode = Number(e?.statusCode) || 400;
+    const msg = typeof e?.message === 'string' ? e.message : 'Bad Request';
+    return json(statusCode, { error: msg });
   }
 };
 
