@@ -12,6 +12,7 @@ const BodySchema = z.object({
   text: z.string().min(1).max(4000),
   to: z.string().min(3).max(64).optional(),
   recipient_id: z.string().min(3).max(128).optional(),
+  client_request_id: z.string().min(8).max(128).optional(),
 });
 
 const CHANNEL_PROVIDER_MAP: Record<Provider, 'twilio' | 'whatsapp' | 'meta'> = {
@@ -31,7 +32,6 @@ export const handler: Handler = async (event) => {
     const body = BodySchema.parse(JSON.parse(event.body || '{}'));
 
     const tenantId = await resolveTenantForUser(supabase as any, authData.user.id, body.tenant_id);
-
     const convo = await loadConversationWithChannel(supabase as any, tenantId, body.conversation_id);
 
     const expectedChannelProvider = CHANNEL_PROVIDER_MAP[body.provider];
@@ -41,18 +41,30 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    const gatewayRoute = body.provider === 'sms'
-      ? '/send/sms'
-      : body.provider === 'whatsapp'
-        ? '/send/whatsapp'
-        : '/send/meta';
+    if (body.provider !== 'meta' && !body.to) {
+      return json(400, { error: `Missing to for ${body.provider}` });
+    }
 
-    const outboundPayload = buildGatewayPayload(body, tenantId);
+    if (body.provider === 'meta' && !body.recipient_id) {
+      return json(400, { error: 'Missing recipient_id for meta' });
+    }
 
     const proxyResponse = await proxyToOracle({
-      path: gatewayRoute,
+      path: '/messages/send',
       method: 'POST',
-      body: outboundPayload,
+      body: {
+        tenant_id: tenantId,
+        conversation_id: body.conversation_id,
+        provider: expectedChannelProvider,
+        channel_preference: expectedChannelProvider,
+        body_text: body.text,
+        text: body.text,
+        to: body.to,
+        recipient_id: body.recipient_id,
+        client_request_id: body.client_request_id,
+      },
+      forwardAuth: true,
+      event,
     });
 
     const responseJson = proxyResponse.json || {};
@@ -61,7 +73,7 @@ export const handler: Handler = async (event) => {
         ok: false,
         error: String(responseJson?.error || `Gateway send failed (${proxyResponse.status})`),
         details: responseJson?.details || null,
-        message_id: responseJson?.message_id || null,
+        outbox_id: responseJson?.outbox_id || null,
       });
     }
 
@@ -70,10 +82,10 @@ export const handler: Handler = async (event) => {
       tenant_id: tenantId,
       conversation_id: body.conversation_id,
       provider: body.provider,
-      message_id: responseJson?.message_id || null,
-      provider_message_id: responseJson?.provider_message_id || responseJson?.provider_message_id_real || null,
-      provider_message_id_real: responseJson?.provider_message_id_real || responseJson?.provider_message_id || null,
-      raw: responseJson?.raw || null,
+      outbox_id: responseJson?.outbox_id || null,
+      status: responseJson?.status || null,
+      deduped: Boolean(responseJson?.deduped),
+      warning: responseJson?.warning || null,
     });
   } catch (e: any) {
     const statusCode = Number(e?.statusCode) || 400;
@@ -81,40 +93,10 @@ export const handler: Handler = async (event) => {
   }
 };
 
-function buildGatewayPayload(body: z.infer<typeof BodySchema>, tenantId: string) {
-  if (body.provider === 'sms') {
-    if (!body.to) throw statusError(400, 'Missing to for sms');
-    return {
-      tenant_id: tenantId,
-      conversation_id: body.conversation_id,
-      to: body.to,
-      text: body.text,
-    };
-  }
-
-  if (body.provider === 'whatsapp') {
-    if (!body.to) throw statusError(400, 'Missing to for whatsapp');
-    return {
-      tenant_id: tenantId,
-      conversation_id: body.conversation_id,
-      to: body.to,
-      text: body.text,
-    };
-  }
-
-  if (!body.recipient_id) throw statusError(400, 'Missing recipient_id for meta');
-  return {
-    tenant_id: tenantId,
-    conversation_id: body.conversation_id,
-    recipient_id: body.recipient_id,
-    text: body.text,
-  };
-}
-
 async function resolveTenantForUser(
   supabase: any,
   userId: string,
-  requestedTenantId?: string
+  requestedTenantId?: string,
 ): Promise<string> {
   const { data, error } = await supabase
     .from('tenant_memberships')

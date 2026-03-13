@@ -47,7 +47,6 @@ export const handler: Handler = async (event) => {
     }
 
     const tenantId = await resolveTenantForUser(supabase as any, authData.user.id, body.tenant_id);
-
     const convo = await loadConversationWithChannel(supabase as any, tenantId, body.conversation_id);
 
     const expectedChannelProvider = CHANNEL_PROVIDER_MAP[body.provider];
@@ -72,20 +71,24 @@ export const handler: Handler = async (event) => {
     const clientRequestId = body.client_request_id || randomUUID();
 
     const proxyResponse = await proxyToOracle({
-      path: '/send/outbox',
+      path: '/messages/send',
       method: 'POST',
       body: {
         tenant_id: tenantId,
         conversation_id: body.conversation_id,
         provider: expectedChannelProvider,
-        channel_account_id: convo.channel_account_id,
-        to_address: toAddress,
-        body: text || null,
+        channel_preference: expectedChannelProvider,
+        body_text: text || null,
+        text: text || null,
         content: body.content || { type: 'text' },
         attachments: body.attachments || undefined,
         client_request_id: clientRequestId,
-        created_by: authData.user.id,
+        to: body.provider === 'meta' ? undefined : toAddress,
+        to_address: toAddress,
+        recipient_id: body.provider === 'meta' ? toAddress : undefined,
       },
+      forwardAuth: true,
+      event,
     });
 
     const responseJson = proxyResponse.json || {};
@@ -94,7 +97,6 @@ export const handler: Handler = async (event) => {
         ok: false,
         error: String(responseJson?.error || `Gateway outbox send failed (${proxyResponse.status})`),
         details: responseJson?.details || null,
-        outbox: responseJson?.outbox || null,
       });
     }
 
@@ -104,14 +106,10 @@ export const handler: Handler = async (event) => {
       conversation_id: body.conversation_id,
       provider: body.provider,
       client_request_id: clientRequestId,
-      outbox: responseJson?.outbox || null,
-      message_id: responseJson?.message_id || null,
-      provider_message_id: responseJson?.provider_message_id || responseJson?.provider_message_id_real || null,
-      provider_message_id_real: responseJson?.provider_message_id_real || responseJson?.provider_message_id || null,
-      raw: responseJson?.raw || null,
+      outbox_id: responseJson?.outbox_id || null,
+      status: responseJson?.status || null,
       deduped: Boolean(responseJson?.deduped),
-      send_attempted: Boolean(responseJson?.send_attempted),
-      error: responseJson?.error || null,
+      warning: responseJson?.warning || null,
     });
   } catch (e: any) {
     const statusCode = Number(e?.statusCode) || 400;
@@ -122,7 +120,7 @@ export const handler: Handler = async (event) => {
 async function resolveTenantForUser(
   supabase: any,
   userId: string,
-  requestedTenantId?: string
+  requestedTenantId?: string,
 ): Promise<string> {
   const { data, error } = await supabase
     .from('tenant_memberships')

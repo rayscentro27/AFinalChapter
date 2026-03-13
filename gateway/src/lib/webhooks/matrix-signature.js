@@ -8,7 +8,8 @@ function getHeader(headers, name) {
 
 export function verifyMatrixWebhookToken({ headers, token }) {
   const configured = String(token || '').trim();
-  if (!configured) return true;
+  // Fail closed: if no token is configured, do not accept Matrix webhooks.
+  if (!configured) return false;
 
   const incoming = getHeader(headers, 'x-matrix-token');
   if (!incoming) return false;

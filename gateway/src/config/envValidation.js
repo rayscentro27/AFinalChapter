@@ -31,6 +31,12 @@ const REQUIRED = {
 };
 
 const RECOMMENDED = {
+  ai_integrations: [
+    'GEMINI_API_KEY',
+    'TELEGRAM_BOT_TOKEN',
+    'TELEGRAM_CHAT_ID',
+    'TRADINGVIEW_WEBHOOK_SECRET',
+  ],
   system_mode: [
     'SYSTEM_MODE',
     'QUEUE_ENABLED',
@@ -50,6 +56,14 @@ const RECOMMENDED = {
   ],
 };
 
+const CONDITIONAL_REQUIRED = {
+  production_security: [
+    'MATRIX_WEBHOOK_TOKEN',
+  ],
+};
+
+const VALID_SYSTEM_MODES = new Set(['development', 'research', 'production', 'maintenance']);
+
 function collectMissing(env, groups) {
   const missing = [];
   for (const [group, keys] of Object.entries(groups)) {
@@ -62,15 +76,34 @@ function collectMissing(env, groups) {
   return missing;
 }
 
+function shouldEnforceProductionSecurity(env, mode) {
+  const nodeEnv = asText(env.NODE_ENV).toLowerCase();
+  return mode === 'production' || nodeEnv === 'production';
+}
+
 export function validateGatewayEnv({ env = process.env, strict = false, logger = console } = {}) {
   const missingRequired = collectMissing(env, REQUIRED);
   const missingRecommended = collectMissing(env, RECOMMENDED);
 
   const mode = asText(env.SYSTEM_MODE || 'development').toLowerCase() || 'development';
+  const modeIsValid = VALID_SYSTEM_MODES.has(mode);
+
+  const missingConditionalRequired = shouldEnforceProductionSecurity(env, mode)
+    ? collectMissing(env, CONDITIONAL_REQUIRED)
+    : [];
+
+  const allMissingRequired = [
+    ...missingRequired,
+    ...missingConditionalRequired,
+  ];
+
   const summary = {
-    ok: missingRequired.length === 0,
+    ok: allMissingRequired.length === 0 && modeIsValid,
     mode,
+    mode_valid: modeIsValid,
+    valid_modes: Array.from(VALID_SYSTEM_MODES),
     missing_required: missingRequired,
+    missing_conditional_required: missingConditionalRequired,
     missing_recommended: missingRecommended,
     flags: {
       queue_enabled: asBool(env.QUEUE_ENABLED, false),
@@ -84,10 +117,22 @@ export function validateGatewayEnv({ env = process.env, strict = false, logger =
     logger.warn({ missing_recommended: missingRecommended }, 'gateway_env_recommended_missing');
   }
 
-  if (missingRequired.length > 0) {
-    logger.error({ missing_required: missingRequired }, 'gateway_env_required_missing');
+  if (allMissingRequired.length > 0) {
+    logger.error({
+      missing_required: missingRequired,
+      missing_conditional_required: missingConditionalRequired,
+    }, 'gateway_env_required_missing');
+
     if (strict) {
-      throw new Error(`Missing required environment variables: ${missingRequired.map((x) => x.key).join(', ')}`);
+      const names = Array.from(new Set(allMissingRequired.map((x) => x.key)));
+      throw new Error(`Missing required environment variables: ${names.join(', ')}`);
+    }
+  }
+
+  if (!modeIsValid) {
+    logger.error({ system_mode: mode, valid_modes: Array.from(VALID_SYSTEM_MODES) }, 'gateway_env_invalid_system_mode');
+    if (strict) {
+      throw new Error(`Invalid SYSTEM_MODE: ${mode}`);
     }
   }
 
