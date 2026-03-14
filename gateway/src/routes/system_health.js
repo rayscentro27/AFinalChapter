@@ -17,6 +17,16 @@ function clampInt(value, min, max) {
   return Math.min(max, Math.max(min, asInt(value, min)));
 }
 
+function asNumber(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return n;
+}
+
+function toLower(value) {
+  return asText(value).toLowerCase();
+}
+
 function isMissingSchema(error) {
   const msg = String(error?.message || '').toLowerCase();
   return (
@@ -34,8 +44,8 @@ async function requireApiKey(req, reply) {
   return undefined;
 }
 
-async function safeCount(table, apply = null) {
-  let query = supabaseAdmin.from(table).select('*', { count: 'exact', head: true });
+async function safeCount(db, table, apply = null) {
+  let query = db.from(table).select('*', { count: 'exact', head: true });
   if (typeof apply === 'function') query = apply(query);
 
   const { count, error } = await query;
@@ -55,9 +65,9 @@ async function safeRows(query) {
   return { rows: Array.isArray(data) ? data : [], missing: false, error: null };
 }
 
-async function safeOldestPendingJob() {
+async function safeOldestPendingJob(db) {
   const nowIso = new Date().toISOString();
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('job_queue')
     .select('id,job_type,tenant_id,status,priority,available_at,created_at')
     .in('status', ['pending', 'retry_wait'])
@@ -73,14 +83,16 @@ async function safeOldestPendingJob() {
   return { row: data?.[0] || null, missing: false, error: null };
 }
 
-async function safeCacheHitRate24h() {
-  const sinceIso = new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString();
+async function safeCacheHitRate24h(db, hours = 24, limit = 5000) {
+  const boundedHours = clampInt(hours, 1, 720);
+  const boundedLimit = clampInt(limit, 100, 10000);
+  const sinceIso = new Date(Date.now() - (boundedHours * 60 * 60 * 1000)).toISOString();
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db
     .from('ai_cache')
     .select('hit_count,last_hit_at,created_at')
     .gte('created_at', sinceIso)
-    .limit(5000);
+    .limit(boundedLimit);
 
   if (error) {
     if (isMissingSchema(error)) return { hit_rate: null, missing: true, error: null };
@@ -151,7 +163,53 @@ function topEntries(countMap, max = 5) {
     .slice(0, Math.max(1, max));
 }
 
-export async function systemHealthRoutes(fastify) {
+function isAiError(row = {}) {
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const details = row.details && typeof row.details === 'object' ? row.details : {};
+  const haystack = [
+    toLower(row.service),
+    toLower(row.component),
+    toLower(row.source),
+    toLower(row.error_type || row.error_code || row.severity),
+    toLower(metadata.job_type || metadata.jobType),
+    toLower(metadata.provider),
+    toLower(metadata.task_type || metadata.taskType),
+    toLower(details.provider),
+    toLower(details.task_type || details.taskType),
+  ].join(' ');
+
+  return haystack.includes('ai')
+    || haystack.includes('gemini')
+    || haystack.includes('openrouter')
+    || haystack.includes('openai')
+    || haystack.includes('nim')
+    || haystack.includes('model_router')
+    || haystack.includes('ai_gateway');
+}
+
+function normalizeTokenUsage(row = {}) {
+  const usage = row.token_usage && typeof row.token_usage === 'object' ? row.token_usage : {};
+
+  const totalTokens = asNumber(
+    usage.total_tokens,
+    asNumber(usage.total, asNumber(usage.totalTokens, NaN)),
+  );
+
+  if (Number.isFinite(totalTokens)) return totalTokens;
+
+  const inputTokens = asNumber(usage.input_tokens, asNumber(usage.inputTokens, 0));
+  const outputTokens = asNumber(usage.output_tokens, asNumber(usage.outputTokens, 0));
+  const promptTokens = asNumber(usage.prompt_tokens, 0);
+  const completionTokens = asNumber(usage.completion_tokens, 0);
+
+  return inputTokens + outputTokens + promptTokens + completionTokens;
+}
+
+export async function systemHealthRoutes(fastify, opts = {}) {
+  const deps = opts?.deps || {};
+  const db = opts?.supabaseAdmin || deps.supabaseAdmin || supabaseAdmin;
+  const aiCacheMetricsFn = opts?.getAiCacheMetrics || deps.getAiCacheMetrics || getAiCacheMetrics;
+
   fastify.get('/api/system/health', {
     preHandler: [requireApiKey],
   }, async (_req, reply) => {
@@ -160,14 +218,14 @@ export async function systemHealthRoutes(fastify) {
     const staleCutoff = new Date(Date.now() - (Math.max(30, Number(ENV.WORKER_HEARTBEAT_SECONDS || 60)) * 1000)).toISOString();
 
     const checks = {
-      queuePending: await safeCount('job_queue', (q) => q.in('status', ['pending', 'retry_wait'])),
-      queueDeadLetter: await safeCount('job_queue', (q) => q.eq('status', 'dead_letter')),
-      queueRunning: await safeCount('job_queue', (q) => q.in('status', ['leased', 'running'])),
-      workersFresh: await safeCount('worker_heartbeats', (q) => q.gte('last_seen_at', staleCutoff)),
-      workersStale: await safeCount('worker_heartbeats', (q) => q.lt('last_seen_at', staleCutoff)),
-      errors24h: await safeCount('system_errors', (q) => q.gte('created_at', new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString())),
-      oldestPending: await safeOldestPendingJob(),
-      cacheHitRate: await safeCacheHitRate24h(),
+      queuePending: await safeCount(db, 'job_queue', (q) => q.in('status', ['pending', 'retry_wait'])),
+      queueDeadLetter: await safeCount(db, 'job_queue', (q) => q.eq('status', 'dead_letter')),
+      queueRunning: await safeCount(db, 'job_queue', (q) => q.in('status', ['leased', 'running'])),
+      workersFresh: await safeCount(db, 'worker_heartbeats', (q) => q.gte('last_seen_at', staleCutoff)),
+      workersStale: await safeCount(db, 'worker_heartbeats', (q) => q.lt('last_seen_at', staleCutoff)),
+      errors24h: await safeCount(db, 'system_errors', (q) => q.gte('created_at', new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString())),
+      oldestPending: await safeOldestPendingJob(db),
+      cacheHitRate: await safeCacheHitRate24h(db),
     };
 
     const missing_tables = [];
@@ -207,7 +265,7 @@ export async function systemHealthRoutes(fastify) {
       ai: {
         cache_hit_rate_24h: checks.cacheHitRate.hit_rate,
         provider: ENV.AI_PROVIDER,
-        metrics: getAiCacheMetrics(),
+        metrics: aiCacheMetricsFn(),
       },
       errors: {
         recent_24h: checks.errors24h.count,
@@ -225,7 +283,7 @@ export async function systemHealthRoutes(fastify) {
     const status = asText(req?.query?.status);
     const staleCutoff = new Date(Date.now() - (staleSeconds * 1000)).toISOString();
 
-    let workersQuery = supabaseAdmin
+    let workersQuery = db
       .from('worker_heartbeats')
       .select('worker_id,worker_type,status,system_mode,current_job_id,last_heartbeat_at,last_seen_at,updated_at,in_flight_jobs,max_concurrency,metadata,meta')
       .order('last_seen_at', { ascending: false })
@@ -234,12 +292,12 @@ export async function systemHealthRoutes(fastify) {
     if (status) workersQuery = workersQuery.eq('status', status);
 
     const workers = await safeRows(workersQuery);
-    const freshCount = await safeCount('worker_heartbeats', (q) => {
+    const freshCount = await safeCount(db, 'worker_heartbeats', (q) => {
       let out = q.gte('last_seen_at', staleCutoff);
       if (status) out = out.eq('status', status);
       return out;
     });
-    const staleCount = await safeCount('worker_heartbeats', (q) => {
+    const staleCount = await safeCount(db, 'worker_heartbeats', (q) => {
       let out = q.lt('last_seen_at', staleCutoff);
       if (status) out = out.eq('status', status);
       return out;
@@ -294,7 +352,7 @@ export async function systemHealthRoutes(fastify) {
 
     const jobs = await safeRows(
       applyJobFilters(
-        supabaseAdmin
+        db
           .from('job_queue')
           .select('id,job_type,tenant_id,status,priority,available_at,leased_at,lease_expires_at,attempt_count,max_attempts,worker_id,last_error,created_at,updated_at')
           .order('created_at', { ascending: false })
@@ -306,7 +364,7 @@ export async function systemHealthRoutes(fastify) {
     const statusChecks = {};
     for (const value of statuses) {
       const key = `status_${value}`;
-      statusChecks[key] = await safeCount('job_queue', (q) => {
+      statusChecks[key] = await safeCount(db, 'job_queue', (q) => {
         let out = q.eq('status', value);
         if (jobType) out = out.eq('job_type', jobType);
         if (tenantId) out = out.eq('tenant_id', tenantId);
@@ -315,7 +373,7 @@ export async function systemHealthRoutes(fastify) {
       status_counts[value] = statusChecks[key].count;
     }
 
-    const oldestPending = await safeOldestPendingJob();
+    const oldestPending = await safeOldestPendingJob(db);
     const checks = { jobs, oldestPending, ...statusChecks };
     const missing_tables = [];
     for (const [key, value] of Object.entries(checks)) {
@@ -349,6 +407,78 @@ export async function systemHealthRoutes(fastify) {
     });
   });
 
+  fastify.get('/api/system/usage', {
+    preHandler: [requireApiKey],
+  }, async (req, reply) => {
+    const hours = clampInt(req?.query?.hours, 24, 720);
+    const limit = clampInt(asInt(req?.query?.limit, 5000), 100, 10000);
+    const sinceIso = new Date(Date.now() - (hours * 60 * 60 * 1000)).toISOString();
+
+    const cacheRows = await safeRows(
+      db
+        .from('ai_cache')
+        .select('provider,model,task_type,token_usage,cost_estimate,hit_count,created_at,last_hit_at')
+        .gte('created_at', sinceIso)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+    );
+
+    const errorRows = await safeRows(
+      db
+        .from('system_errors')
+        .select('service,component,source,error_type,error_code,severity,metadata,details,created_at')
+        .gte('created_at', sinceIso)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+    );
+
+    const cacheHitRate = await safeCacheHitRate24h(db, hours, limit);
+
+    const provider_counts = {};
+    const task_type_counts = {};
+
+    let aiRequests24h = 0;
+    let tokenUsage24h = 0;
+    let costEstimate24h = 0;
+
+    for (const row of cacheRows.rows) {
+      aiRequests24h += 1;
+      const provider = asText(row.provider) || 'unknown';
+      const taskType = asText(row.task_type) || 'unknown';
+      provider_counts[provider] = Number(provider_counts[provider] || 0) + 1;
+      task_type_counts[taskType] = Number(task_type_counts[taskType] || 0) + 1;
+      tokenUsage24h += normalizeTokenUsage(row);
+      costEstimate24h += asNumber(row.cost_estimate, 0);
+    }
+
+    const aiFailures24h = errorRows.rows.filter(isAiError).length;
+
+    const checks = { cacheRows, errorRows, cacheHitRate };
+    const missing_tables = [];
+    for (const [key, value] of Object.entries(checks)) {
+      if (value?.missing) missing_tables.push(key);
+    }
+
+    return reply.send({
+      ok: true,
+      timestamp: new Date().toISOString(),
+      hours,
+      ai_requests_24h: aiRequests24h,
+      ai_failures_24h: aiFailures24h,
+      ai_cache_hit_rate_24h: cacheHitRate.hit_rate ?? 0,
+      token_usage_24h: Math.round(tokenUsage24h),
+      cost_estimate_24h_usd: Number(costEstimate24h.toFixed(6)),
+      summary: {
+        provider_counts,
+        task_type_counts,
+        analyzed_cache_rows: cacheRows.rows.length,
+        analyzed_error_rows: errorRows.rows.length,
+      },
+      missing_tables,
+      warnings: summarizeErrors(checks),
+    });
+  });
+
   fastify.get('/api/system/errors', {
     preHandler: [requireApiKey],
   }, async (req, reply) => {
@@ -361,7 +491,7 @@ export async function systemHealthRoutes(fastify) {
     const sinceIso = new Date(Date.now() - (hours * 60 * 60 * 1000)).toISOString();
 
     const rawRows = await safeRows(
-      supabaseAdmin
+      db
         .from('system_errors')
         .select('*')
         .gte('created_at', sinceIso)
