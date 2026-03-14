@@ -1,6 +1,9 @@
 # Nexus Video Content Worker
 
-Scaffold worker for generating draft video content packs from Nexus research and transcript inputs.
+Phase A Ticket A1 scope:
+- direct-run draft generation hardening
+- tenant-scoped validation
+- dry-run and non-dry-run command validation
 
 ## Safety
 - Draft-only output (`status=draft`).
@@ -11,26 +14,36 @@ Scaffold worker for generating draft video content packs from Nexus research and
 ## Install
 ```bash
 cd /opt/nexus-services/video-content-worker
-npm ci
+npm install
 cp .env.example .env
 ```
 
-## Run once (direct mode)
+## Direct-Run Validation (Tenant Required)
+Dry-run:
 ```bash
-node worker.js --once --tenant <TENANT_UUID>
+node worker.js --once --tenant <TENANT_UUID> --dry-run
 ```
 
-## Run once (queue mode)
+Non-dry-run (writes draft artifacts):
 ```bash
-VIDEO_WORKER_QUEUE_ENABLED=true node worker.js --once --queue
+node worker.js --once --tenant <TENANT_UUID> --no-dry-run
 ```
 
-## Check syntax
+## Queue Run (Optional)
+```bash
+VIDEO_WORKER_QUEUE_ENABLED=true node worker.js --once --queue --dry-run
+```
+
+## Check and Test
 ```bash
 npm run check
+npm run test
 ```
 
-## Output target
-Default write target is `research_artifacts` with `summary/key_points/tags/trace_id` fields and draft metadata embedded in tags/key points.
+## Write Safety Guards
+Non-dry-run writes can be blocked if:
+- insufficient evidence (`VIDEO_WORKER_MIN_EVIDENCE_ITEMS`)
+- tenant-scoped signals missing when `VIDEO_WORKER_STRICT_TENANT_SCOPE=true`
 
-If `VIDEO_WORKER_DRY_RUN=true`, worker only prints previews and does not write rows.
+## Output Target
+Default write target is `research_artifacts` with draft markers in `key_points` and `tags`, including `tenant_id:<TENANT_UUID>` for traceability.
