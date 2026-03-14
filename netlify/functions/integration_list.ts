@@ -2,6 +2,7 @@ import type { Handler } from '@netlify/functions';
 import { z } from 'zod';
 import { getUserSupabaseClient } from './_shared/supabase_user_client';
 import { resolveTenantId } from './_shared/tenant_resolve';
+import { maskIntegrationCredentials } from './_shared/integration_credentials_crypto';
 
 const QuerySchema = z.object({
   tenant_id: z.string().uuid().optional(),
@@ -37,7 +38,6 @@ export const handler: Handler = async (event) => {
 
 function redactIntegration(row: any) {
   const provider = String(row?.provider || '');
-  const credentials = row?.credentials || {};
   return {
     id: row?.id,
     provider,
@@ -46,29 +46,8 @@ function redactIntegration(row: any) {
     last_tested_at: row?.last_tested_at,
     last_error: row?.last_error,
     metadata: row?.metadata || {},
-    credentials_masked: maskCredentials(provider, credentials),
+    credentials_masked: maskIntegrationCredentials(provider, row?.credentials || {}),
   };
-}
-
-function maskCredentials(provider: string, credentials: Record<string, any>) {
-  const masked: Record<string, string> = {};
-  for (const [k, v] of Object.entries(credentials || {})) {
-    if (typeof v !== 'string') continue;
-    if (k.includes('token') || k.includes('key')) masked[k] = maskSecret(v);
-    else masked[k] = v;
-  }
-
-  if (provider === 'stripe' && credentials?.secret_key && !masked.secret_key) {
-    masked.secret_key = maskSecret(String(credentials.secret_key));
-  }
-
-  return masked;
-}
-
-function maskSecret(value: string) {
-  const v = String(value || '');
-  if (v.length <= 8) return '********';
-  return `${v.slice(0, 4)}...${v.slice(-4)}`;
 }
 
 function json(statusCode: number, body: any) {

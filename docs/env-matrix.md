@@ -37,7 +37,17 @@ Validation:
 - Startup validation module: `gateway/src/config/envValidation.js`.
 - Strict mode support via `ENV_VALIDATE_STRICT=true`.
 
-## C) Mac Mini AI Node (secret/private)
+## C) Netlify Functions (secret/private)
+Required:
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (required by `integration_upsert`, `integration_test`, `integration_list` for encrypted `tenant_integrations.credentials`).
+
+Validation:
+- Function-level fail-fast for missing encryption key when encrypting/decrypting stored integration credentials.
+- Keep this variable server-side only; never expose as `VITE_*`.
+
+## D) Mac Mini AI Node (secret/private)
 Required (expected):
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
