@@ -72,6 +72,34 @@ async function sendEmail({ destination, payload }) {
   return { ok: true, status: 202, body: 'sent' };
 }
 
+async function sendTelegram({ destination, payload }) {
+  const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const chatId = String(destination || process.env.TELEGRAM_CHAT_ID || '').trim();
+
+  if (!botToken || !chatId) {
+    return { ok: false, status: 0, body: 'telegram_not_configured' };
+  }
+
+  const endpoint = `https://api.telegram.org/bot${encodeURIComponent(botToken)}/sendMessage`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: `${payload.title}\n${payload.text}\nTenant: ${payload.tenant_id}`,
+      disable_web_page_preview: true,
+    }),
+    signal: AbortSignal.timeout(8000),
+  });
+
+  const body = await response.text().catch(() => '');
+  return {
+    ok: response.ok,
+    status: response.status,
+    body: safeText(body),
+  };
+}
+
 export async function sendNotifications({ tenant_id, alert_event }) {
   const channels = await getActiveChannels({ tenant_id });
   const payload = buildMessage({
@@ -88,7 +116,13 @@ export async function sendNotifications({ tenant_id, alert_event }) {
     const kind = String(channel.kind || '').trim().toLowerCase();
     const destination = String(channel.destination || '').trim();
 
-    if (!kind || !destination) {
+    if (!kind) {
+      results.push({ channel_id: channel.id, kind, ok: false, status: 0, error: 'invalid_channel_kind' });
+      continue;
+    }
+
+    const allowsEmptyDestination = kind === 'telegram' || kind === 'telegram_chat';
+    if (!destination && !allowsEmptyDestination) {
       results.push({ channel_id: channel.id, kind, ok: false, status: 0, error: 'invalid_channel_destination' });
       continue;
     }
@@ -112,6 +146,12 @@ export async function sendNotifications({ tenant_id, alert_event }) {
 
       if (kind === 'email') {
         const res = await sendEmail({ destination, payload });
+        results.push({ channel_id: channel.id, kind, ok: res.ok, status: res.status, error: res.ok ? null : res.body });
+        continue;
+      }
+
+      if (kind === 'telegram' || kind === 'telegram_chat') {
+        const res = await sendTelegram({ destination, payload });
         results.push({ channel_id: channel.id, kind, ok: res.ok, status: res.status, error: res.ok ? null : res.body });
         continue;
       }

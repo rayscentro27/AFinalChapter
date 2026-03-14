@@ -4,6 +4,7 @@ import { requireTenantRole } from '../lib/auth/requireTenantRole.js';
 import { ADMIN_RATE_LIMIT } from '../util/rate-limit.js';
 import { hasValidCronToken, isLocalRequest, parseAllowedTenantIds } from '../util/cron-auth.js';
 import { redactSecrets, redactText } from '../util/redact.js';
+import { sendNotifications } from '../lib/monitoring/notify.js';
 
 const MAX_ERROR_LEN = 500;
 
@@ -388,9 +389,6 @@ async function markAlertNotified(alertRowId) {
 }
 
 function shouldSendNotification({ transition, row }) {
-  const url = asText(ENV.ALERTS_WEBHOOK_URL);
-  if (!url) return false;
-
   if (transition === 'opened' || transition === 'reopened') return true;
   if (transition === 'resolved') return Boolean(ENV.ALERTS_NOTIFY_ON_RESOLVE);
   if (transition !== 'still_open') return false;
@@ -408,7 +406,6 @@ async function deliverNotification({ tenantId, check, transition, row }) {
     return { notified: false, reason: 'cooldown_or_disabled' };
   }
 
-  const webhookUrl = asText(ENV.ALERTS_WEBHOOK_URL);
   const payload = {
     source: 'nexus-gateway',
     tenant_id: tenantId,
@@ -421,16 +418,20 @@ async function deliverNotification({ tenantId, check, transition, row }) {
   };
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
+    const delivery = await sendNotifications({
+      tenant_id: tenantId,
+      alert_event: {
+        severity: check.severity,
+        alert_key: check.alert_key,
+        message: check.summary,
+        details: check.details,
       },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(8000),
     });
 
-    const text = await response.text().catch(() => '');
+    const hasActiveChannels = Number(delivery?.total || 0) > 0;
+    const sentCount = Number(delivery?.sent || 0);
+    const failedCount = Number(delivery?.failed || 0);
+    const delivered = sentCount > 0;
 
     await insertNotificationLog({
       tenantId,
@@ -439,20 +440,26 @@ async function deliverNotification({ tenantId, check, transition, row }) {
       severity: check.severity,
       summary: check.summary,
       payload,
-      delivered: response.ok,
-      responseCode: response.status,
-      responseBody: text,
-      error: response.ok ? null : `non_2xx_${response.status}`,
+      delivered,
+      responseCode: null,
+      responseBody: JSON.stringify({
+        channels_total: hasActiveChannels ? Number(delivery?.total || 0) : 0,
+        channels_sent: sentCount,
+        channels_failed: failedCount,
+      }),
+      error: delivered ? null : (hasActiveChannels ? 'channels_delivery_failed' : 'no_active_channels'),
     });
 
-    if (response.ok && row?.id) {
+    if (delivered && row?.id) {
       await markAlertNotified(row.id);
     }
 
     return {
-      notified: response.ok,
-      status_code: response.status,
-      error: response.ok ? null : `non_2xx_${response.status}`,
+      notified: delivered,
+      channels_total: Number(delivery?.total || 0),
+      channels_sent: sentCount,
+      channels_failed: failedCount,
+      reason: delivered ? 'notified' : (hasActiveChannels ? 'channels_delivery_failed' : 'no_active_channels'),
     };
   } catch (error) {
     const message = String(error?.message || error);

@@ -51,7 +51,6 @@ const RECOMMENDED = {
     'WORKER_HEARTBEAT_SECONDS',
   ],
   observability: [
-    'ALERTS_WEBHOOK_URL',
     'LOG_LEVEL',
   ],
 };

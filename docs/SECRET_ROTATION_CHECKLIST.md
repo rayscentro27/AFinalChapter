@@ -30,7 +30,6 @@ This checklist is for rotating and validating secrets after env hygiene cleanup 
 ## Current Missing/Placeholder Keys (Doppler)
 Fill these in Doppler (`nexuscrm/dev_personal`) before production use:
 - `AI_API_KEY`
-- `ALERTS_WEBHOOK_URL`
 - `GEMINI_API_KEY`
 - `MATRIX_WEBHOOK_TOKEN`
 - `META_APP_SECRET`
