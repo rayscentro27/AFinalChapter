@@ -254,6 +254,152 @@ function isResearchIngestionFailure(row = {}) {
     || haystack.includes('ingest');
 }
 
+function parseTagList(value) {
+  if (Array.isArray(value)) return value.map((item) => asText(item)).filter(Boolean);
+  const text = asText(value);
+  if (!text) return [];
+  if (text.includes(',')) return text.split(',').map((item) => asText(item)).filter(Boolean);
+  return [text];
+}
+
+function rowTenantId(row = {}) {
+  const direct = asText(row.tenant_id);
+  if (direct) return direct;
+
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const meta = row.meta && typeof row.meta === 'object' ? row.meta : {};
+  const details = row.details && typeof row.details === 'object' ? row.details : {};
+
+  const fromMeta = asText(metadata.tenant_id || metadata.tenantId || meta.tenant_id || meta.tenantId || details.tenant_id || details.tenantId);
+  if (fromMeta) return fromMeta;
+
+  const tags = parseTagList(row.tags);
+  const taggedTenant = tags.find((tag) => toLower(tag).startsWith('tenant_id:'));
+  if (taggedTenant) return asText(taggedTenant.split(':').slice(1).join(':'));
+
+  return '';
+}
+
+function filterRowsByTenant(rows, tenantId) {
+  if (!tenantId) return Array.isArray(rows) ? rows : [];
+  const list = Array.isArray(rows) ? rows : [];
+  return list.filter((row) => rowTenantId(row) === tenantId);
+}
+
+function createdAtOrNull(row = {}) {
+  const candidates = [row.created_at, row.updated_at, row.completed_at, row.last_hit_at, row.last_seen_at, row.last_heartbeat_at];
+  for (const value of candidates) {
+    const text = asText(value);
+    if (!text) continue;
+    const parsed = new Date(text);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  return null;
+}
+
+function latestTimestamp(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  let latest = null;
+  for (const row of list) {
+    const ts = createdAtOrNull(row);
+    if (!ts) continue;
+    if (!latest || ts > latest) latest = ts;
+  }
+  return latest;
+}
+
+function rowLooksLikeOpportunity(row = {}) {
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const meta = row.meta && typeof row.meta === 'object' ? row.meta : {};
+  const tags = parseTagList(row.tags);
+  const haystack = [
+    toLower(row.opportunity_type || row.type),
+    toLower(row.title),
+    toLower(row.niche),
+    toLower(row.description),
+    toLower(row.status),
+    toLower(metadata.opportunity_type || metadata.type),
+    toLower(meta.opportunity_type || meta.type),
+    ...tags.map((tag) => toLower(tag)),
+  ].join(' ');
+
+  return haystack.includes('opportun')
+    || haystack.includes('service_gap')
+    || haystack.includes('service gap')
+    || haystack.includes('automation_idea')
+    || haystack.includes('automation idea')
+    || haystack.includes('saas_idea')
+    || haystack.includes('grant');
+}
+
+function rowLooksLikeVideoJob(row = {}) {
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const meta = row.meta && typeof row.meta === 'object' ? row.meta : {};
+  const haystack = [
+    toLower(row.job_type),
+    toLower(row.worker_type),
+    toLower(row.status),
+    toLower(metadata.job_type || metadata.jobType),
+    toLower(metadata.worker_type || metadata.workerType),
+    toLower(meta.job_type || meta.jobType),
+  ].join(' ');
+
+  return haystack.includes('video')
+    || haystack.includes('shorts')
+    || haystack.includes('reel')
+    || haystack.includes('tiktok')
+    || haystack.includes('thumbnail')
+    || haystack.includes('caption')
+    || haystack.includes('script');
+}
+
+function rowLooksLikeVideoWorker(row = {}) {
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const meta = row.meta && typeof row.meta === 'object' ? row.meta : {};
+  const haystack = [
+    toLower(row.worker_type),
+    toLower(row.worker_id),
+    toLower(row.status),
+    toLower(metadata.worker_type || metadata.workerType),
+    toLower(meta.worker_type || meta.workerType),
+  ].join(' ');
+
+  return haystack.includes('video') || haystack.includes('content_worker');
+}
+
+function rowLooksLikeVideoArtifact(row = {}) {
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const meta = row.meta && typeof row.meta === 'object' ? row.meta : {};
+  const tags = parseTagList(row.tags);
+
+  const haystack = [
+    toLower(row.title),
+    toLower(row.status),
+    toLower(row.artifact_type || row.type),
+    toLower(metadata.artifact_type || metadata.type),
+    toLower(meta.artifact_type || meta.type),
+    ...tags.map((tag) => toLower(tag)),
+  ].join(' ');
+
+  return haystack.includes('video')
+    || haystack.includes('shorts')
+    || haystack.includes('reel')
+    || haystack.includes('tiktok')
+    || haystack.includes('thumbnail')
+    || haystack.includes('caption')
+    || haystack.includes('script');
+}
+
+function countBy(rows, keyFn) {
+  const out = {};
+  const list = Array.isArray(rows) ? rows : [];
+  for (const row of list) {
+    const key = asText(keyFn(row)) || 'unknown';
+    out[key] = Number(out[key] || 0) + 1;
+  }
+  return out;
+}
+
 function normalizeTokenUsage(row = {}) {
   const usage = row.token_usage && typeof row.token_usage === 'object' ? row.token_usage : {};
 
@@ -623,6 +769,250 @@ export async function systemHealthRoutes(fastify, opts = {}) {
       },
       missing_tables,
       warnings: summarizeErrors(checks),
+    });
+  });
+
+  fastify.get('/api/system/opportunities', {
+    preHandler: [requireApiKey],
+  }, async (req, reply) => {
+    const hours = clampInt(req?.query?.hours, 24, 720);
+    const tenantId = asText(req?.query?.tenant_id);
+    const limit = clampInt(asInt(req?.query?.limit, 2000), 100, 10000);
+    const sinceIso = new Date(Date.now() - (hours * 60 * 60 * 1000)).toISOString();
+
+    const checks = {
+      businessRows: await safeRows(
+        db
+          .from('business_opportunities')
+          .select('*')
+          .gte('created_at', sinceIso)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+      ),
+      grantRows: await safeRows(
+        db
+          .from('grant_opportunities')
+          .select('*')
+          .gte('created_at', sinceIso)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+      ),
+      serviceGapRows: await safeRows(
+        db
+          .from('coverage_gaps')
+          .select('*')
+          .gte('created_at', sinceIso)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+      ),
+      briefRows: await safeRows(
+        db
+          .from('research_briefs')
+          .select('*')
+          .gte('created_at', sinceIso)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+      ),
+      artifactRows: await safeRows(
+        db
+          .from('research_artifacts')
+          .select('*')
+          .gte('created_at', sinceIso)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+      ),
+    };
+
+    const businessRows = filterRowsByTenant(checks.businessRows.rows, tenantId);
+    const grantRows = filterRowsByTenant(checks.grantRows.rows, tenantId);
+    const serviceGapRows = filterRowsByTenant(checks.serviceGapRows.rows, tenantId);
+    const briefRows = filterRowsByTenant(checks.briefRows.rows, tenantId);
+    const artifactRows = filterRowsByTenant(checks.artifactRows.rows, tenantId);
+
+    const automationIdeas = businessRows.filter((row) => {
+      const kind = toLower(row.opportunity_type || row.type || row.niche || row.title);
+      return kind.includes('automation');
+    }).length;
+
+    const artifactOpportunities = artifactRows.filter(rowLooksLikeOpportunity);
+
+    const typeCounts = countBy(
+      [...businessRows, ...grantRows, ...serviceGapRows, ...artifactOpportunities],
+      (row) => row.opportunity_type || row.gap_type || row.type || 'unknown',
+    );
+
+    const topOpportunities = [...businessRows, ...grantRows]
+      .map((row) => ({
+        id: row.id || null,
+        source_table: grantRows.includes(row) ? 'grant_opportunities' : 'business_opportunities',
+        tenant_id: rowTenantId(row) || null,
+        title: asText(row.title || row.opportunity_title || row.name) || null,
+        opportunity_type: asText(row.opportunity_type || row.type) || null,
+        niche: asText(row.niche || row.category) || null,
+        score: asNumber(row.score, null),
+        confidence: asNumber(row.confidence, null),
+        urgency: asNumber(row.urgency, null),
+        recommended_owner: asText(row.recommended_owner || row.owner) || null,
+        status: asText(row.status) || null,
+        created_at: createdAtOrNull(row),
+      }))
+      .sort((a, b) => {
+        const scoreA = Number.isFinite(a.score) ? a.score : -Infinity;
+        const scoreB = Number.isFinite(b.score) ? b.score : -Infinity;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return asText(b.created_at).localeCompare(asText(a.created_at));
+      })
+      .slice(0, 10);
+
+    const latestOpportunityAt = latestTimestamp([
+      ...businessRows,
+      ...grantRows,
+      ...serviceGapRows,
+      ...briefRows,
+      ...artifactOpportunities,
+    ]);
+
+    const checksForWarnings = {
+      businessRows: checks.businessRows,
+      grantRows: checks.grantRows,
+      serviceGapRows: checks.serviceGapRows,
+      briefRows: checks.briefRows,
+      artifactRows: checks.artifactRows,
+    };
+
+    const missing_tables = [];
+    for (const [key, value] of Object.entries(checksForWarnings)) {
+      if (value?.missing) missing_tables.push(key);
+    }
+
+    const totalOpportunities = businessRows.length + grantRows.length + serviceGapRows.length;
+
+    return reply.send({
+      ok: true,
+      timestamp: new Date().toISOString(),
+      hours,
+      tenant_id: tenantId || null,
+      business_opportunities_24h: businessRows.length,
+      grant_opportunities_24h: grantRows.length,
+      service_gaps_24h: serviceGapRows.length,
+      opportunity_briefs_24h: briefRows.length,
+      automation_ideas_24h: automationIdeas,
+      total_opportunities_24h: totalOpportunities,
+      summary: {
+        type_counts: typeCounts,
+        top_opportunities: topOpportunities,
+        latest_opportunity_at: latestOpportunityAt,
+        analyzed_rows: {
+          business_opportunities: checks.businessRows.rows.length,
+          grant_opportunities: checks.grantRows.rows.length,
+          coverage_gaps: checks.serviceGapRows.rows.length,
+          research_briefs: checks.briefRows.rows.length,
+          research_artifacts: checks.artifactRows.rows.length,
+        },
+      },
+      missing_tables,
+      warnings: summarizeErrors(checksForWarnings),
+    });
+  });
+
+  fastify.get('/api/system/video-worker', {
+    preHandler: [requireApiKey],
+  }, async (req, reply) => {
+    const hours = clampInt(req?.query?.hours, 24, 720);
+    const tenantId = asText(req?.query?.tenant_id);
+    const limit = clampInt(asInt(req?.query?.limit, 2000), 100, 10000);
+    const sinceIso = new Date(Date.now() - (hours * 60 * 60 * 1000)).toISOString();
+    const staleCutoff = new Date(Date.now() - (Math.max(30, Number(ENV.WORKER_HEARTBEAT_SECONDS || 60)) * 1000)).toISOString();
+
+    const checks = {
+      jobRows: await safeRows(
+        db
+          .from('job_queue')
+          .select('id,tenant_id,job_type,status,attempt_count,max_attempts,worker_id,created_at,updated_at,completed_at,metadata,meta')
+          .gte('created_at', sinceIso)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+      ),
+      workerRows: await safeRows(
+        db
+          .from('worker_heartbeats')
+          .select('worker_id,tenant_id,worker_type,status,last_seen_at,last_heartbeat_at,current_job_id,in_flight_jobs,max_concurrency,updated_at,metadata,meta')
+          .order('last_seen_at', { ascending: false })
+          .limit(limit),
+      ),
+      artifactRows: await safeRows(
+        db
+          .from('research_artifacts')
+          .select('*')
+          .gte('created_at', sinceIso)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+      ),
+    };
+
+    const scopedJobs = filterRowsByTenant(checks.jobRows.rows, tenantId).filter(rowLooksLikeVideoJob);
+    const scopedWorkers = filterRowsByTenant(checks.workerRows.rows, tenantId).filter(rowLooksLikeVideoWorker);
+    const scopedArtifacts = filterRowsByTenant(checks.artifactRows.rows, tenantId).filter(rowLooksLikeVideoArtifact);
+
+    const jobStatusCounts = countBy(scopedJobs, (row) => row.status || 'unknown');
+    const queueDepthPending = Number(jobStatusCounts.pending || 0) + Number(jobStatusCounts.retry_wait || 0);
+    const currentlyRunning = Number(jobStatusCounts.running || 0) + Number(jobStatusCounts.leased || 0);
+    const deadLetterCount = Number(jobStatusCounts.dead_letter || 0);
+    const failedCount = Number(jobStatusCounts.failed || 0);
+    const completedCount = Number(jobStatusCounts.completed || 0);
+
+    let workersFresh = 0;
+    let workersStale = 0;
+    for (const row of scopedWorkers) {
+      const seenAt = asText(row.last_seen_at || row.last_heartbeat_at || row.updated_at);
+      if (seenAt && seenAt >= staleCutoff) workersFresh += 1;
+      else workersStale += 1;
+    }
+
+    const draftsGenerated = scopedArtifacts.filter((row) => toLower(row.status) === 'draft').length;
+    const reviewPending = scopedArtifacts.filter((row) => {
+      const status = toLower(row.status);
+      return status === 'review_pending' || status === 'pending_review';
+    }).length;
+
+    const checksForWarnings = {
+      jobRows: checks.jobRows,
+      workerRows: checks.workerRows,
+      artifactRows: checks.artifactRows,
+    };
+
+    const missing_tables = [];
+    for (const [key, value] of Object.entries(checksForWarnings)) {
+      if (value?.missing) missing_tables.push(key);
+    }
+
+    return reply.send({
+      ok: true,
+      timestamp: new Date().toISOString(),
+      hours,
+      tenant_id: tenantId || null,
+      queue_depth_pending: queueDepthPending,
+      currently_running: currentlyRunning,
+      dead_letter_count: deadLetterCount,
+      video_jobs_processed_24h: scopedJobs.length,
+      video_jobs_completed_24h: completedCount,
+      video_worker_failures_24h: failedCount + deadLetterCount,
+      video_drafts_generated_24h: draftsGenerated,
+      video_review_pending: reviewPending,
+      workers_known: scopedWorkers.length,
+      workers_fresh: workersFresh,
+      workers_stale: workersStale,
+      latest_video_artifact_at: latestTimestamp(scopedArtifacts),
+      summary: {
+        job_status_counts: jobStatusCounts,
+        analyzed_rows: {
+          job_queue: checks.jobRows.rows.length,
+          worker_heartbeats: checks.workerRows.rows.length,
+          research_artifacts: checks.artifactRows.rows.length,
+        },
+      },
+      missing_tables,
+      warnings: summarizeErrors(checksForWarnings),
     });
   });
 
