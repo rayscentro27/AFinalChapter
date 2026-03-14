@@ -32,6 +32,7 @@ export const PERMISSION_LIST = [
 
 export const LEGACY_ROLE_PERMISSION_MAP = {
   owner: [ALL_PERMISSIONS],
+  super_admin: [ALL_PERMISSIONS],
   admin: [
     'inbox.read',
     'inbox.write',

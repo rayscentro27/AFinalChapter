@@ -27,7 +27,10 @@ import { aiWorkflowRoutes } from './routes/ai_workflow.js';
 import { platformMaturityRoutes } from './routes/platform_maturity.js';
 import { adminSreRoutes } from './routes/admin_sre.js';
 import { enterpriseRoutes } from './routes/enterprise.js';
+import { tradingviewRoutes } from './routes/tradingview.js';
+import { researchRoutes } from './routes/research.js';
 import { systemHealthRoutes } from './routes/system_health.js';
+import { adminMembershipRoutes } from './routes/admin_membership.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -50,6 +53,7 @@ function requestProvider(req) {
   if (path.includes('/webhooks/whatsapp')) return 'whatsapp';
   if (path.includes('/webhooks/twilio')) return 'twilio';
   if (path.includes('/webhooks/matrix')) return 'matrix';
+  if (path.includes('/webhooks/tradingview')) return 'tradingview';
   return null;
 }
 
@@ -73,6 +77,11 @@ const fastify = Fastify({
         'gemini_api_key',
         'openrouter_api_key',
         'nvidia_nim_api_key',
+        'tradingview_webhook_secret',
+        'oanda_api_key',
+        'telegram_bot_token',
+        'req.body.secret',
+        'body.secret',
       ],
       censor: '[REDACTED]',
     },
@@ -150,6 +159,7 @@ await fastify.register(twilioRoutes);
 await fastify.register(metaRoutes);
 await fastify.register(whatsappRoutes);
 await fastify.register(matrixRoutes);
+await fastify.register(tradingviewRoutes);
 await fastify.register(sendRoutes);
 await fastify.register(outboxRoutes);
 await fastify.register(routingRoutes);
@@ -163,6 +173,8 @@ await fastify.register(aiWorkflowRoutes);
 await fastify.register(platformMaturityRoutes);
 await fastify.register(adminSreRoutes);
 await fastify.register(enterpriseRoutes);
+await fastify.register(researchRoutes);
+await fastify.register(adminMembershipRoutes);
 
 fastify.setErrorHandler((error, req, reply) => {
   req.log.error({
