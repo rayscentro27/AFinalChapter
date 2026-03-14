@@ -61,16 +61,21 @@ curl -s -H "x-api-key: $INTERNAL_API_KEY" "http://127.0.0.1:3000/api/system/erro
   - `worker_id`
 
 ## Safe Pause / Resume
-Pause:
-- set `QUEUE_ENABLED=false`
-- optionally set `SYSTEM_MODE=maintenance`
-- restart gateway and workers
+Use automated control-plane commands (requires `INTERNAL_API_KEY`, `REAL_USER_BEARER_TOKEN`, and `TENANT_ID`):
 
-Resume:
-- switch to `SYSTEM_MODE=production` (or desired mode)
-- set `QUEUE_ENABLED=true`
-- restart worker
-- monitor queue + errors endpoints
+```bash
+npm run system:safe-pause
+npm run system:diagnostics
+```
+
+Resume after containment:
+
+```bash
+npm run system:safe-resume
+npm run system:diagnostics
+```
+
+Reference: `docs/system-safe-pause-resume-playbook.md`
 
 ## Failure Triage Sequence
 1. Check `/api/system/health` safety flags.

@@ -13,7 +13,10 @@
     "tradingview:enrich": "node src/workers/tradingview_enricher.js",
     "data:validate": "node scripts/validate_nexus_tables.js",
     "data:integrity": "node scripts/data_integrity_check.js",
-    "queue:worker": "node src/workers/queue_worker.js"
+    "queue:worker": "node src/workers/queue_worker.js",
+    "system:diagnostics": "node scripts/system_control_cli.js diagnostics",
+    "system:safe-pause": "node scripts/system_control_cli.js incident-contain",
+    "system:safe-resume": "node scripts/system_control_cli.js incident-resume"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
