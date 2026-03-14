@@ -9,13 +9,18 @@ import { sendNotifications } from '../lib/monitoring/notify.js';
 
 const MAX_ERROR_LEN = 500;
 
-const ALERT_RULES = {
+export const ALERT_RULES = {
   OUTBOX_FAILED_SPIKE_MIN: 10,
   OUTBOX_FAILED_RATE_MIN: 0.2,
   WEBHOOK_FAILED_SPIKE_MIN: 10,
   WEBHOOK_LAG_P95_WARN_SECONDS: 120,
   PROVIDER_DOWN_MINUTES: 10,
   DELIVERY_FAILED_SPIKE_MIN: 10,
+  QUEUE_PENDING_WARN_MIN: 100,
+  QUEUE_PENDING_CRITICAL_MIN: 500,
+  DEAD_LETTER_GROWTH_HOURLY_CRITICAL_MIN: 10,
+  WORKER_STALE_ALERT_SECONDS: 300,
+  STALE_WORKERS_WHILE_QUEUE_ENABLED_MIN: 1,
 };
 
 function asText(value) {
@@ -229,6 +234,44 @@ async function loadDownChannelsOverMinutes(tenantId, minutes) {
   return Number(count || 0);
 }
 
+
+async function countQueueRows(tenantId, statuses, sinceIso = null, tsColumn = 'updated_at') {
+  let query = supabaseAdmin
+    .from('job_queue')
+    .select('*', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId);
+
+  if (Array.isArray(statuses) && statuses.length > 0) query = query.in('status', statuses);
+  if (sinceIso) query = query.gte(tsColumn, sinceIso);
+
+  const { count, error } = await query;
+  if (error) {
+    if (shouldReturnZeroOnCountError(error)) return 0;
+    throw new Error('job_queue count failed: ' + (error.message || error.details || 'unknown'));
+  }
+
+  return Number(count || 0);
+}
+
+async function countWorkerRowsByFreshness(tenantId, staleCutoffIso, isStale) {
+  let query = supabaseAdmin
+    .from('worker_heartbeats')
+    .select('*', { count: 'exact', head: true })
+    .eq('tenant_scope', tenantId);
+
+  query = isStale
+    ? query.lt('last_seen_at', staleCutoffIso)
+    : query.gte('last_seen_at', staleCutoffIso);
+
+  const { count, error } = await query;
+  if (error) {
+    if (shouldReturnZeroOnCountError(error)) return 0;
+    throw new Error('worker_heartbeats freshness count failed: ' + (error.message || error.details || 'unknown'));
+  }
+
+  return Number(count || 0);
+}
+
 async function loadOpenAlerts(tenantId, limit = 10) {
   const { data, error } = await supabaseAdmin
     .from('alert_events')
@@ -259,6 +302,8 @@ async function loadOpenAlerts(tenantId, limit = 10) {
 
 async function loadOverviewSnapshot(tenantId, windowMinutes = 15) {
   const sinceIso = minutesAgoIso(windowMinutes);
+  const deadLetterSinceIso = minutesAgoIso(60);
+  const staleCutoffIso = new Date(Date.now() - (ALERT_RULES.WORKER_STALE_ALERT_SECONDS * 1000)).toISOString();
 
   const [
     queued,
@@ -274,6 +319,13 @@ async function loadOverviewSnapshot(tenantId, windowMinutes = 15) {
     deliveryFailed,
     providers,
     alertsOpen,
+    queuePending,
+    queueRetryWait,
+    queueRunning,
+    queueDeadLetter,
+    queueDeadLetterLastHour,
+    workersStale,
+    workersFresh,
   ] = await Promise.all([
     countRows('outbox_messages', tenantId, 'status', 'queued'),
     countRows('outbox_messages', tenantId, 'status', 'sending'),
@@ -288,6 +340,13 @@ async function loadOverviewSnapshot(tenantId, windowMinutes = 15) {
     countRows('messages', tenantId, 'delivery_status', 'failed'),
     loadProviderSummary(tenantId),
     loadOpenAlerts(tenantId, 10),
+    countQueueRows(tenantId, ['pending']),
+    countQueueRows(tenantId, ['retry_wait']),
+    countQueueRows(tenantId, ['running', 'leased']),
+    countQueueRows(tenantId, ['dead_letter']),
+    countQueueRows(tenantId, ['dead_letter'], deadLetterSinceIso, 'updated_at'),
+    countWorkerRowsByFreshness(tenantId, staleCutoffIso, true),
+    countWorkerRowsByFreshness(tenantId, staleCutoffIso, false),
   ]);
 
   return {
@@ -308,6 +367,18 @@ async function loadOverviewSnapshot(tenantId, windowMinutes = 15) {
       delivered: deliveryDelivered,
       failed: deliveryFailed,
     },
+    queue: {
+      pending: queuePending,
+      retry_wait: queueRetryWait,
+      running: queueRunning,
+      dead_letter: queueDeadLetter,
+      dead_letter_last_hour: queueDeadLetterLastHour,
+    },
+    workers: {
+      stale_count: workersStale,
+      fresh_count: workersFresh,
+      stale_cutoff_iso: staleCutoffIso,
+    },
     providers,
     alerts_open: alertsOpen,
   };
@@ -322,7 +393,7 @@ function normalizeStatusInput(value) {
   return 'open';
 }
 
-function buildAlertRules(snapshot, ruleContext) {
+export function buildAlertRules(snapshot, ruleContext) {
   const failedRecent = Number(ruleContext.failedOutboxLastWindow || 0);
   const totalRecent = Number(ruleContext.totalOutboxLastWindow || 0);
   const failedRate = totalRecent > 0 ? failedRecent / totalRecent : 0;
@@ -383,6 +454,43 @@ function buildAlertRules(snapshot, ruleContext) {
       message: `Delivery failures in window: ${ruleContext.deliveryFailedLastWindow}`,
       details: {
         failed_15m: Number(ruleContext.deliveryFailedLastWindow || 0),
+      },
+    },
+    {
+      alert_key: 'QUEUE_PENDING_SPIKE',
+      severity: Number(snapshot.queue.pending || 0) + Number(snapshot.queue.retry_wait || 0) >= ALERT_RULES.QUEUE_PENDING_CRITICAL_MIN ? 'critical' : 'warn',
+      triggered: Number(snapshot.queue.pending || 0) + Number(snapshot.queue.retry_wait || 0) >= ALERT_RULES.QUEUE_PENDING_WARN_MIN,
+      message: `Queue pending depth is ${Number(snapshot.queue.pending || 0) + Number(snapshot.queue.retry_wait || 0)} (warn ${ALERT_RULES.QUEUE_PENDING_WARN_MIN}, critical ${ALERT_RULES.QUEUE_PENDING_CRITICAL_MIN})`,
+      details: {
+        pending: Number(snapshot.queue.pending || 0),
+        retry_wait: Number(snapshot.queue.retry_wait || 0),
+        running: Number(snapshot.queue.running || 0),
+        warn_threshold: ALERT_RULES.QUEUE_PENDING_WARN_MIN,
+        critical_threshold: ALERT_RULES.QUEUE_PENDING_CRITICAL_MIN,
+      },
+    },
+    {
+      alert_key: 'QUEUE_DEAD_LETTER_GROWTH',
+      severity: 'critical',
+      triggered: Number(snapshot.queue.dead_letter_last_hour || 0) >= ALERT_RULES.DEAD_LETTER_GROWTH_HOURLY_CRITICAL_MIN,
+      message: `Queue dead-letter growth in last hour is ${snapshot.queue.dead_letter_last_hour} (threshold ${ALERT_RULES.DEAD_LETTER_GROWTH_HOURLY_CRITICAL_MIN})`,
+      details: {
+        dead_letter_total: Number(snapshot.queue.dead_letter || 0),
+        dead_letter_last_hour: Number(snapshot.queue.dead_letter_last_hour || 0),
+        threshold: ALERT_RULES.DEAD_LETTER_GROWTH_HOURLY_CRITICAL_MIN,
+      },
+    },
+    {
+      alert_key: 'WORKERS_STALE_WHILE_QUEUE_ENABLED',
+      severity: 'critical',
+      triggered: Boolean(ruleContext.queueEnabled) && Number(snapshot.workers.stale_count || 0) >= ALERT_RULES.STALE_WORKERS_WHILE_QUEUE_ENABLED_MIN,
+      message: `Stale workers detected while queue enabled: ${snapshot.workers.stale_count}`,
+      details: {
+        queue_enabled: Boolean(ruleContext.queueEnabled),
+        stale_workers: Number(snapshot.workers.stale_count || 0),
+        fresh_workers: Number(snapshot.workers.fresh_count || 0),
+        threshold: ALERT_RULES.STALE_WORKERS_WHILE_QUEUE_ENABLED_MIN,
+        stale_cutoff_iso: snapshot.workers.stale_cutoff_iso || null,
       },
     },
   ];
@@ -633,6 +741,7 @@ export async function adminMonitoringV2Routes(fastify) {
         deliveryFailedLastWindow,
         providersDownOverThreshold,
         activeChannels,
+        queueEnabled: ENV.QUEUE_ENABLED,
       });
 
       const results = [];
@@ -692,6 +801,9 @@ export async function adminMonitoringV2Routes(fastify) {
         recordMetric({ tenant_id: tenantId, metric: 'monitoring.webhooks.failed_15m', value_num: snapshot.webhooks.failed_15m }),
         recordMetric({ tenant_id: tenantId, metric: 'monitoring.webhooks.lag_p95_seconds', value_num: snapshot.webhooks.lag_p95_seconds }),
         recordMetric({ tenant_id: tenantId, metric: 'monitoring.delivery.failed', value_num: snapshot.delivery.failed }),
+        recordMetric({ tenant_id: tenantId, metric: 'monitoring.queue.pending', value_num: Number(snapshot.queue.pending || 0) + Number(snapshot.queue.retry_wait || 0) }),
+        recordMetric({ tenant_id: tenantId, metric: 'monitoring.queue.dead_letter_last_hour', value_num: snapshot.queue.dead_letter_last_hour }),
+        recordMetric({ tenant_id: tenantId, metric: 'monitoring.workers.stale', value_num: snapshot.workers.stale_count }),
       ]);
 
       return reply.send({
