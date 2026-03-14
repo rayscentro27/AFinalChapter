@@ -1,6 +1,16 @@
 import { ENV } from '../env.js';
 import { supabaseAdmin } from '../supabase.js';
 import { getAiCacheMetrics } from '../ai/cache.js';
+import { requireTenantPermission } from '../lib/auth/requireTenantPermission.js';
+import { logAudit } from '../lib/audit/auditLog.js';
+import {
+  VALID_SYSTEM_MODES,
+  getSystemControlState,
+  setSystemMode,
+  updateSystemFlags,
+  safePauseSystem,
+  safeResumeSystem,
+} from '../system/controlPlaneState.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -422,12 +432,45 @@ export async function systemHealthRoutes(fastify, opts = {}) {
   const deps = opts?.deps || {};
   const db = opts?.supabaseAdmin || deps.supabaseAdmin || supabaseAdmin;
   const aiCacheMetricsFn = opts?.getAiCacheMetrics || deps.getAiCacheMetrics || getAiCacheMetrics;
+  const monitoringManageGuard = requireTenantPermission({
+    supabaseAdmin,
+    permission: 'monitoring.manage',
+    mfaMode: 'admin',
+  });
+
+  async function recordControlAudit({ req, tenantId, action, previous, current, changed, details = {} }) {
+    const result = await logAudit({
+      supabaseAdmin,
+      tenant_id: tenantId,
+      actor_user_id: req.user?.id || null,
+      actor_type: 'user',
+      action,
+      entity_type: 'system_control',
+      entity_id: 'global',
+      metadata: {
+        route: asText(req?.routeOptions?.url || req?.routerPath || req?.raw?.url),
+        request_id: req.id,
+        mode: current?.system_mode || null,
+        changed,
+        previous,
+        current,
+        details,
+      },
+    });
+
+    if (!result?.ok) {
+      const error = new Error('audit_unavailable');
+      error.statusCode = 503;
+      throw error;
+    }
+  }
 
   fastify.get('/api/system/health', {
     preHandler: [requireApiKey],
   }, async (_req, reply) => {
     const now = new Date();
     const nowIso = now.toISOString();
+    const controlState = getSystemControlState();
     const staleCutoff = new Date(Date.now() - (Math.max(30, Number(ENV.WORKER_HEARTBEAT_SECONDS || 60)) * 1000)).toISOString();
 
     const checks = {
@@ -452,16 +495,19 @@ export async function systemHealthRoutes(fastify, opts = {}) {
       timestamp: nowIso,
       version: process.env.npm_package_version || null,
       uptime_seconds: Number(process.uptime().toFixed(3)),
-      system_mode: ENV.SYSTEM_MODE,
-      queue_enabled: ENV.QUEUE_ENABLED,
-      ai_jobs_enabled: ENV.AI_JOBS_ENABLED,
-      research_jobs_enabled: ENV.RESEARCH_JOBS_ENABLED,
-      notifications_enabled: ENV.NOTIFICATIONS_ENABLED,
+      system_mode: controlState.system_mode,
+      queue_enabled: controlState.queue_enabled,
+      ai_jobs_enabled: controlState.ai_jobs_enabled,
+      research_jobs_enabled: controlState.research_jobs_enabled,
+      notifications_enabled: controlState.notifications_enabled,
       safety_flags: {
-        queue_enabled: ENV.QUEUE_ENABLED,
-        ai_jobs_enabled: ENV.AI_JOBS_ENABLED,
-        research_jobs_enabled: ENV.RESEARCH_JOBS_ENABLED,
-        notifications_enabled: ENV.NOTIFICATIONS_ENABLED,
+        queue_enabled: controlState.queue_enabled,
+        ai_jobs_enabled: controlState.ai_jobs_enabled,
+        research_jobs_enabled: controlState.research_jobs_enabled,
+        notifications_enabled: controlState.notifications_enabled,
+        job_max_runtime_seconds: controlState.job_max_runtime_seconds,
+        worker_max_concurrency: controlState.worker_max_concurrency,
+        tenant_job_limit_active: controlState.tenant_job_limit_active,
         safe_mode: ENV.SAFE_MODE,
       },
       queue: {
@@ -1036,6 +1082,196 @@ export async function systemHealthRoutes(fastify, opts = {}) {
       warnings: summarizeErrors(checksForWarnings),
     });
   });
+
+
+  fastify.post('/api/system/mode/set', {
+    preHandler: [requireApiKey, monitoringManageGuard],
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const mode = asText(req.body?.mode).toLowerCase();
+
+    if (!tenantId) return reply.code(400).send({ ok: false, error: 'missing_tenant_id' });
+    if (!mode) return reply.code(400).send({ ok: false, error: 'missing_mode' });
+
+    const result = setSystemMode(mode);
+    if (!result.ok) {
+      return reply.code(400).send({
+        ok: false,
+        error: result.error || 'invalid_system_mode',
+        details: result.details || { valid_modes: Array.from(VALID_SYSTEM_MODES) },
+      });
+    }
+
+    try {
+      await recordControlAudit({
+        req,
+        tenantId,
+        action: 'system_mode_set',
+        previous: result.previous,
+        current: result.current,
+        changed: result.changed,
+        details: {
+          requested_mode: mode,
+          valid_modes: Array.from(VALID_SYSTEM_MODES),
+        },
+      });
+    } catch (error) {
+      req.log.error({ err: error }, 'system mode audit failed');
+      return reply.code(Number(error?.statusCode) || 500).send({ ok: false, error: String(error?.message || 'audit_failed') });
+    }
+
+    return reply.send({
+      ok: true,
+      action: 'system_mode_set',
+      tenant_id: tenantId,
+      previous: result.previous,
+      current: result.current,
+      changed: result.changed,
+    });
+  });
+
+  fastify.post('/api/system/flags/update', {
+    preHandler: [requireApiKey, monitoringManageGuard],
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+
+    if (!tenantId) return reply.code(400).send({ ok: false, error: 'missing_tenant_id' });
+
+    const patch = {
+      queue_enabled: req.body?.queue_enabled,
+      ai_jobs_enabled: req.body?.ai_jobs_enabled,
+      research_jobs_enabled: req.body?.research_jobs_enabled,
+      notifications_enabled: req.body?.notifications_enabled,
+      job_max_runtime_seconds: req.body?.job_max_runtime_seconds,
+      worker_max_concurrency: req.body?.worker_max_concurrency,
+      tenant_job_limit_active: req.body?.tenant_job_limit_active,
+    };
+
+    const result = updateSystemFlags(patch);
+    if (!result.ok) {
+      return reply.code(400).send({
+        ok: false,
+        error: result.error || 'invalid_flags_update',
+        details: result.details || null,
+      });
+    }
+
+    try {
+      await recordControlAudit({
+        req,
+        tenantId,
+        action: 'system_flags_update',
+        previous: result.previous,
+        current: result.current,
+        changed: result.changed,
+        details: {
+          requested_patch: patch,
+        },
+      });
+    } catch (error) {
+      req.log.error({ err: error }, 'system flags audit failed');
+      return reply.code(Number(error?.statusCode) || 500).send({ ok: false, error: String(error?.message || 'audit_failed') });
+    }
+
+    return reply.send({
+      ok: true,
+      action: 'system_flags_update',
+      tenant_id: tenantId,
+      previous: result.previous,
+      current: result.current,
+      changed: result.changed,
+    });
+  });
+
+  fastify.post('/api/system/safe-pause', {
+    preHandler: [requireApiKey, monitoringManageGuard],
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const reason = asText(req.body?.reason);
+    const disableNotifications = req.body?.disable_notifications;
+
+    if (!tenantId) return reply.code(400).send({ ok: false, error: 'missing_tenant_id' });
+
+    const result = safePauseSystem({
+      tenantId,
+      disableNotifications,
+    });
+
+    try {
+      await recordControlAudit({
+        req,
+        tenantId,
+        action: 'system_safe_pause',
+        previous: result.previous,
+        current: result.current,
+        changed: result.changed,
+        details: {
+          reason: reason || null,
+          disable_notifications: disableNotifications === undefined ? null : Boolean(disableNotifications),
+          snapshot_key: result.snapshot_key,
+        },
+      });
+    } catch (error) {
+      req.log.error({ err: error }, 'system safe pause audit failed');
+      return reply.code(Number(error?.statusCode) || 500).send({ ok: false, error: String(error?.message || 'audit_failed') });
+    }
+
+    return reply.send({
+      ok: true,
+      action: 'system_safe_pause',
+      tenant_id: tenantId,
+      previous: result.previous,
+      current: result.current,
+      changed: result.changed,
+    });
+  });
+
+  fastify.post('/api/system/safe-resume', {
+    preHandler: [requireApiKey, monitoringManageGuard],
+  }, async (req, reply) => {
+    const tenantId = asText(req.body?.tenant_id || req.tenant?.id);
+    const reason = asText(req.body?.reason);
+
+    if (!tenantId) return reply.code(400).send({ ok: false, error: 'missing_tenant_id' });
+
+    const result = safeResumeSystem({ tenantId });
+    if (!result.ok) {
+      const statusCode = result.error === 'no_pause_snapshot' ? 409 : 400;
+      return reply.code(statusCode).send({
+        ok: false,
+        error: result.error || 'resume_failed',
+        details: result.details || null,
+      });
+    }
+
+    try {
+      await recordControlAudit({
+        req,
+        tenantId,
+        action: 'system_safe_resume',
+        previous: result.previous,
+        current: result.current,
+        changed: result.changed,
+        details: {
+          reason: reason || null,
+          snapshot_key: result.snapshot_key,
+        },
+      });
+    } catch (error) {
+      req.log.error({ err: error }, 'system safe resume audit failed');
+      return reply.code(Number(error?.statusCode) || 500).send({ ok: false, error: String(error?.message || 'audit_failed') });
+    }
+
+    return reply.send({
+      ok: true,
+      action: 'system_safe_resume',
+      tenant_id: tenantId,
+      previous: result.previous,
+      current: result.current,
+      changed: result.changed,
+    });
+  });
+
 
   fastify.get('/api/system/errors', {
     preHandler: [requireApiKey],
