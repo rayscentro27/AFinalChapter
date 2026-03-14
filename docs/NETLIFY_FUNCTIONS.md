@@ -19,6 +19,7 @@ npm install
   - `SUPABASE_ANON_KEY` (required for task/notification functions)
   - `ADMIN_IMPORT_TOKEN` (required for `/import_training_bundle`)
   - `OPENAI_API_KEY`
+  - `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (required for encrypted tenant integration credentials at rest)
   - `MAILERLITE_API_KEY` (required for `/.netlify/functions/mailerlite_sync`)
   - Optional `MAILERLITE_GROUP_ID` (fallback group if client does not pass one)
   - Optional `OPENAI_MODEL`
@@ -64,6 +65,7 @@ In Netlify site settings, set:
 - Optional `MAILERLITE_GROUP_ID` (fallback group if client does not pass one)
 - `SUPABASE_ANON_KEY` (required for task/notification functions)
 - `OPENAI_API_KEY` (required for `/agent`)
+- `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (required for encrypted `tenant_integrations.credentials`)
 - Optional `OPENAI_MODEL` (used by `/agent`)
 - Optional `INTEL_INGEST_TOKEN` (for non-user ingestion jobs to `/ingest_approval_intel`)
 - Optional `CRON_SHARED_TOKEN` (for non-scheduled/manual calls to `/check_overdue_tasks`)
@@ -76,7 +78,7 @@ Knowledge Vault (Option 2):
 - Run `docs/supabase/agent_cache.sql` in Supabase SQL Editor (optional, enables /agent caching)
 - Use the Distiller prompt starter in `docs/DISTILLER_PROMPT_STARTER.md`
 
-Security note: `SUPABASE_SERVICE_ROLE_KEY` must never be exposed to the browser (Vite `VITE_*` env vars).
+Security note: `SUPABASE_SERVICE_ROLE_KEY` and `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` must never be exposed to the browser (Vite `VITE_*` env vars).
 
 
 Agent caching:
