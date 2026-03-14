@@ -16,10 +16,13 @@ const { normalizePayload, toArtifactInput } = require('./formatter');
 const { buildDraftReviewState } = require('./reviewer');
 const { buildWeeklyCalendar } = require('./calendar');
 const { sendTelegramMessage } = require('./notifier');
-
-function asText(value) {
-  return String(value || '').trim();
-}
+const {
+  asText,
+  isUuid,
+  countEvidenceItems,
+  hasTenantScopedSignal,
+  ensureDirectTenant,
+} = require('./validation');
 
 function parseArgs(argv) {
   const args = new Set(argv.slice(2));
@@ -27,10 +30,14 @@ function parseArgs(argv) {
   const tenantFlagIndex = argv.findIndex((part) => part === '--tenant');
   const tenantFromFlag = tenantFlagIndex >= 0 ? argv[tenantFlagIndex + 1] : '';
 
+  let dryRun = config.dryRun;
+  if (args.has('--dry-run')) dryRun = true;
+  if (args.has('--no-dry-run')) dryRun = false;
+
   return {
     once: args.has('--once'),
     queue: args.has('--queue'),
-    dryRun: args.has('--dry-run') || config.dryRun,
+    dryRun,
     tenantId: asText((tenantArg || '').split('=').slice(1).join('=') || tenantFromFlag),
   };
 }
@@ -49,6 +56,21 @@ function parseJobPayload(job) {
 function preferredFormatsForPlatform(platform) {
   if (platform === 'youtube') return ['long_form'];
   return ['faceless_short'];
+}
+
+function appendTenantDraftMarkers(artifactInput, tenantId) {
+  const keyPoints = Array.isArray(artifactInput.key_points) ? artifactInput.key_points.slice() : [];
+  const tags = Array.isArray(artifactInput.tags) ? artifactInput.tags.slice() : [];
+
+  if (!keyPoints.includes(`tenant_id:${tenantId}`)) keyPoints.push(`tenant_id:${tenantId}`);
+  if (!keyPoints.includes('status:draft')) keyPoints.push('status:draft');
+  if (!tags.includes('tenant_scoped')) tags.push('tenant_scoped');
+
+  return {
+    ...artifactInput,
+    key_points: keyPoints,
+    tags,
+  };
 }
 
 async function processPayload({ supabase, tenantId, payload, traceId, dryRun }) {
@@ -70,11 +92,46 @@ async function processPayload({ supabase, tenantId, payload, traceId, dryRun }) 
     },
   });
 
+  const warnings = new Set(context.warnings || []);
+  const evidenceItems = countEvidenceItems(context);
+  const tenantSignal = hasTenantScopedSignal(context);
+
+  if (!dryRun && config.requireEvidenceForWrite && evidenceItems < config.minEvidenceItems) {
+    warnings.add('write_skipped_insufficient_evidence');
+    return {
+      outputs: [],
+      calendar: [],
+      contextWarnings: Array.from(warnings),
+      stats: {
+        evidence_items: evidenceItems,
+        tenant_scoped_signal: tenantSignal,
+        writes_skipped: true,
+      },
+    };
+  }
+
+  if (!dryRun && config.strictTenantScope && !tenantSignal) {
+    warnings.add('write_skipped_tenant_scope_data_missing');
+    return {
+      outputs: [],
+      calendar: [],
+      contextWarnings: Array.from(warnings),
+      stats: {
+        evidence_items: evidenceItems,
+        tenant_scoped_signal: tenantSignal,
+        writes_skipped: true,
+      },
+    };
+  }
+
   const topics = normalized.topic
     ? [{ topic: normalized.topic, title: normalized.title, evidence: ['topic_forced_by_payload'] }]
     : detectTopics(context, { maxTopics: config.maxTopics });
 
   const outputs = [];
+  let stored = 0;
+  let skipped = 0;
+
   for (const topic of topics.slice(0, config.outputLimit)) {
     const formats = preferredFormatsForPlatform(normalized.platform);
     for (const format of formats) {
@@ -97,11 +154,14 @@ async function processPayload({ supabase, tenantId, payload, traceId, dryRun }) 
         continue;
       }
 
-      const artifactInput = toArtifactInput(reviewed);
-      await writeDraftArtifact(supabase, {
+      const artifactInput = appendTenantDraftMarkers(toArtifactInput(reviewed), normalized.tenant_id);
+      const writeRes = await writeDraftArtifact(supabase, {
         output: artifactInput,
         traceId,
       });
+
+      if (writeRes.stored) stored += 1;
+      else skipped += 1;
     }
   }
 
@@ -110,7 +170,14 @@ async function processPayload({ supabase, tenantId, payload, traceId, dryRun }) 
   return {
     outputs,
     calendar,
-    contextWarnings: context.warnings,
+    contextWarnings: Array.from(warnings),
+    stats: {
+      evidence_items: evidenceItems,
+      tenant_scoped_signal: tenantSignal,
+      writes_skipped: false,
+      stored,
+      skipped,
+    },
   };
 }
 
@@ -120,6 +187,8 @@ async function runDirectOnce({ supabase, tenantId, dryRun }) {
   const allOutputs = [];
   const allCalendars = [];
   const warnings = new Set();
+  let stored = 0;
+  let skipped = 0;
 
   for (const platform of platformList) {
     const result = await processPayload({
@@ -138,9 +207,11 @@ async function runDirectOnce({ supabase, tenantId, dryRun }) {
     allOutputs.push(...result.outputs);
     allCalendars.push(...result.calendar);
     for (const warning of result.contextWarnings) warnings.add(warning);
+    stored += Number(result.stats?.stored || 0);
+    skipped += Number(result.stats?.skipped || 0);
   }
 
-  console.log(`[video-content-worker] mode=direct trace=${traceId} outputs=${allOutputs.length} calendar_slots=${allCalendars.length} dry_run=${String(dryRun)}`);
+  console.log(`[video-content-worker] mode=direct trace=${traceId} outputs=${allOutputs.length} calendar_slots=${allCalendars.length} dry_run=${String(dryRun)} stored=${stored} skipped=${skipped}`);
   if (warnings.size > 0) {
     console.log(`[video-content-worker] warnings=${Array.from(warnings).join(',')}`);
   }
@@ -148,7 +219,7 @@ async function runDirectOnce({ supabase, tenantId, dryRun }) {
   await sendTelegramMessage(
     config.telegramBotToken,
     config.telegramChatId,
-    `VideoContentWorker run complete\ntrace=${traceId}\noutputs=${allOutputs.length}\ndry_run=${String(dryRun)}`
+    `VideoContentWorker run complete\ntrace=${traceId}\noutputs=${allOutputs.length}\ndry_run=${String(dryRun)}\nstored=${stored}\nskipped=${skipped}`
   ).catch((error) => {
     console.warn(`[video-content-worker] telegram_error=${error.message}`);
   });
@@ -183,6 +254,7 @@ async function runQueueOnce({ supabase, dryRun }) {
       const payload = parseJobPayload(leased.row);
       const tenantId = asText(payload.tenant_id || leased.row.tenant_id);
       if (!tenantId) throw new Error('missing_tenant_id_for_queue_job');
+      if (!isUuid(tenantId)) throw new Error('invalid_tenant_id_for_queue_job');
 
       const result = await processPayload({
         supabase,
@@ -202,6 +274,9 @@ async function runQueueOnce({ supabase, dryRun }) {
             calendar_slots: result.calendar.length,
             dry_run: dryRun,
             trace_id: traceId,
+            stored: Number(result.stats?.stored || 0),
+            skipped: Number(result.stats?.skipped || 0),
+            warnings: result.contextWarnings,
           },
           lease_expires_at: null,
         },
@@ -242,13 +317,11 @@ async function main() {
     return;
   }
 
-  if (!args.tenantId) {
-    throw new Error('missing_tenant_id_for_direct_mode (use --tenant <TENANT_UUID>)');
-  }
+  const tenantId = ensureDirectTenant(args.tenantId);
 
   await runDirectOnce({
     supabase,
-    tenantId: args.tenantId,
+    tenantId,
     dryRun: args.dryRun,
   });
 }
