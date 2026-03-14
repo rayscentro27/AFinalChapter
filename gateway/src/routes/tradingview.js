@@ -5,7 +5,6 @@ import { supabaseAdmin as defaultSupabaseAdmin } from '../supabase.js';
 import { WEBHOOK_RATE_LIMIT } from '../util/rate-limit.js';
 import { getSourceIp as defaultGetSourceIp } from '../util/request.js';
 import { redactSecrets } from '../util/redact.js';
-import { normalizeSymbol } from '../lib/oandaClient.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -30,6 +29,18 @@ function normalizeSide(value) {
   return side;
 }
 
+function normalizeSymbol(value) {
+  const raw = asText(value).toUpperCase();
+  if (!raw) return '';
+
+  const compact = raw.replace(/[^A-Z]/g, '');
+  if (compact.length === 6) {
+    return `${compact.slice(0, 3)}_${compact.slice(3)}`;
+  }
+
+  return raw.replace(/[\-\/]/g, '_');
+}
+
 function timingSafeEquals(a, b) {
   const left = Buffer.from(String(a || ''));
   const right = Buffer.from(String(b || ''));
@@ -37,6 +48,15 @@ function timingSafeEquals(a, b) {
   if (left.length !== right.length) return false;
   if (left.length === 0) return false;
   return crypto.timingSafeEqual(left, right);
+}
+
+async function requireApiKey(req, reply) {
+  const key = asText(req.headers['x-api-key']);
+  if (!key || key !== ENV.INTERNAL_API_KEY) {
+    reply.code(401).send({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  return undefined;
 }
 
 export function normalizeTradingViewPayload(payload = {}) {
@@ -191,7 +211,9 @@ export async function tradingviewRoutes(fastify, { deps = {} } = {}) {
     });
   });
 
-  fastify.get('/api/webhooks/tradingview/health', async () => {
+  fastify.get('/api/webhooks/tradingview/health', {
+    preHandler: [requireApiKey],
+  }, async () => {
     return {
       ok: true,
       service: 'tradingview_webhook_intake',
