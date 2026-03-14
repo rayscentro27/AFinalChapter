@@ -1,0 +1,19 @@
+{
+  "name": "video-content-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Nexus VideoContentWorker scaffold (draft generation, queue/direct compatible)",
+  "main": "worker.js",
+  "scripts": {
+    "start": "node worker.js --once",
+    "once": "node worker.js --once",
+    "queue:once": "node worker.js --once --queue",
+    "check": "node --check worker.js && node --check config.js && node --check db.js && node --check detector.js && node --check generator.js && node --check formatter.js && node --check reviewer.js && node --check calendar.js && node --check notifier.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "dotenv": "^16.4.7",
+    "undici": "^7.22.0"
+  }
+}
