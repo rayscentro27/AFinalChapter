@@ -1,4 +1,15 @@
-# Email Orchestrator: Brevo-First Test Commands
+# Email Orchestrator Provider Test Commands
+
+Transactional routing now supports Resend as the preferred transport when `RESEND_API_KEY` is set.
+Legacy Brevo transport remains available when `BREVO_API_KEY` is configured.
+
+## Required environment for transactional sends
+
+- `DEFAULT_FROM_EMAIL`
+- `DEFAULT_FROM_NAME` (optional)
+- `RESEND_API_KEY` (recommended)
+- `BREVO_API_KEY` (optional fallback)
+- `EMAIL_TRANSACTIONAL_PROVIDER` (`resend` | `brevo` | `auto`, default behaves as resend-first)
 
 ## 1) Send transactional email via orchestrator
 
@@ -18,9 +29,9 @@ curl -X POST "${SUPABASE_URL}/functions/v1/email-orchestrator/send" \
   }'
 ```
 
-Expected: JSON response with `message_id`, `provider` (`brevo`), and `status`.
+Expected: JSON response with `message_id`, logical `provider` (`brevo` route family), transport (`resend` or `brevo`), and `status`.
 
-## 2) Ingest Brevo webhook payload
+## 2) Ingest Brevo webhook payload (optional if using Brevo)
 
 ```bash
 curl -X POST "${SUPABASE_URL}/functions/v1/email-orchestrator/webhook/brevo" \
