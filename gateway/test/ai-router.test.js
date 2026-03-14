@@ -152,3 +152,60 @@ test('executeAiRequest returns cache hit payload when cache has match', async ()
   assert.equal(result.output_text, 'from-cache');
   assert.equal(providerCalls, 0);
 });
+
+test('executeAiRequest blocks disallowed openrouter task with explicit policy reason', async () => {
+  const result = await executeAiRequest({
+    traceId: 'trace-openrouter-blocked',
+    body: {
+      provider: 'openrouter',
+      task_type: 'credit_report_analysis',
+      prompt: 'Analyze this credit report and suggest a dispute strategy.',
+      cache_bypass: true,
+    },
+    logger: quietLogger,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'policy_blocked');
+  assert.equal(result.provider, 'openrouter');
+  assert.ok(String(result.reason || '').includes('denied for openrouter'));
+  assert.equal(result.routing.stage, 'policy_blocked');
+  assert.equal(result.routing.attempted_providers[0].result, 'blocked');
+});
+
+test('executeAiRequest applies retry cap to provider attempts', async () => {
+  const previousMaxRetries = process.env.AI_MAX_PROVIDER_RETRIES;
+  process.env.AI_MAX_PROVIDER_RETRIES = '1';
+
+  const attempts = [];
+  try {
+    const result = await executeAiRequest({
+      traceId: 'trace-retry-cap',
+      body: {
+        provider: 'gemini',
+        task_type: 'research_summary',
+        prompt: 'summarize findings',
+        cache_bypass: true,
+        max_retries: 5,
+      },
+      logger: quietLogger,
+      deps: {
+        executeWithProvider: async ({ provider, model }) => {
+          attempts.push({ provider, model });
+          throw new Error(`simulated_failure:${provider}`);
+        },
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.error, 'all_providers_failed');
+    assert.equal(attempts.length, 2);
+    assert.equal(result.routing.retry_cap, 1);
+  } finally {
+    if (previousMaxRetries === undefined) {
+      delete process.env.AI_MAX_PROVIDER_RETRIES;
+    } else {
+      process.env.AI_MAX_PROVIDER_RETRIES = previousMaxRetries;
+    }
+  }
+});

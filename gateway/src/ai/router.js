@@ -34,6 +34,12 @@ function asBool(value, fallback = false) {
   return fallback;
 }
 
+function asInteger(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.trunc(n);
+}
+
 function usageStub() {
   return {
     input_tokens: 0,
@@ -85,6 +91,152 @@ function uniqueProviders(values) {
     out.push(provider);
   }
   return out;
+}
+
+function parseCsv(value) {
+  return asText(value)
+    .split(',')
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function stableStringify(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function collectInputText(payload = {}) {
+  return [
+    stableStringify(payload.prompt),
+    stableStringify(payload.input),
+    stableStringify(payload.messages),
+    stableStringify(payload.context),
+    stableStringify(payload.knowledge_result),
+    stableStringify(payload.retrieval_result),
+    stableStringify(payload.structured_result),
+  ]
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 100_000);
+}
+
+function defaultOpenRouterAllowedTasks() {
+  return [
+    'research_summary',
+    'transcript_summary',
+    'structured_extraction',
+    'opportunity_detection',
+    'opportunity_brief',
+    'rewrite',
+    'style_normalization',
+    'video_script_draft',
+  ];
+}
+
+function defaultOpenRouterDeniedTasks() {
+  return [
+    'credit_report_analysis',
+    'credit_dispute_generation',
+    'billing_decision',
+    'authorization_decision',
+    'tenant_policy_decision',
+    'trading_execution',
+    'broker_execution',
+    'live_trading',
+  ];
+}
+
+function resolveRetryCap(payload = {}) {
+  const envCap = Math.max(0, asInteger(process.env.AI_MAX_PROVIDER_RETRIES, 2));
+  const requested = asInteger(payload.max_retries ?? payload.retry_limit, envCap);
+  return Math.max(0, Math.min(requested, envCap));
+}
+
+function resolveInputSizeCap() {
+  return Math.max(1000, asInteger(process.env.AI_MAX_INPUT_CHARS, 12_000));
+}
+
+function looksSensitiveForOpenRouter(value) {
+  const text = asText(value);
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  if (/(ssn|social security|credit report|routing number|account number|dob|date of birth)/i.test(lower)) return true;
+  if (/\b\d{3}-?\d{2}-?\d{4}\b/.test(text)) return true;
+  if (/\b(?:\d[ -]*?){13,19}\b/.test(text)) return true;
+  return false;
+}
+
+function evaluateOpenRouterEligibility({ taskType, payload = {}, requestedProvider } = {}) {
+  const configuredAllowed = parseCsv(process.env.OPENROUTER_ALLOWED_TASKS);
+  const configuredDenied = parseCsv(process.env.OPENROUTER_DENIED_TASKS);
+  const allowedTasks = configuredAllowed.length > 0 ? configuredAllowed : defaultOpenRouterAllowedTasks();
+  const deniedTasks = configuredDenied.length > 0 ? configuredDenied : defaultOpenRouterDeniedTasks();
+  const maxInputChars = resolveInputSizeCap();
+  const inputText = collectInputText(payload);
+  const requested = normalizeProvider(requestedProvider);
+
+  if (deniedTasks.includes(taskType)) {
+    return {
+      allowed: false,
+      code: 'openrouter_task_denied',
+      reason: `task_type '${taskType}' is denied for openrouter`,
+      requested_provider: requested,
+      task_type: taskType,
+      max_input_chars: maxInputChars,
+      hard_block: requested === 'openrouter',
+    };
+  }
+
+  if (!allowedTasks.includes(taskType)) {
+    return {
+      allowed: false,
+      code: 'openrouter_task_not_allowlisted',
+      reason: `task_type '${taskType}' is not allowlisted for openrouter`,
+      requested_provider: requested,
+      task_type: taskType,
+      max_input_chars: maxInputChars,
+      hard_block: requested === 'openrouter',
+    };
+  }
+
+  if (inputText.length > maxInputChars) {
+    return {
+      allowed: false,
+      code: 'openrouter_input_too_large',
+      reason: `input exceeds max chars (${inputText.length} > ${maxInputChars})`,
+      requested_provider: requested,
+      task_type: taskType,
+      max_input_chars: maxInputChars,
+      hard_block: requested === 'openrouter',
+    };
+  }
+
+  if (looksSensitiveForOpenRouter(inputText)) {
+    return {
+      allowed: false,
+      code: 'openrouter_sensitive_payload_blocked',
+      reason: 'payload appears sensitive and is not eligible for openrouter',
+      requested_provider: requested,
+      task_type: taskType,
+      max_input_chars: maxInputChars,
+      hard_block: requested === 'openrouter',
+    };
+  }
+
+  return {
+    allowed: true,
+    code: null,
+    reason: null,
+    requested_provider: requested,
+    task_type: taskType,
+    max_input_chars: maxInputChars,
+    hard_block: false,
+  };
 }
 
 export function buildProviderExecutionPlan({ requestedProvider, forceOrder, allowFallback = true } = {}) {
@@ -226,11 +378,101 @@ export async function executeAiRequest({ traceId, body = {}, logger = console, d
 
   const bypassCache = Boolean(payload.cache_bypass || payload.bypass_cache || payload?.cache?.bypass === true);
   const allowFallback = asBool(payload.allow_fallback, true);
-  const providerPlan = buildProviderExecutionPlan({
+  const retryCap = resolveRetryCap(payload);
+  const openrouterEligibility = evaluateOpenRouterEligibility({
+    taskType,
+    payload,
+    requestedProvider: payload.provider || ENV.AI_PROVIDER || 'stub',
+  });
+  const rawProviderPlan = buildProviderExecutionPlan({
     requestedProvider: payload.provider || ENV.AI_PROVIDER || 'stub',
     forceOrder: payload.provider_plan || payload.provider_order,
     allowFallback,
   });
+
+  const attempts = [];
+
+  if (!openrouterEligibility.allowed && openrouterEligibility.hard_block) {
+    return {
+      ok: false,
+      trace_id: traceId,
+      provider: 'openrouter',
+      model: asText(payload.model) || defaultModelForProvider('openrouter'),
+      output_text: '',
+      error: 'policy_blocked',
+      reason: openrouterEligibility.reason,
+      policy: openrouterEligibility,
+      provider_errors: [],
+      usage: usageStub(),
+      cost: costStub(),
+      cache: {
+        status: bypassCache ? 'bypassed' : 'miss',
+        cache_key: null,
+        expires_at: null,
+        bypassed: bypassCache,
+      },
+      routing: {
+        stage: 'policy_blocked',
+        attempted_providers: [{
+          provider: 'openrouter',
+          model: asText(payload.model) || defaultModelForProvider('openrouter'),
+          stage: 'policy',
+          result: 'blocked',
+          reason: openrouterEligibility.reason,
+        }],
+        selected_tier: null,
+        fallback_used: false,
+        retry_cap: retryCap,
+      },
+    };
+  }
+
+  if (!openrouterEligibility.allowed && rawProviderPlan.includes('openrouter')) {
+    attempts.push({
+      provider: 'openrouter',
+      model: defaultModelForProvider('openrouter'),
+      stage: 'policy',
+      result: 'blocked',
+      reason: openrouterEligibility.reason,
+    });
+  }
+
+  const maxAttempts = allowFallback ? (1 + retryCap) : 1;
+  const providerPlan = rawProviderPlan
+    .filter((provider) => {
+      if (provider !== 'openrouter') return true;
+      return openrouterEligibility.allowed;
+    })
+    .slice(0, Math.max(1, maxAttempts));
+
+  if (providerPlan.length === 0) {
+    return {
+      ok: false,
+      trace_id: traceId,
+      provider: null,
+      model: null,
+      output_text: '',
+      error: 'no_eligible_providers',
+      reason: openrouterEligibility.allowed ? 'no_provider_available' : openrouterEligibility.reason,
+      policy: openrouterEligibility.allowed ? null : openrouterEligibility,
+      provider_errors: [],
+      usage: usageStub(),
+      cost: costStub(),
+      cache: {
+        status: bypassCache ? 'bypassed' : 'miss',
+        cache_key: null,
+        expires_at: null,
+        bypassed: bypassCache,
+      },
+      routing: {
+        stage: 'policy_blocked',
+        attempted_providers: attempts,
+        selected_tier: null,
+        fallback_used: false,
+        retry_cap: retryCap,
+      },
+    };
+  }
 
   const knowledgeOutput = readKnowledgeOutput(payload);
   if (knowledgeOutput && !asBool(payload.force_model_call, false)) {
@@ -265,6 +507,7 @@ export async function executeAiRequest({ traceId, body = {}, logger = console, d
         attempted_providers: [],
         selected_tier: 'knowledge',
         fallback_used: false,
+        retry_cap: retryCap,
       },
     };
   }
@@ -276,8 +519,36 @@ export async function executeAiRequest({ traceId, body = {}, logger = console, d
     context: payload.context,
     taskType,
   });
+
+  const maxInputChars = resolveInputSizeCap();
+  if (normalizedPrompt.length > maxInputChars) {
+    return {
+      ok: false,
+      trace_id: traceId,
+      provider: null,
+      model: null,
+      output_text: '',
+      error: 'input_too_large',
+      reason: `normalized prompt exceeds max chars (${normalizedPrompt.length} > ${maxInputChars})`,
+      usage: usageStub(),
+      cost: costStub(),
+      cache: {
+        status: bypassCache ? 'bypassed' : 'miss',
+        cache_key: null,
+        expires_at: null,
+        bypassed: bypassCache,
+      },
+      routing: {
+        stage: 'policy_blocked',
+        attempted_providers: attempts,
+        selected_tier: null,
+        fallback_used: false,
+        retry_cap: retryCap,
+      },
+    };
+  }
+
   const promptHash = cacheApi.hashPrompt(normalizedPrompt);
-  const attempts = [];
 
   if (!bypassCache) {
     for (let i = 0; i < providerPlan.length; i += 1) {
@@ -351,6 +622,7 @@ export async function executeAiRequest({ traceId, body = {}, logger = console, d
             attempted_providers: attempts,
             selected_tier: providerTier(candidateProvider),
             fallback_used: i > 0,
+            retry_cap: retryCap,
           },
         };
       }
@@ -479,6 +751,7 @@ export async function executeAiRequest({ traceId, body = {}, logger = console, d
           attempted_providers: attempts,
           selected_tier: providerTier(provider),
           fallback_used: i > 0,
+          retry_cap: retryCap,
         },
       };
     } catch (error) {
@@ -523,6 +796,7 @@ export async function executeAiRequest({ traceId, body = {}, logger = console, d
       attempted_providers: attempts,
       selected_tier: null,
       fallback_used: attempts.length > 1,
+      retry_cap: retryCap,
     },
   };
 }
