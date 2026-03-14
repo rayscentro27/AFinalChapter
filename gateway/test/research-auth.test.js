@@ -17,6 +17,21 @@ process.env.META_PAGE_ACCESS_TOKEN = process.env.META_PAGE_ACCESS_TOKEN || 'meta
 
 const { researchRoutes } = await import('../src/routes/research.js');
 
+test('GET /api/research/strategy-rankings requires internal API key', async () => {
+  const app = Fastify({ logger: false, trustProxy: true });
+  await app.register(researchRoutes);
+
+  const response = await app.inject({
+    method: 'GET',
+    url: '/api/research/strategy-rankings',
+  });
+
+  assert.equal(response.statusCode, 401);
+  assert.deepEqual(response.json(), { ok: false, error: 'unauthorized' });
+
+  await app.close();
+});
+
 test('GET /api/research/strategy-rankings requires tenant_id for internal API key auth', async () => {
   const app = Fastify({ logger: false, trustProxy: true });
   await app.register(researchRoutes);
