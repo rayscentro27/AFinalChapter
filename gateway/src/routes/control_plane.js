@@ -1,5 +1,8 @@
 import { ENV } from '../env.js';
 import { supabaseAdmin } from '../supabase.js';
+import { requireTenantRole } from '../lib/auth/requireTenantRole.js';
+import { requireTenantPermission } from '../lib/auth/requireTenantPermission.js';
+import { ADMIN_RATE_LIMIT } from '../util/rate-limit.js';
 
 const VALID_SYSTEM_MODES = new Set([
   'development',
@@ -53,8 +56,8 @@ async function requireApiKey(req, reply) {
 
 function actorFromRequest(req) {
   return {
-    user_id: asText(req.headers['x-actor-id']) || null,
-    role: asText(req.headers['x-actor-role']) || 'internal_api_key',
+    user_id: asText(req.user?.id) || asText(req.headers['x-actor-id']) || null,
+    role: asText(req.tenant?.role) || asText(req.headers['x-actor-role']) || 'internal_api_key',
   };
 }
 
@@ -153,8 +156,17 @@ async function upsertGlobalSystemConfig(nextState) {
 }
 
 export async function controlPlaneRoutes(fastify) {
+  const ownerAdminRoleGuard = requireTenantRole({
+    supabaseAdmin,
+    allowedRoles: ['owner', 'admin', 'super_admin'],
+  });
+  const controlPlaneWriteGuard = requireTenantPermission({
+    supabaseAdmin,
+    permission: 'policy.manage',
+  });
   fastify.get('/api/control-plane/state', {
-    preHandler: [requireApiKey],
+    preHandler: [requireApiKey, ownerAdminRoleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
   }, async (_req, reply) => {
     const systemConfig = await safeRows(
       supabaseAdmin
@@ -201,7 +213,8 @@ export async function controlPlaneRoutes(fastify) {
   });
 
   fastify.get('/api/control-plane/flags', {
-    preHandler: [requireApiKey],
+    preHandler: [requireApiKey, ownerAdminRoleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
   }, async (req, reply) => {
     const { scope, scope_id } = parseScope(req.query || {});
     const limit = clampInt(req.query?.limit, 1, 500);
@@ -232,7 +245,8 @@ export async function controlPlaneRoutes(fastify) {
   });
 
   fastify.get('/api/control-plane/incidents', {
-    preHandler: [requireApiKey],
+    preHandler: [requireApiKey, ownerAdminRoleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
   }, async (req, reply) => {
     const status = asText(req.query?.status || 'active').toLowerCase();
     const limit = clampInt(req.query?.limit, 1, 200);
@@ -260,7 +274,8 @@ export async function controlPlaneRoutes(fastify) {
   });
 
   fastify.get('/api/control-plane/audit', {
-    preHandler: [requireApiKey],
+    preHandler: [requireApiKey, ownerAdminRoleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
   }, async (req, reply) => {
     const limit = clampInt(req.query?.limit, 1, 500);
     const action = asText(req.query?.action);
@@ -286,7 +301,8 @@ export async function controlPlaneRoutes(fastify) {
   });
 
   fastify.post('/api/control-plane/mode', {
-    preHandler: [requireApiKey],
+    preHandler: [requireApiKey, ownerAdminRoleGuard, controlPlaneWriteGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
   }, async (req, reply) => {
     if (!ENV.CONTROL_PLANE_WRITE_ENABLED) return writeModeDisabled(reply);
 
@@ -317,6 +333,9 @@ export async function controlPlaneRoutes(fastify) {
         beforeState: result.before || {},
         afterState: result.after || {},
         reason,
+        metadata: {
+          tenant_id: asText(req.tenant?.id) || null,
+        },
       });
 
       return reply.send({
@@ -330,7 +349,8 @@ export async function controlPlaneRoutes(fastify) {
   });
 
   fastify.post('/api/control-plane/feature-flags/:flagKey', {
-    preHandler: [requireApiKey],
+    preHandler: [requireApiKey, ownerAdminRoleGuard, controlPlaneWriteGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
   }, async (req, reply) => {
     if (!ENV.CONTROL_PLANE_WRITE_ENABLED) return writeModeDisabled(reply);
 
@@ -402,6 +422,9 @@ export async function controlPlaneRoutes(fastify) {
         beforeState: existing || {},
         afterState: next || {},
         reason,
+        metadata: {
+          tenant_id: asText(req.tenant?.id) || null,
+        },
       });
 
       return reply.send({ ok: true, timestamp: new Date().toISOString(), flag: next });
@@ -411,7 +434,8 @@ export async function controlPlaneRoutes(fastify) {
   });
 
   fastify.post('/api/control-plane/emergency-stop', {
-    preHandler: [requireApiKey],
+    preHandler: [requireApiKey, ownerAdminRoleGuard, controlPlaneWriteGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
   }, async (req, reply) => {
     if (!ENV.CONTROL_PLANE_WRITE_ENABLED) return writeModeDisabled(reply);
 
@@ -465,6 +489,7 @@ export async function controlPlaneRoutes(fastify) {
         },
         reason,
         metadata: {
+          tenant_id: asText(req.tenant?.id) || null,
           incident_id: incidentInsert.data?.id || null,
         },
       });
