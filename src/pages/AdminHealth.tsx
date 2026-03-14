@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import SystemObservabilityPanels, { type SystemObservabilityPayload } from '../components/admin/SystemObservabilityPanels';
 
 type Tenant = {
   id: string;
@@ -73,6 +74,7 @@ export default function AdminHealth() {
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [notifications, setNotifications] = useState<AlertNotificationItem[]>([]);
+  const [systemObservability, setSystemObservability] = useState<SystemObservabilityPayload | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -200,11 +202,30 @@ export default function AdminHealth() {
     setNotifications(Array.isArray(payload?.items) ? payload.items : []);
   }
 
+  async function fetchSystemObservability() {
+    if (!tenantId) return;
+
+    const token = await authToken();
+    const response = await fetch(`/.netlify/functions/admin-system-observability?tenant_id=${encodeURIComponent(tenantId)}&hours=24`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as SystemObservabilityPayload & { error?: string };
+    if (!response.ok) {
+      throw new Error(String(payload?.error || `System observability failed (${response.status})`));
+    }
+
+    setSystemObservability(payload);
+  }
+
   async function refreshAll() {
     try {
       setRefreshing(true);
       setError('');
-      await Promise.all([fetchHealth(), fetchAlerts(), fetchAlertNotifications()]);
+      await Promise.all([fetchHealth(), fetchAlerts(), fetchAlertNotifications(), fetchSystemObservability()]);
     } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
@@ -298,6 +319,8 @@ export default function AdminHealth() {
           </div>
         ))}
       </div>
+
+      <SystemObservabilityPanels payload={systemObservability} />
 
       <div className="bg-slate-900 border border-white/10 rounded-3xl overflow-hidden">
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
