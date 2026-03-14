@@ -84,3 +84,30 @@ For future membership override APIs:
 - enforce server-side permission checks (`billing.manage` + superadmin guard)
 - log every mutation using `logAudit` helper in `gateway/src/lib/audit/auditLog.js`
 - ensure operations are reversible and time-bounded
+
+## Safe Pause/Resume Automation (E2)
+Use the scripted operator command set for incident containment:
+
+```bash
+cd /home/rayscentro/Projects/AFinalChapter_linux/gateway
+export SYSTEM_API_BASE_URL="http://127.0.0.1:3000"
+export INTERNAL_API_KEY="<INTERNAL_API_KEY>"
+export TENANT_ID="<TENANT_UUID>"
+export REAL_USER_BEARER_TOKEN="<REAL_USER_JWT>"
+
+npm run system:diagnostics
+npm run system:safe-pause
+npm run system:diagnostics
+npm run system:safe-resume
+npm run system:diagnostics
+```
+
+Endpoint mapping used by the script:
+- `POST /api/system/safe-pause`
+- `POST /api/system/safe-resume`
+- `POST /api/system/mode/set`
+- `POST /api/system/flags/update`
+- `GET /api/system/health`
+- `GET /api/system/jobs`
+- `GET /api/system/workers`
+- `GET /api/system/errors`
