@@ -214,11 +214,16 @@ test('GET /api/system/usage returns usage telemetry for populated data', async (
   assert.equal(body.hours, 24);
   assert.equal(body.ai_requests_24h, 2);
   assert.equal(body.ai_failures_24h, 1);
+  assert.equal(body.ai_cache_hits_24h, 1);
   assert.equal(body.ai_cache_hit_rate_24h, 0.5);
   assert.equal(body.token_usage_24h, 170);
   assert.equal(body.cost_estimate_24h_usd, 0.17);
   assert.deepEqual(body.summary.provider_counts, { gemini: 1, openrouter: 1 });
   assert.deepEqual(body.summary.task_type_counts, { research_summary: 1, assistant_conversation: 1 });
+  assert.equal(body.summary.openrouter_requests_24h, 1);
+  assert.equal(body.summary.openrouter_cache_hits_24h, 0);
+  assert.equal(body.summary.openrouter_cache_hit_rate_24h, 0);
+  assert.ok(body.runtime_cache_metrics && typeof body.runtime_cache_metrics === 'object');
   assert.deepEqual(body.missing_tables, []);
   assert.deepEqual(body.warnings, []);
 
@@ -247,11 +252,16 @@ test('GET /api/system/usage returns stable empty payload when no rows exist', as
   assert.equal(body.ok, true);
   assert.equal(body.ai_requests_24h, 0);
   assert.equal(body.ai_failures_24h, 0);
+  assert.equal(body.ai_cache_hits_24h, 0);
   assert.equal(body.ai_cache_hit_rate_24h, 0);
   assert.equal(body.token_usage_24h, 0);
   assert.equal(body.cost_estimate_24h_usd, 0);
   assert.deepEqual(body.summary.provider_counts, {});
   assert.deepEqual(body.summary.task_type_counts, {});
+  assert.equal(body.summary.openrouter_requests_24h, 0);
+  assert.equal(body.summary.openrouter_cache_hits_24h, 0);
+  assert.equal(body.summary.openrouter_cache_hit_rate_24h, 0);
+  assert.ok(body.runtime_cache_metrics && typeof body.runtime_cache_metrics === 'object');
 
   await app.close();
 });

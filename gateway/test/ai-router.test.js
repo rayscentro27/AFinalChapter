@@ -209,3 +209,45 @@ test('executeAiRequest applies retry cap to provider attempts', async () => {
     }
   }
 });
+
+test('executeAiRequest uses cache-first flow for openrouter and skips provider call on hit', async () => {
+  let providerCalls = 0;
+
+  const result = await executeAiRequest({
+    traceId: 'trace-openrouter-cache-hit',
+    body: {
+      provider: 'openrouter',
+      task_type: 'research_summary',
+      prompt: 'Summarize this report',
+    },
+    logger: quietLogger,
+    deps: {
+      cache: {
+        getCachedResponse: async () => ({
+          hit: true,
+          cache_key: 'openrouter-cache-hit',
+          response_payload: { output_text: 'openrouter-cache-result' },
+          token_usage: {
+            input_tokens: 10,
+            output_tokens: 5,
+            total_tokens: 15,
+          },
+          cost_estimate: 0.0002,
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        }),
+      },
+      executeWithProvider: async () => {
+        providerCalls += 1;
+        return {
+          output_text: 'should-not-execute',
+        };
+      },
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.provider, 'openrouter');
+  assert.equal(result.cache.status, 'hit');
+  assert.equal(result.output_text, 'openrouter-cache-result');
+  assert.equal(providerCalls, 0);
+});

@@ -7,6 +7,7 @@ const METRICS = {
   cache_write: 0,
   cache_invalidate: 0,
   cache_error: 0,
+  by_provider: {},
 };
 
 const TTL_SECONDS = Object.freeze({
@@ -25,6 +26,45 @@ function asText(value) {
 
 function asObject(value) {
   return value && typeof value === 'object' ? value : {};
+}
+
+function asNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizedProvider(value) {
+  return asText(value).toLowerCase() || 'unknown';
+}
+
+function providerBucket(provider) {
+  const key = normalizedProvider(provider);
+  if (!METRICS.by_provider[key]) {
+    METRICS.by_provider[key] = {
+      cache_hit: 0,
+      cache_miss: 0,
+      cache_write: 0,
+      cache_error: 0,
+      cache_invalidate: 0,
+    };
+  }
+  return METRICS.by_provider[key];
+}
+
+function bumpMetric(metric, provider = null, amount = 1) {
+  const safeAmount = asNumber(amount, 0);
+  if (safeAmount <= 0) return;
+
+  if (typeof METRICS[metric] === 'number') {
+    METRICS[metric] += safeAmount;
+  }
+
+  if (provider) {
+    const bucket = providerBucket(provider);
+    if (typeof bucket[metric] === 'number') {
+      bucket[metric] += safeAmount;
+    }
+  }
 }
 
 function isMissingSchema(error) {
@@ -95,7 +135,14 @@ export function buildRequestFingerprint({ tenantId, provider, model, taskType, p
 }
 
 export function getAiCacheMetrics() {
-  return { ...METRICS };
+  return {
+    cache_hit: METRICS.cache_hit,
+    cache_miss: METRICS.cache_miss,
+    cache_write: METRICS.cache_write,
+    cache_invalidate: METRICS.cache_invalidate,
+    cache_error: METRICS.cache_error,
+    by_provider: { ...METRICS.by_provider },
+  };
 }
 
 export async function getCachedResponse({
@@ -112,7 +159,7 @@ export async function getCachedResponse({
   const fp = asText(requestFingerprint);
 
   if (!p || !m || !t || !fp) {
-    METRICS.cache_miss += 1;
+    bumpMetric('cache_miss', p || provider || null);
     return { hit: false, reason: 'invalid_lookup_input' };
   }
 
@@ -131,22 +178,22 @@ export async function getCachedResponse({
 
   if (error) {
     if (isMissingSchema(error)) {
-      METRICS.cache_miss += 1;
+      bumpMetric('cache_miss', p);
       return { hit: false, reason: 'schema_missing' };
     }
 
-    METRICS.cache_error += 1;
-    logger.warn({ event: 'ai_cache_lookup_failed', error: String(error.message || error) }, 'ai_cache_lookup_failed');
+    bumpMetric('cache_error', p);
+    logger.warn({ event: 'ai_cache_lookup_failed', provider: p, error: String(error.message || error) }, 'ai_cache_lookup_failed');
     return { hit: false, reason: 'lookup_failed' };
   }
 
   if (!data) {
-    METRICS.cache_miss += 1;
+    bumpMetric('cache_miss', p);
     return { hit: false, reason: 'not_found' };
   }
 
   if (data.expires_at && String(data.expires_at) <= nowIso) {
-    METRICS.cache_miss += 1;
+    bumpMetric('cache_miss', p);
     return { hit: false, reason: 'expired', cache_key: data.cache_key };
   }
 
@@ -160,11 +207,11 @@ export async function getCachedResponse({
     .eq('id', data.id);
 
   if (updateError && !isMissingSchema(updateError)) {
-    METRICS.cache_error += 1;
-    logger.warn({ event: 'ai_cache_hit_update_failed', cache_key: data.cache_key, error: String(updateError.message || updateError) }, 'ai_cache_hit_update_failed');
+    bumpMetric('cache_error', p);
+    logger.warn({ event: 'ai_cache_hit_update_failed', cache_key: data.cache_key, provider: p, error: String(updateError.message || updateError) }, 'ai_cache_hit_update_failed');
   }
 
-  METRICS.cache_hit += 1;
+  bumpMetric('cache_hit', p);
   return {
     hit: true,
     cache_key: data.cache_key,
@@ -190,9 +237,11 @@ export async function storeCachedResponse({
   logger = console,
 } = {}) {
   const nowIso = new Date().toISOString();
+  const providerKey = normalizedProvider(provider);
+
   const row = {
     cache_key: asText(cacheKey),
-    provider: asText(provider).toLowerCase(),
+    provider: providerKey,
     model: asText(model).toLowerCase(),
     task_type: asText(taskType).toLowerCase(),
     prompt_hash: asText(promptHash),
@@ -226,8 +275,8 @@ export async function storeCachedResponse({
   const existing = await findActiveRow();
   if (existing.error) {
     if (isMissingSchema(existing.error)) return { ok: false, schemaMissing: true };
-    METRICS.cache_error += 1;
-    logger.warn({ event: 'ai_cache_lookup_before_write_failed', error: String(existing.error.message || existing.error) }, 'ai_cache_lookup_before_write_failed');
+    bumpMetric('cache_error', providerKey);
+    logger.warn({ event: 'ai_cache_lookup_before_write_failed', provider: providerKey, error: String(existing.error.message || existing.error) }, 'ai_cache_lookup_before_write_failed');
     return { ok: false, error: existing.error };
   }
 
@@ -244,12 +293,12 @@ export async function storeCachedResponse({
 
     if (error) {
       if (isMissingSchema(error)) return { ok: false, schemaMissing: true };
-      METRICS.cache_error += 1;
-      logger.warn({ event: 'ai_cache_write_failed', error: String(error.message || error) }, 'ai_cache_write_failed');
+      bumpMetric('cache_error', providerKey);
+      logger.warn({ event: 'ai_cache_write_failed', provider: providerKey, error: String(error.message || error) }, 'ai_cache_write_failed');
       return { ok: false, error };
     }
 
-    METRICS.cache_write += 1;
+    bumpMetric('cache_write', providerKey);
     return { ok: true, row: data || null };
   }
 
@@ -265,8 +314,8 @@ export async function storeCachedResponse({
     if (isUniqueViolation(inserted.error)) {
       const raced = await findActiveRow();
       if (raced.error) {
-        METRICS.cache_error += 1;
-        logger.warn({ event: 'ai_cache_race_recovery_lookup_failed', error: String(raced.error.message || raced.error) }, 'ai_cache_race_recovery_lookup_failed');
+        bumpMetric('cache_error', providerKey);
+        logger.warn({ event: 'ai_cache_race_recovery_lookup_failed', provider: providerKey, error: String(raced.error.message || raced.error) }, 'ai_cache_race_recovery_lookup_failed');
         return { ok: false, error: raced.error };
       }
 
@@ -282,22 +331,22 @@ export async function storeCachedResponse({
           .maybeSingle();
 
         if (recovered.error) {
-          METRICS.cache_error += 1;
-          logger.warn({ event: 'ai_cache_race_recovery_update_failed', error: String(recovered.error.message || recovered.error) }, 'ai_cache_race_recovery_update_failed');
+          bumpMetric('cache_error', providerKey);
+          logger.warn({ event: 'ai_cache_race_recovery_update_failed', provider: providerKey, error: String(recovered.error.message || recovered.error) }, 'ai_cache_race_recovery_update_failed');
           return { ok: false, error: recovered.error };
         }
 
-        METRICS.cache_write += 1;
+        bumpMetric('cache_write', providerKey);
         return { ok: true, row: recovered.data || null };
       }
     }
 
-    METRICS.cache_error += 1;
-    logger.warn({ event: 'ai_cache_write_failed', error: String(inserted.error.message || inserted.error) }, 'ai_cache_write_failed');
+    bumpMetric('cache_error', providerKey);
+    logger.warn({ event: 'ai_cache_write_failed', provider: providerKey, error: String(inserted.error.message || inserted.error) }, 'ai_cache_write_failed');
     return { ok: false, error: inserted.error };
   }
 
-  METRICS.cache_write += 1;
+  bumpMetric('cache_write', providerKey);
   return { ok: true, row: inserted.data || null };
 }
 
@@ -313,12 +362,12 @@ export async function invalidateCache({ cacheKey, logger = console } = {}) {
 
   if (error) {
     if (isMissingSchema(error)) return { ok: false, schemaMissing: true };
-    METRICS.cache_error += 1;
+    bumpMetric('cache_error', null);
     logger.warn({ event: 'ai_cache_invalidate_failed', cache_key: key, error: String(error.message || error) }, 'ai_cache_invalidate_failed');
     return { ok: false, error };
   }
 
-  METRICS.cache_invalidate += 1;
+  bumpMetric('cache_invalidate', null);
   return { ok: true };
 }
 
