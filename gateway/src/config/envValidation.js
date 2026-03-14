@@ -54,11 +54,10 @@ const RECOMMENDED = {
     'ALERTS_WEBHOOK_URL',
     'LOG_LEVEL',
   ],
-};
-
-const CONDITIONAL_REQUIRED = {
-  production_security: [
-    'MATRIX_WEBHOOK_TOKEN',
+  network_proxy: [
+    'TRUST_PROXY',
+    'TRUST_PROXY_CIDRS',
+    'TRUST_PROXY_ALLOW_ALL',
   ],
 };
 
@@ -76,9 +75,41 @@ function collectMissing(env, groups) {
   return missing;
 }
 
-function shouldEnforceProductionSecurity(env, mode) {
+function shouldEnforceProductionRules(env, mode) {
   const nodeEnv = asText(env.NODE_ENV).toLowerCase();
   return mode === 'production' || nodeEnv === 'production';
+}
+
+function parseCidrs(value) {
+  const text = asText(value);
+  if (!text) return [];
+  return text.split(',').map((part) => part.trim()).filter(Boolean);
+}
+
+function evaluateProxyTrustPosture(env) {
+  const nodeEnv = asText(env.NODE_ENV).toLowerCase();
+  const trustProxy = asBool(env.TRUST_PROXY, nodeEnv !== 'production');
+  const trustProxyAllowAll = asBool(env.TRUST_PROXY_ALLOW_ALL, false);
+  const trustProxyCidrs = parseCidrs(env.TRUST_PROXY_CIDRS);
+
+  if (!trustProxy) {
+    return {
+      ok: true,
+      trust_proxy: false,
+      allow_all: false,
+      cidrs: trustProxyCidrs,
+      reason: 'disabled',
+    };
+  }
+
+  const ok = trustProxyAllowAll || trustProxyCidrs.length > 0;
+  return {
+    ok,
+    trust_proxy: true,
+    allow_all: trustProxyAllowAll,
+    cidrs: trustProxyCidrs,
+    reason: ok ? 'configured' : 'missing_cidrs_or_allow_all',
+  };
 }
 
 export function validateGatewayEnv({ env = process.env, strict = false, logger = console } = {}) {
@@ -87,24 +118,24 @@ export function validateGatewayEnv({ env = process.env, strict = false, logger =
 
   const mode = asText(env.SYSTEM_MODE || 'development').toLowerCase() || 'development';
   const modeIsValid = VALID_SYSTEM_MODES.has(mode);
+  const productionRules = shouldEnforceProductionRules(env, mode);
 
-  const missingConditionalRequired = shouldEnforceProductionSecurity(env, mode)
-    ? collectMissing(env, CONDITIONAL_REQUIRED)
-    : [];
-
-  const allMissingRequired = [
-    ...missingRequired,
-    ...missingConditionalRequired,
-  ];
+  const proxyTrust = evaluateProxyTrustPosture(env);
 
   const summary = {
-    ok: allMissingRequired.length === 0 && modeIsValid,
+    ok: missingRequired.length === 0 && modeIsValid && proxyTrust.ok,
     mode,
     mode_valid: modeIsValid,
     valid_modes: Array.from(VALID_SYSTEM_MODES),
     missing_required: missingRequired,
-    missing_conditional_required: missingConditionalRequired,
     missing_recommended: missingRecommended,
+    proxy_trust: {
+      ok: proxyTrust.ok,
+      trust_proxy: proxyTrust.trust_proxy,
+      allow_all: proxyTrust.allow_all,
+      cidrs: proxyTrust.cidrs,
+      reason: proxyTrust.reason,
+    },
     flags: {
       queue_enabled: asBool(env.QUEUE_ENABLED, false),
       ai_jobs_enabled: asBool(env.AI_JOBS_ENABLED, true),
@@ -117,14 +148,14 @@ export function validateGatewayEnv({ env = process.env, strict = false, logger =
     logger.warn({ missing_recommended: missingRecommended }, 'gateway_env_recommended_missing');
   }
 
-  if (allMissingRequired.length > 0) {
-    logger.error({
-      missing_required: missingRequired,
-      missing_conditional_required: missingConditionalRequired,
-    }, 'gateway_env_required_missing');
+  if (productionRules && !strict) {
+    logger.warn({ mode, node_env: asText(env.NODE_ENV) || 'development' }, 'gateway_env_strict_disabled_in_production');
+  }
 
+  if (missingRequired.length > 0) {
+    logger.error({ missing_required: missingRequired }, 'gateway_env_required_missing');
     if (strict) {
-      const names = Array.from(new Set(allMissingRequired.map((x) => x.key)));
+      const names = Array.from(new Set(missingRequired.map((x) => x.key)));
       throw new Error(`Missing required environment variables: ${names.join(', ')}`);
     }
   }
@@ -134,6 +165,22 @@ export function validateGatewayEnv({ env = process.env, strict = false, logger =
     if (strict) {
       throw new Error(`Invalid SYSTEM_MODE: ${mode}`);
     }
+  }
+
+  if (!proxyTrust.ok) {
+    logger.error({
+      trust_proxy: proxyTrust.trust_proxy,
+      trust_proxy_allow_all: proxyTrust.allow_all,
+      trust_proxy_cidrs: proxyTrust.cidrs,
+    }, 'gateway_env_invalid_trust_proxy_configuration');
+
+    if (strict) {
+      throw new Error('Invalid trust proxy configuration: set TRUST_PROXY_CIDRS or TRUST_PROXY_ALLOW_ALL=true when TRUST_PROXY=true');
+    }
+  }
+
+  if (proxyTrust.allow_all && productionRules) {
+    logger.warn({ mode }, 'gateway_env_trust_proxy_allow_all_enabled');
   }
 
   return summary;
