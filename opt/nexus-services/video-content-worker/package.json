@@ -9,7 +9,7 @@
     "start": "node worker.js --once",
     "once": "node worker.js --once",
     "queue:once": "node worker.js --once --queue",
-    "check": "node --check worker.js && node --check config.js && node --check db.js && node --check detector.js && node --check generator.js && node --check formatter.js && node --check reviewer.js && node --check calendar.js && node --check notifier.js && node --check validation.js",
+    "check": "node --check worker.js && node --check config.js && node --check db.js && node --check detector.js && node --check generator.js && node --check formatter.js && node --check reviewer.js && node --check calendar.js && node --check notifier.js && node --check validation.js && node --check retryPolicy.js",
     "test": "node --test ./test"
   },
   "dependencies": {

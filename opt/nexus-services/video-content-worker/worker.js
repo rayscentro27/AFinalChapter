@@ -23,6 +23,13 @@ const {
   hasTenantScopedSignal,
   ensureDirectTenant,
 } = require('./validation');
+const { nextRetryAt, shouldMoveToDeadLetter } = require('./retryPolicy');
+
+function asInt(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.trunc(n);
+}
 
 function parseArgs(argv) {
   const args = new Set(argv.slice(2));
@@ -70,6 +77,94 @@ function appendTenantDraftMarkers(artifactInput, tenantId) {
     ...artifactInput,
     key_points: keyPoints,
     tags,
+  }; 
+}
+
+function isNonRetryableQueueError(error) {
+  const msg = asText(error?.message || error).toLowerCase();
+  return (
+    msg.includes('missing_tenant_id_for_queue_job')
+    || msg.includes('invalid_tenant_id_for_queue_job')
+    || msg.includes('invalid_tenant_id_for_direct_mode')
+    || msg.includes('missing_tenant_id_for_direct_mode')
+  );
+}
+
+function getJobAttemptInfo(job) {
+  const priorAttempts = Math.max(0, asInt(job?.attempt_count, 0));
+  const maxAttempts = Math.max(1, asInt(job?.max_attempts, config.queueMaxAttemptsDefault));
+  return { priorAttempts, maxAttempts };
+}
+
+async function applyQueueFailurePolicy({ supabase, job, error, traceId }) {
+  const nowIso = new Date().toISOString();
+  const message = asText(error?.message || error) || 'unknown_queue_error';
+  const { priorAttempts, maxAttempts } = getJobAttemptInfo(job);
+  const nextAttempt = priorAttempts + 1;
+  const nonRetryable = isNonRetryableQueueError(error);
+  const deadLetter = nonRetryable || shouldMoveToDeadLetter({ attemptCount: nextAttempt, maxAttempts });
+
+  if (deadLetter) {
+    await updateJobState(supabase, {
+      jobId: job.id,
+      status: 'dead_letter',
+      fields: {
+        attempt_count: nextAttempt,
+        max_attempts: maxAttempts,
+        lease_expires_at: null,
+        available_at: null,
+        last_error: message,
+        dead_lettered_at: nowIso,
+        result: {
+          trace_id: traceId,
+          action: 'dead_letter',
+          non_retryable: nonRetryable,
+          error: message,
+        },
+      },
+    });
+
+    return {
+      action: 'dead_letter',
+      nextAttempt,
+      maxAttempts,
+      retryAt: null,
+      nonRetryable,
+      message,
+    };
+  }
+
+  const retryAt = nextRetryAt({
+    attemptCount: nextAttempt,
+    baseDelaySeconds: config.queueRetryBaseDelaySeconds,
+    maxDelaySeconds: config.queueRetryMaxDelaySeconds,
+  });
+
+  await updateJobState(supabase, {
+    jobId: job.id,
+    status: 'retry_wait',
+    fields: {
+      attempt_count: nextAttempt,
+      max_attempts: maxAttempts,
+      lease_expires_at: null,
+      available_at: retryAt,
+      last_error: message,
+      result: {
+        trace_id: traceId,
+        action: 'retry_wait',
+        retry_at: retryAt,
+        error: message,
+      },
+    },
+  });
+
+  return {
+    action: 'retry_wait',
+    nextAttempt,
+    maxAttempts,
+    retryAt,
+    nonRetryable: false,
+    message,
   };
 }
 
@@ -236,6 +331,9 @@ async function runQueueOnce({ supabase, dryRun }) {
   const pending = await listPendingVideoJobs(supabase, { limit: config.queueBatch });
 
   let processed = 0;
+  let retried = 0;
+  let deadLettered = 0;
+
   for (const job of pending.rows) {
     const leased = await leaseJob(supabase, {
       jobId: job.id,
@@ -247,7 +345,9 @@ async function runQueueOnce({ supabase, dryRun }) {
     await updateJobState(supabase, {
       jobId: job.id,
       status: 'running',
-      fields: { started_at: new Date().toISOString() },
+      fields: {
+        started_at: new Date().toISOString(),
+      },
     });
 
     try {
@@ -269,6 +369,8 @@ async function runQueueOnce({ supabase, dryRun }) {
         status: 'completed',
         fields: {
           completed_at: new Date().toISOString(),
+          lease_expires_at: null,
+          last_error: null,
           result: {
             output_count: result.outputs.length,
             calendar_slots: result.calendar.length,
@@ -278,25 +380,31 @@ async function runQueueOnce({ supabase, dryRun }) {
             skipped: Number(result.stats?.skipped || 0),
             warnings: result.contextWarnings,
           },
-          lease_expires_at: null,
         },
       });
 
       processed += 1;
+      console.log(`[video-content-worker] queue_job_completed id=${job.id} outputs=${result.outputs.length}`);
     } catch (error) {
-      await updateJobState(supabase, {
-        jobId: job.id,
-        status: 'failed',
-        fields: {
-          last_error: String(error.message || error),
-          lease_expires_at: null,
-        },
-      }).catch(() => {});
-      console.error(`[video-content-worker] queue_job_failed id=${job.id} error=${error.message}`);
+      const failure = await applyQueueFailurePolicy({
+        supabase,
+        job: leased.row,
+        error,
+        traceId,
+      });
+
+      if (failure.action === 'dead_letter') deadLettered += 1;
+      else retried += 1;
+
+      console.error(
+        `[video-content-worker] queue_job_failed id=${job.id} action=${failure.action} attempt=${failure.nextAttempt}/${failure.maxAttempts} retry_at=${failure.retryAt || 'n/a'} error=${failure.message}`
+      );
     }
   }
 
-  console.log(`[video-content-worker] mode=queue trace=${traceId} pending=${pending.rows.length} processed=${processed} dry_run=${String(dryRun)}`);
+  console.log(
+    `[video-content-worker] mode=queue trace=${traceId} pending=${pending.rows.length} processed=${processed} retried=${retried} dead_lettered=${deadLettered} dry_run=${String(dryRun)}`
+  );
   if (pending.warnings.length > 0) {
     console.log(`[video-content-worker] warnings=${pending.warnings.join(',')}`);
   }
