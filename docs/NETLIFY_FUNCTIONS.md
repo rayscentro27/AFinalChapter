@@ -20,6 +20,9 @@ npm install
   - `ADMIN_IMPORT_TOKEN` (required for `/import_training_bundle`)
   - `OPENAI_API_KEY`
   - `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (required for encrypted tenant integration credentials at rest)
+  - Optional `INTEGRATION_CREDENTIALS_ENCRYPTION_ACTIVE_KID` (active key id used for new writes)
+  - Optional `INTEGRATION_CREDENTIALS_ENCRYPTION_KEYRING` (JSON map of key ids to secrets for rotation)
+  - Optional `INTEGRATION_CREDENTIALS_ENCRYPTION_PREVIOUS_KEY` (legacy read fallback during rotation)
   - `MAILERLITE_API_KEY` (required for `/.netlify/functions/mailerlite_sync`)
   - Optional `MAILERLITE_GROUP_ID` (fallback group if client does not pass one)
   - Optional `OPENAI_MODEL`
@@ -66,6 +69,9 @@ In Netlify site settings, set:
 - `SUPABASE_ANON_KEY` (required for task/notification functions)
 - `OPENAI_API_KEY` (required for `/agent`)
 - `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (required for encrypted `tenant_integrations.credentials`)
+- Optional `INTEGRATION_CREDENTIALS_ENCRYPTION_ACTIVE_KID` (active key id for new encrypted envelopes)
+- Optional `INTEGRATION_CREDENTIALS_ENCRYPTION_KEYRING` (JSON map for multi-key decrypt + rotation windows)
+- Optional `INTEGRATION_CREDENTIALS_ENCRYPTION_PREVIOUS_KEY` (temporary read fallback while rotating keys)
 - Optional `OPENAI_MODEL` (used by `/agent`)
 - Optional `INTEL_INGEST_TOKEN` (for non-user ingestion jobs to `/ingest_approval_intel`)
 - Optional `CRON_SHARED_TOKEN` (for non-scheduled/manual calls to `/check_overdue_tasks`)
@@ -78,7 +84,9 @@ Knowledge Vault (Option 2):
 - Run `docs/supabase/agent_cache.sql` in Supabase SQL Editor (optional, enables /agent caching)
 - Use the Distiller prompt starter in `docs/DISTILLER_PROMPT_STARTER.md`
 
-Security note: `SUPABASE_SERVICE_ROLE_KEY` and `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` must never be exposed to the browser (Vite `VITE_*` env vars).
+Security note: `SUPABASE_SERVICE_ROLE_KEY`, `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY`, `INTEGRATION_CREDENTIALS_ENCRYPTION_KEYRING`, and `INTEGRATION_CREDENTIALS_ENCRYPTION_PREVIOUS_KEY` must never be exposed to the browser (Vite `VITE_*` env vars).
+
+Rotation runbook: see `docs/INTEGRATION_CREDENTIALS_KEY_ROTATION.md` for no-downtime key rollout and rollback steps.
 
 
 Agent caching:
