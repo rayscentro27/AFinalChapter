@@ -1,9 +1,8 @@
 # Nexus Video Content Worker
 
-Phase A Ticket A1 scope:
-- direct-run draft generation hardening
-- tenant-scoped validation
-- dry-run and non-dry-run command validation
+Phase A scope:
+- A1: direct-run draft generation hardening and tenant-scoped validation
+- A2: queue retry/backoff/dead-letter hardening
 
 ## Safety
 - Draft-only output (`status=draft`).
@@ -29,10 +28,20 @@ Non-dry-run (writes draft artifacts):
 node worker.js --once --tenant <TENANT_UUID> --no-dry-run
 ```
 
-## Queue Run (Optional)
+## Queue Validation
+Dry-run queue pass:
 ```bash
 VIDEO_WORKER_QUEUE_ENABLED=true node worker.js --once --queue --dry-run
 ```
+
+Queue failure policy:
+- retryable failures -> `retry_wait` + exponential backoff
+- terminal failures or max attempts reached -> `dead_letter`
+
+Configurable controls:
+- `VIDEO_WORKER_QUEUE_RETRY_BASE_DELAY_SECONDS`
+- `VIDEO_WORKER_QUEUE_RETRY_MAX_DELAY_SECONDS`
+- `VIDEO_WORKER_QUEUE_MAX_ATTEMPTS_DEFAULT`
 
 ## Check and Test
 ```bash
