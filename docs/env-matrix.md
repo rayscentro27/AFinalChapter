@@ -47,11 +47,17 @@ Validation:
 Required:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (required by `integration_upsert`, `integration_test`, `integration_list` for encrypted `tenant_integrations.credentials`).
+- `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (required for encrypted `tenant_integrations.credentials` at rest).
+
+Optional (recommended for key rotation):
+- `INTEGRATION_CREDENTIALS_ENCRYPTION_ACTIVE_KID` (write key id for new envelopes).
+- `INTEGRATION_CREDENTIALS_ENCRYPTION_KEYRING` (JSON map of key ids to secrets).
+- `INTEGRATION_CREDENTIALS_ENCRYPTION_PREVIOUS_KEY` (legacy read-only fallback during rotation windows).
 
 Validation:
-- Function-level fail-fast for missing encryption key when encrypting/decrypting stored integration credentials.
-- Keep this variable server-side only; never expose as `VITE_*`.
+- Function-level fail-fast for missing/ambiguous write key when encrypting credentials.
+- Decryption supports multi-key fallback (`kid`, active key, previous key, keyring) to keep legacy rows readable during rotations.
+- Keep these variables server-side only; never expose as `VITE_*`.
 
 ## D) Mac Mini AI Node (secret/private)
 Required (expected):
