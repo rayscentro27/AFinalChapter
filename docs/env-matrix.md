@@ -33,9 +33,15 @@ Recommended runtime controls:
 - `WORKER_HEARTBEAT_SECONDS`
 - `ENV_VALIDATE_STRICT`
 
+Proxy trust controls:
+- `TRUST_PROXY`
+- `TRUST_PROXY_CIDRS`
+- `TRUST_PROXY_ALLOW_ALL`
+
 Validation:
 - Startup validation module: `gateway/src/config/envValidation.js`.
-- Strict mode support via `ENV_VALIDATE_STRICT=true`.
+- In production (`NODE_ENV=production`), strict validation defaults to enabled unless explicitly overridden.
+- When `TRUST_PROXY=true`, configure `TRUST_PROXY_CIDRS` (preferred) or explicitly set `TRUST_PROXY_ALLOW_ALL=true`.
 
 ## C) Netlify Functions (secret/private)
 Required:

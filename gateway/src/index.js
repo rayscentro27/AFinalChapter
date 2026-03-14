@@ -53,6 +53,23 @@ function requestProvider(req) {
   return null;
 }
 
+
+function resolveTrustProxyOption() {
+  if (!ENV.TRUST_PROXY) return false;
+  if (Array.isArray(ENV.TRUST_PROXY_CIDRS) && ENV.TRUST_PROXY_CIDRS.length > 0) {
+    return ENV.TRUST_PROXY_CIDRS;
+  }
+  if (ENV.TRUST_PROXY_ALLOW_ALL) {
+    return true;
+  }
+  return false;
+}
+
+const trustProxyOption = resolveTrustProxyOption();
+if (ENV.TRUST_PROXY && trustProxyOption === false) {
+  console.warn('[gateway] TRUST_PROXY enabled but no TRUST_PROXY_CIDRS configured and TRUST_PROXY_ALLOW_ALL=false; disabling trust proxy for safety');
+}
+
 const fastify = Fastify({
   logger: {
     level: ENV.LOG_LEVEL,
@@ -77,7 +94,7 @@ const fastify = Fastify({
       censor: '[REDACTED]',
     },
   },
-  trustProxy: ENV.TRUST_PROXY,
+  trustProxy: trustProxyOption,
   bodyLimit: 2 * 1024 * 1024,
 });
 
