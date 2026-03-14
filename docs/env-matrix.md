@@ -1,58 +1,70 @@
 # Env Matrix (Phase 1)
 
-## A) Netlify Frontend (public)
-Required:
-- `VITE_API_BASE_URL`: Gateway base URL.
-- `VITE_BACKEND_MODE`: runtime adapter selection.
-- `VITE_SUPABASE_URL`: Supabase project URL.
-- `VITE_SUPABASE_ANON_KEY`: public anon key.
+## Backend (Fastify gateway on Oracle VM)
 
-Optional:
-- Feature flags for UI-only modules.
+### Required at startup (secret)
+- `INTERNAL_API_KEY`: internal/system endpoint auth.
+- `SUPABASE_URL`: Supabase project URL.
+- `SUPABASE_SERVICE_ROLE_KEY`: service-role DB access.
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_FROM_NUMBER`
+- `META_APP_SECRET`
+- `META_VERIFY_TOKEN`
+- `WHATSAPP_VERIFY_TOKEN`
+- `WHATSAPP_TOKEN`
+- `META_PAGE_ACCESS_TOKEN`
 
-Validation:
-- Frontend boot check for missing `VITE_*` values.
-- Fail-fast in build for empty placeholders.
+### Recommended for full integrations (secret)
+- `GEMINI_API_KEY`
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+- `TRADINGVIEW_WEBHOOK_SECRET`
 
-## B) Oracle VM Gateway (secret/private)
-Required:
-- `INTERNAL_API_KEY`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- Channel credentials used by enabled providers (`TWILIO_*`, `META_*`, `WHATSAPP_*`).
-
-Recommended runtime controls:
-- `SYSTEM_MODE`
+### Runtime safety controls (non-secret)
+- `SYSTEM_MODE` (`development|research|production|maintenance|degraded|emergency_stop`)
 - `QUEUE_ENABLED`
 - `AI_JOBS_ENABLED`
 - `RESEARCH_JOBS_ENABLED`
 - `NOTIFICATIONS_ENABLED`
+- `CONTROL_PLANE_WRITE_ENABLED` (keep `false` by default)
 - `JOB_MAX_RUNTIME_SECONDS`
 - `WORKER_MAX_CONCURRENCY`
 - `TENANT_JOB_LIMIT_ACTIVE`
 - `WORKER_HEARTBEAT_SECONDS`
 - `ENV_VALIDATE_STRICT`
 
-Validation:
-- Startup validation module: `gateway/src/config/envValidation.js`.
-- Strict mode support via `ENV_VALIDATE_STRICT=true`.
+### Optional backend settings
+Secret:
+- `OPENROUTER_API_KEY`
+- `NVIDIA_NIM_API_KEY`
+- `SUPABASE_JWT_SECRET`
 
-## C) Mac Mini AI Node (secret/private)
-Required (expected):
+Non-secret:
+- `LOG_LEVEL`
+- `PORT`
+- `TRUST_PROXY`
+- `ALLOWED_ORIGINS`
+- `AI_PROVIDER`
+
+### Validation implementation
+- Module: `gateway/src/config/envValidation.js`
+- Boot config: `gateway/src/env.js`
+- Strict mode: `ENV_VALIDATE_STRICT=true`
+
+## Frontend (Netlify, documentation only)
+Public (`VITE_*` only):
+- `VITE_API_BASE_URL`
+- `VITE_BACKEND_MODE`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+## Mac Mini AI node (documentation only)
+Expected secret variables:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- provider keys actually used by research workers (`GEMINI_API_KEY`, optional fallback keys)
+- model provider keys used by research workers.
 
-Recommended:
+Expected non-secret controls:
 - `SYSTEM_MODE=research`
-- `QUEUE_ENABLED`
-- worker concurrency and runtime caps aligned with gateway settings.
-
-Validation:
-- Mirror gateway-style startup validation on Mac worker entrypoints.
-- Reject startup when required AI routing vars are missing.
-
-## Naming convention
-- Upper snake case only.
-- `VITE_*` is frontend-public only.
-- all credentials remain non-`VITE_*` and server-side only.
+- queue/runtime caps aligned to gateway policy.

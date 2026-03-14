@@ -119,6 +119,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.LENDER_ROOM} label="Lender Room" icon={Scale} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.SBA_PREP} label="SBA Prep" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.FUNDING_RESEARCH} label="Funding Research" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
+            <SidebarItem id={ViewMode.RESEARCH_DASHBOARD} label="Research Dashboard" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.FUNDING_OUTCOMES} label="Funding Outcomes" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.GRANTS} label="Grants Engine" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.DOC_GENERATOR} label="Doc Draftsman" icon={FileText} currentView={currentView} onViewChange={handleNav} />
@@ -146,6 +147,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.BILLING_COMMISSIONS} label="Commission Billing" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
             {userRole === 'admin' && (
               <>
+                <SidebarItem id={ViewMode.ADMIN_CONTROL_PLANE} label="Control Plane" icon={ShieldAlert} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_SUBSCRIPTIONS} label="Subscriptions" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_CONSENTS} label="Consent Ledger" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_SMS_TEMPLATES} label="SMS Templates" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />

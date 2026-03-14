@@ -36,6 +36,7 @@ import CommissionManager from './components/CommissionManager';
 import RiskMonitor from './components/RiskMonitor';
 import SalesLeaderboard from './components/SalesLeaderboard';
 import FundingResearchPage from './src/pages/FundingResearchPage';
+import ResearchDashboardPage from './src/pages/ResearchDashboardPage';
 import AdminFundingCatalogPage from './src/pages/AdminFundingCatalogPage';
 import GrantsPage from './src/pages/GrantsPage';
 import AdminGrantsCatalogPage from './src/pages/AdminGrantsCatalogPage';
@@ -101,6 +102,8 @@ import AdminSubscriptionManager from './src/pages/AdminSubscriptionManager';
 import AdminDocumentsPage from './src/pages/AdminDocumentsPage';
 import SmsTermsPage from './src/pages/SmsTermsPage';
 import CommunicationPreferencesPage from './src/pages/CommunicationPreferencesPage';
+import SecuritySettingsPage from './src/pages/SecuritySettingsPage';
+import AdminControlPlanePage from './src/pages/AdminControlPlanePage';
 import UploadCreditReportPage from './src/pages/UploadCreditReportPage';
 import DisputeFactsReviewPage from './src/pages/DisputeFactsReviewPage';
 import DraftPreviewPage from './src/pages/DraftPreviewPage';
@@ -154,6 +157,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/suggestions': ViewMode.SUGGESTIONS,
   '/admin/health': ViewMode.ADMIN_HEALTH,
   '/admin/monitoring': ViewMode.ADMIN_HEALTH,
+  '/admin/control-plane': ViewMode.ADMIN_CONTROL_PLANE,
   '/admin/sre': ViewMode.SRE_DASHBOARD,
   '/admin/channel-health': ViewMode.CHANNEL_HEALTH,
   '/admin/outbox': ViewMode.OUTBOX,
@@ -174,6 +178,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/documents': ViewMode.DOCUMENTS,
   '/sba': ViewMode.SBA_PREP,
   '/funding/research': ViewMode.FUNDING_RESEARCH,
+  '/research': ViewMode.RESEARCH_DASHBOARD,
   '/funding/outcomes': ViewMode.FUNDING_OUTCOMES,
   '/billing/commissions': ViewMode.BILLING_COMMISSIONS,
   '/grants': ViewMode.GRANTS,
@@ -204,6 +209,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/sba': ViewMode.ADMIN_SBA,
   '/admin/commissions': ViewMode.ADMIN_COMMISSIONS,
   '/settings/communication': ViewMode.COMMUNICATION_PREFERENCES,
+  '/settings/security': ViewMode.SECURITY_SETTINGS,
   '/free-score': ViewMode.FREE_SCORE,
   '/free-checklist': ViewMode.FREE_CHECKLIST,
   '/unsubscribe': ViewMode.UNSUBSCRIBE,
@@ -392,6 +398,7 @@ export const App = () => {
           ViewMode.BILLING,
           ViewMode.DOCUMENTS,
           ViewMode.COMMUNICATION_PREFERENCES,
+          ViewMode.SECURITY_SETTINGS,
           ViewMode.MEMBERSHIP_AGREEMENT,
           ViewMode.CLIENT_MAILING_APPROVALS,
           ViewMode.DISPUTE_LETTER_PREVIEW,
@@ -555,6 +562,7 @@ export const App = () => {
         if (currentView === ViewMode.BILLING) return <BillingPage selectedPlan={billingUpgradeTarget} />;
         if (currentView === ViewMode.DOCUMENTS) return <DocumentsPage />;
         if (currentView === ViewMode.COMMUNICATION_PREFERENCES) return <CommunicationPreferencesPage />;
+        if (currentView === ViewMode.SECURITY_SETTINGS) return <SecuritySettingsPage />;
         if (currentView === ViewMode.UPLOAD_CREDIT_REPORT) return <UploadCreditReportPage />;
         if (currentView === ViewMode.DISPUTE_FACTS_REVIEW) return <DisputeFactsReviewPage />;
         if (currentView === ViewMode.DRAFT_PREVIEW) return <DraftPreviewPage />;
@@ -592,6 +600,7 @@ export const App = () => {
                     case ViewMode.BILLING: return <BillingPage selectedPlan={billingUpgradeTarget} />;
                     case ViewMode.DOCUMENTS: return <DocumentsPage />;
                     case ViewMode.COMMUNICATION_PREFERENCES: return <CommunicationPreferencesPage />;
+                    case ViewMode.SECURITY_SETTINGS: return <SecuritySettingsPage />;
                     case ViewMode.UPLOAD_CREDIT_REPORT: return <UploadCreditReportPage />;
                     case ViewMode.DISPUTE_FACTS_REVIEW: return <DisputeFactsReviewPage />;
                     case ViewMode.DRAFT_PREVIEW: return <DraftPreviewPage />;
@@ -610,6 +619,7 @@ export const App = () => {
                     case ViewMode.RISK_MONITOR: return <RiskMonitor />;
                     case ViewMode.FUNDING_FLOW: return renderTierGate(ViewMode.FUNDING_FLOW, <PGFundingFlow />);
                     case ViewMode.FUNDING_RESEARCH: return renderTierGate(ViewMode.FUNDING_RESEARCH, <FundingResearchPage />);
+                    case ViewMode.RESEARCH_DASHBOARD: return <ResearchDashboardPage />;
                     case ViewMode.FUNDING_OUTCOMES: return renderTierGate(ViewMode.FUNDING_OUTCOMES, <FundingOutcomesPage />);
                     case ViewMode.BILLING_COMMISSIONS: return renderTierGate(ViewMode.BILLING_COMMISSIONS, <BillingCommissionsPage />);
                     case ViewMode.AUTOMATION: return <LiveAutomationMonitor />;
@@ -636,6 +646,7 @@ export const App = () => {
                     case ViewMode.DEAD_LETTERS: return <AdminDeadLetters />;
                     case ViewMode.CHANNEL_HEALTH: return <AdminChannelHealth />;
                     case ViewMode.ADMIN_HEALTH: return <AdminMonitoring />;
+                    case ViewMode.ADMIN_CONTROL_PLANE: return <AdminControlPlanePage />;
                     case ViewMode.SRE_DASHBOARD: return <AdminSRE />;
                     case ViewMode.OUTBOX: return <AdminOutbox />;
                     case ViewMode.PUBLIC_API: return <AdminPublicApi />;

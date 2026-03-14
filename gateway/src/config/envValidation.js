@@ -44,6 +44,9 @@ const RECOMMENDED = {
     'RESEARCH_JOBS_ENABLED',
     'NOTIFICATIONS_ENABLED',
   ],
+  control_plane: [
+    'CONTROL_PLANE_WRITE_ENABLED',
+  ],
   queue_runtime: [
     'JOB_MAX_RUNTIME_SECONDS',
     'WORKER_MAX_CONCURRENCY',
@@ -61,7 +64,7 @@ const CONDITIONAL_REQUIRED = {
   ],
 };
 
-const VALID_SYSTEM_MODES = new Set(['development', 'research', 'production', 'maintenance']);
+const VALID_SYSTEM_MODES = new Set(['development', 'research', 'production', 'maintenance', 'degraded', 'emergency_stop']);
 
 function collectMissing(env, groups) {
   const missing = [];
@@ -109,6 +112,7 @@ export function validateGatewayEnv({ env = process.env, strict = false, logger =
       ai_jobs_enabled: asBool(env.AI_JOBS_ENABLED, true),
       research_jobs_enabled: asBool(env.RESEARCH_JOBS_ENABLED, true),
       notifications_enabled: asBool(env.NOTIFICATIONS_ENABLED, true),
+      control_plane_write_enabled: asBool(env.CONTROL_PLANE_WRITE_ENABLED, false),
     },
   };
 

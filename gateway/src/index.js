@@ -31,6 +31,7 @@ import { tradingviewRoutes } from './routes/tradingview.js';
 import { researchRoutes } from './routes/research.js';
 import { systemHealthRoutes } from './routes/system_health.js';
 import { adminMembershipRoutes } from './routes/admin_membership.js';
+import { controlPlaneRoutes } from './routes/control_plane.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -175,6 +176,7 @@ await fastify.register(adminSreRoutes);
 await fastify.register(enterpriseRoutes);
 await fastify.register(researchRoutes);
 await fastify.register(adminMembershipRoutes);
+await fastify.register(controlPlaneRoutes);
 
 fastify.setErrorHandler((error, req, reply) => {
   req.log.error({

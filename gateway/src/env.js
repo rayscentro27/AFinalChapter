@@ -1,9 +1,17 @@
 import 'dotenv/config';
 
+const VALID_SYSTEM_MODES = new Set(['development', 'research', 'production', 'maintenance', 'degraded', 'emergency_stop']);
+
 function required(name) {
   const value = process.env[name];
   if (!value) throw new Error(`Missing env var: ${name}`);
   return value;
+}
+
+function systemMode(value) {
+  const mode = String(value || 'development').toLowerCase();
+  if (VALID_SYSTEM_MODES.has(mode)) return mode;
+  return 'development';
 }
 
 export const ENV = {
@@ -29,6 +37,15 @@ export const ENV = {
   SUPABASE_URL: required('SUPABASE_URL'),
   SUPABASE_SERVICE_ROLE_KEY: required('SUPABASE_SERVICE_ROLE_KEY'),
   SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || '',
+
+  TRADINGVIEW_WEBHOOK_SECRET: process.env.TRADINGVIEW_WEBHOOK_SECRET || '',
+
+  OANDA_API_KEY: process.env.OANDA_API_KEY || '',
+  OANDA_ACCOUNT_ID: process.env.OANDA_ACCOUNT_ID || '',
+  OANDA_URL: process.env.OANDA_URL || 'https://api-fxpractice.oanda.com',
+
+  TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
+  TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || '',
 
   TWILIO_ACCOUNT_SID: required('TWILIO_ACCOUNT_SID'),
   TWILIO_AUTH_TOKEN: required('TWILIO_AUTH_TOKEN'),
@@ -57,11 +74,12 @@ export const ENV = {
   AI_MASK_PII: String(process.env.AI_MASK_PII || 'true').toLowerCase() !== 'false',
   SAFE_MODE: String(process.env.SAFE_MODE || 'false').toLowerCase() === 'true',
 
-  SYSTEM_MODE: process.env.SYSTEM_MODE || 'development',
+  SYSTEM_MODE: systemMode(process.env.SYSTEM_MODE),
   QUEUE_ENABLED: String(process.env.QUEUE_ENABLED || 'false').toLowerCase() === 'true',
   AI_JOBS_ENABLED: String(process.env.AI_JOBS_ENABLED || 'true').toLowerCase() !== 'false',
   RESEARCH_JOBS_ENABLED: String(process.env.RESEARCH_JOBS_ENABLED || 'true').toLowerCase() !== 'false',
   NOTIFICATIONS_ENABLED: String(process.env.NOTIFICATIONS_ENABLED || 'true').toLowerCase() !== 'false',
+  CONTROL_PLANE_WRITE_ENABLED: String(process.env.CONTROL_PLANE_WRITE_ENABLED || 'false').toLowerCase() === 'true',
   JOB_MAX_RUNTIME_SECONDS: Number(process.env.JOB_MAX_RUNTIME_SECONDS || 300),
   WORKER_MAX_CONCURRENCY: Number(process.env.WORKER_MAX_CONCURRENCY || 4),
   TENANT_JOB_LIMIT_ACTIVE: Number(process.env.TENANT_JOB_LIMIT_ACTIVE || 20),
