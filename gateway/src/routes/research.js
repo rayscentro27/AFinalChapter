@@ -30,14 +30,15 @@ function normalizeTenantId(req) {
   return asText(req.query?.tenant_id || req.params?.tenant_id || '');
 }
 
-async function requireTenantScopeForInternalKey(req, reply) {
+async function requireApiKey(req, reply) {
   const internalApiKey = asText(req.headers?.['x-api-key']);
-  if (!internalApiKey) return undefined;
-
-  if (internalApiKey !== ENV.INTERNAL_API_KEY) {
+  if (!internalApiKey || internalApiKey !== ENV.INTERNAL_API_KEY) {
     return reply.code(401).send({ ok: false, error: 'unauthorized' });
   }
+  return undefined;
+}
 
+async function requireTenantScopeForInternalKey(req, reply) {
   const tenantId = normalizeTenantId(req);
   if (!tenantId) {
     return reply.code(400).send({ ok: false, error: 'missing_tenant_id' });
@@ -45,7 +46,6 @@ async function requireTenantScopeForInternalKey(req, reply) {
 
   return undefined;
 }
-
 
 function applyTenantFilter(query, tenantId) {
   if (!tenantId) return query;
@@ -189,6 +189,8 @@ function buildReplayPerformance(rows) {
 }
 
 export async function researchRoutes(fastify) {
+  fastify.addHook('onRequest', requireApiKey);
+
   fastify.get('/api/research/strategy-rankings', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
     const limit = normalizeLimit(req.query?.limit, 20);
