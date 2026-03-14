@@ -653,18 +653,34 @@ export async function systemHealthRoutes(fastify, opts = {}) {
     let aiRequests24h = 0;
     let tokenUsage24h = 0;
     let costEstimate24h = 0;
+    let aiCacheHits24h = 0;
+
+    let openrouterRequests24h = 0;
+    let openrouterCacheHits24h = 0;
 
     for (const row of cacheRows.rows) {
       aiRequests24h += 1;
-      const provider = asText(row.provider) || 'unknown';
+      const provider = toLower(row.provider) || 'unknown';
       const taskType = asText(row.task_type) || 'unknown';
+      const hitCount = Math.max(0, asNumber(row.hit_count, 0));
+
       provider_counts[provider] = Number(provider_counts[provider] || 0) + 1;
       task_type_counts[taskType] = Number(task_type_counts[taskType] || 0) + 1;
+
+      aiCacheHits24h += hitCount;
       tokenUsage24h += normalizeTokenUsage(row);
       costEstimate24h += asNumber(row.cost_estimate, 0);
+
+      if (provider === 'openrouter') {
+        openrouterRequests24h += 1;
+        openrouterCacheHits24h += hitCount;
+      }
     }
 
     const aiFailures24h = errorRows.rows.filter(isAiError).length;
+    const openrouterCacheHitRate24h = openrouterRequests24h > 0
+      ? Number((openrouterCacheHits24h / openrouterRequests24h).toFixed(4))
+      : 0;
 
     const checks = { cacheRows, errorRows, cacheHitRate };
     const missing_tables = [];
@@ -678,15 +694,20 @@ export async function systemHealthRoutes(fastify, opts = {}) {
       hours,
       ai_requests_24h: aiRequests24h,
       ai_failures_24h: aiFailures24h,
+      ai_cache_hits_24h: aiCacheHits24h,
       ai_cache_hit_rate_24h: cacheHitRate.hit_rate ?? 0,
       token_usage_24h: Math.round(tokenUsage24h),
       cost_estimate_24h_usd: Number(costEstimate24h.toFixed(6)),
       summary: {
         provider_counts,
         task_type_counts,
+        openrouter_requests_24h: openrouterRequests24h,
+        openrouter_cache_hits_24h: openrouterCacheHits24h,
+        openrouter_cache_hit_rate_24h: openrouterCacheHitRate24h,
         analyzed_cache_rows: cacheRows.rows.length,
         analyzed_error_rows: errorRows.rows.length,
       },
+      runtime_cache_metrics: aiCacheMetricsFn(),
       missing_tables,
       warnings: summarizeErrors(checks),
     });
