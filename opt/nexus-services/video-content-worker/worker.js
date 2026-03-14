@@ -13,7 +13,11 @@ const {
 const { detectTopics } = require('./detector');
 const { generateContentPack } = require('./generator');
 const { normalizePayload, toArtifactInput } = require('./formatter');
-const { buildDraftReviewState } = require('./reviewer');
+const {
+  buildDraftReviewState,
+  reviewMetadataMarkers,
+  enforcePublishHandoffPolicy,
+} = require('./reviewer');
 const { buildWeeklyCalendar } = require('./calendar');
 const { sendTelegramMessage } = require('./notifier');
 const {
@@ -65,19 +69,28 @@ function preferredFormatsForPlatform(platform) {
   return ['faceless_short'];
 }
 
-function appendTenantDraftMarkers(artifactInput, tenantId) {
+function appendTenantDraftMarkers(artifactInput, tenantId, reviewedOutput) {
   const keyPoints = Array.isArray(artifactInput.key_points) ? artifactInput.key_points.slice() : [];
   const tags = Array.isArray(artifactInput.tags) ? artifactInput.tags.slice() : [];
+  const reviewMarkers = reviewMetadataMarkers(reviewedOutput);
 
   if (!keyPoints.includes(`tenant_id:${tenantId}`)) keyPoints.push(`tenant_id:${tenantId}`);
   if (!keyPoints.includes('status:draft')) keyPoints.push('status:draft');
+
+  for (const marker of reviewMarkers.keyPoints) {
+    if (!keyPoints.includes(marker)) keyPoints.push(marker);
+  }
+
   if (!tags.includes('tenant_scoped')) tags.push('tenant_scoped');
+  for (const tag of reviewMarkers.tags) {
+    if (!tags.includes(tag)) tags.push(tag);
+  }
 
   return {
     ...artifactInput,
     key_points: keyPoints,
     tags,
-  }; 
+  };
 }
 
 function isNonRetryableQueueError(error) {
@@ -87,6 +100,8 @@ function isNonRetryableQueueError(error) {
     || msg.includes('invalid_tenant_id_for_queue_job')
     || msg.includes('invalid_tenant_id_for_direct_mode')
     || msg.includes('missing_tenant_id_for_direct_mode')
+    || msg.includes('publish_handoff_requires_manual_approval')
+    || msg.includes('publish_handoff_not_supported_in_phase_a3')
   );
 }
 
@@ -176,6 +191,8 @@ async function processPayload({ supabase, tenantId, payload, traceId, dryRun }) 
     audience: config.defaultAudience,
   });
 
+  enforcePublishHandoffPolicy(normalized);
+
   const context = await fetchContextInputs(supabase, {
     tenantId: normalized.tenant_id,
     limits: {
@@ -241,15 +258,17 @@ async function processPayload({ supabase, tenantId, payload, traceId, dryRun }) 
         traceId,
       });
 
-      const reviewed = buildDraftReviewState(output);
+      const reviewed = buildDraftReviewState(output, {
+        policyVersion: config.reviewPolicyVersion,
+      });
       outputs.push(reviewed);
 
       if (dryRun) {
-        console.log(`[video-content-worker] dry_run topic=${reviewed.topic} platform=${reviewed.platform} format=${reviewed.format}`);
+        console.log(`[video-content-worker] dry_run topic=${reviewed.topic} platform=${reviewed.platform} format=${reviewed.format} review_status=${reviewed.review_workflow.review_status}`);
         continue;
       }
 
-      const artifactInput = appendTenantDraftMarkers(toArtifactInput(reviewed), normalized.tenant_id);
+      const artifactInput = appendTenantDraftMarkers(toArtifactInput(reviewed), normalized.tenant_id, reviewed);
       const writeRes = await writeDraftArtifact(supabase, {
         output: artifactInput,
         traceId,
@@ -314,7 +333,7 @@ async function runDirectOnce({ supabase, tenantId, dryRun }) {
   await sendTelegramMessage(
     config.telegramBotToken,
     config.telegramChatId,
-    `VideoContentWorker run complete\ntrace=${traceId}\noutputs=${allOutputs.length}\ndry_run=${String(dryRun)}\nstored=${stored}\nskipped=${skipped}`
+    `VideoContentWorker run complete\ntrace=${traceId}\noutputs=${allOutputs.length}\ndry_run=${String(dryRun)}\nstored=${stored}\nskipped=${skipped}\nreview_required=true`
   ).catch((error) => {
     console.warn(`[video-content-worker] telegram_error=${error.message}`);
   });
@@ -379,6 +398,7 @@ async function runQueueOnce({ supabase, dryRun }) {
             stored: Number(result.stats?.stored || 0),
             skipped: Number(result.stats?.skipped || 0),
             warnings: result.contextWarnings,
+            review_required: true,
           },
         },
       });

@@ -64,6 +64,7 @@ const config = {
   minEvidenceItems: asInt(process.env.VIDEO_WORKER_MIN_EVIDENCE_ITEMS, 1, 0, 2000),
   strictTenantScope: asBool(process.env.VIDEO_WORKER_STRICT_TENANT_SCOPE, true),
   requireEvidenceForWrite: asBool(process.env.VIDEO_WORKER_REQUIRE_EVIDENCE_FOR_WRITE, true),
+  reviewPolicyVersion: String(process.env.VIDEO_WORKER_REVIEW_POLICY_VERSION || 'v1').trim(),
   platforms: asList(process.env.VIDEO_WORKER_PLATFORMS, ['youtube', 'instagram', 'tiktok']),
   defaultTone: String(process.env.VIDEO_WORKER_DEFAULT_TONE || 'educational_authority').trim(),
   defaultAudience: String(process.env.VIDEO_WORKER_DEFAULT_AUDIENCE || 'new_leads').trim(),
