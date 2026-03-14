@@ -113,6 +113,30 @@ async function safeCacheHitRate24h(db, hours = 24, limit = 5000) {
   return { hit_rate: Number(rate.toFixed(4)), missing: false, error: null };
 }
 
+async function safeLatestTimestamp(db, table, column = 'created_at', apply = null) {
+  let query = db
+    .from(table)
+    .select(column)
+    .order(column, { ascending: false })
+    .limit(1);
+
+  if (typeof apply === 'function') query = apply(query);
+
+  const { data, error } = await query;
+  if (error) {
+    if (isMissingSchema(error)) return { value: null, missing: true, error: null };
+    return { value: null, missing: false, error };
+  }
+
+  const value = asText(data?.[0]?.[column]);
+  if (!value) return { value: null, missing: false, error: null };
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return { value: null, missing: false, error: null };
+
+  return { value: parsed.toISOString(), missing: false, error: null };
+}
+
 function summarizeErrors(checks) {
   const out = [];
   for (const [key, value] of Object.entries(checks)) {
@@ -185,6 +209,49 @@ function isAiError(row = {}) {
     || haystack.includes('nim')
     || haystack.includes('model_router')
     || haystack.includes('ai_gateway');
+}
+
+function isTranscriptIngestionFailure(row = {}) {
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const details = row.details && typeof row.details === 'object' ? row.details : {};
+  const haystack = [
+    toLower(row.service),
+    toLower(row.component),
+    toLower(row.source),
+    toLower(row.error_type || row.error_code || row.severity),
+    toLower(row.error_message || row.message),
+    toLower(metadata.job_type || metadata.jobType),
+    toLower(metadata.error),
+    toLower(details.error),
+  ].join(' ');
+
+  return haystack.includes('transcript')
+    || haystack.includes('youtube')
+    || haystack.includes('no_transcript')
+    || haystack.includes('ingest');
+}
+
+function isResearchIngestionFailure(row = {}) {
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const details = row.details && typeof row.details === 'object' ? row.details : {};
+  const haystack = [
+    toLower(row.service),
+    toLower(row.component),
+    toLower(row.source),
+    toLower(row.error_type || row.error_code || row.severity),
+    toLower(row.error_message || row.message),
+    toLower(metadata.job_type || metadata.jobType),
+    toLower(details.error),
+  ].join(' ');
+
+  return haystack.includes('research')
+    || haystack.includes('claim')
+    || haystack.includes('cluster')
+    || haystack.includes('hypothes')
+    || haystack.includes('coverage_gap')
+    || haystack.includes('coverage gap')
+    || haystack.includes('brief')
+    || haystack.includes('ingest');
 }
 
 function normalizeTokenUsage(row = {}) {
@@ -473,6 +540,86 @@ export async function systemHealthRoutes(fastify, opts = {}) {
         task_type_counts,
         analyzed_cache_rows: cacheRows.rows.length,
         analyzed_error_rows: errorRows.rows.length,
+      },
+      missing_tables,
+      warnings: summarizeErrors(checks),
+    });
+  });
+
+  fastify.get('/api/system/ingestion', {
+    preHandler: [requireApiKey],
+  }, async (req, reply) => {
+    const hours = clampInt(req?.query?.hours, 24, 720);
+    const sinceIso = new Date(Date.now() - (hours * 60 * 60 * 1000)).toISOString();
+
+    const checks = {
+      transcripts24h: await safeCount(db, 'youtube_transcripts', (q) => q.gte('created_at', sinceIso)),
+      knowledgeDocs24h: await safeCount(db, 'knowledge_docs', (q) => q.gte('created_at', sinceIso)),
+      researchArtifacts24h: await safeCount(db, 'research_artifacts', (q) => q.gte('created_at', sinceIso)),
+      researchClaims24h: await safeCount(db, 'research_claims', (q) => q.gte('created_at', sinceIso)),
+      researchClusters24h: await safeCount(db, 'research_clusters', (q) => q.gte('created_at', sinceIso)),
+      researchBriefs24h: await safeCount(db, 'research_briefs', (q) => q.gte('created_at', sinceIso)),
+      researchHypotheses24h: await safeCount(db, 'research_hypotheses', (q) => q.gte('created_at', sinceIso)),
+      coverageGaps24h: await safeCount(db, 'coverage_gaps', (q) => q.gte('created_at', sinceIso)),
+      latestTranscriptAt: await safeLatestTimestamp(db, 'youtube_transcripts'),
+      latestKnowledgeDocAt: await safeLatestTimestamp(db, 'knowledge_docs'),
+      latestResearchArtifactAt: await safeLatestTimestamp(db, 'research_artifacts'),
+      latestResearchClaimAt: await safeLatestTimestamp(db, 'research_claims'),
+      latestResearchClusterAt: await safeLatestTimestamp(db, 'research_clusters'),
+      latestResearchBriefAt: await safeLatestTimestamp(db, 'research_briefs'),
+      latestResearchHypothesisAt: await safeLatestTimestamp(db, 'research_hypotheses'),
+      latestCoverageGapAt: await safeLatestTimestamp(db, 'coverage_gaps'),
+      recentErrors: await safeRows(
+        db
+          .from('system_errors')
+          .select('service,component,source,error_type,error_code,severity,error_message,message,metadata,details,created_at')
+          .gte('created_at', sinceIso)
+          .order('created_at', { ascending: false })
+          .limit(1000),
+      ),
+    };
+
+    const errors = checks.recentErrors.rows || [];
+    const transcriptFailures = errors.filter(isTranscriptIngestionFailure).length;
+    const researchFailures = errors.filter(isResearchIngestionFailure).length;
+
+    const missing_tables = [];
+    for (const [key, value] of Object.entries(checks)) {
+      if (value?.missing) missing_tables.push(key);
+    }
+
+    return reply.send({
+      ok: true,
+      timestamp: new Date().toISOString(),
+      hours,
+      transcripts_ingested_24h: checks.transcripts24h.count,
+      knowledge_docs_ingested_24h: checks.knowledgeDocs24h.count,
+      research_artifacts_ingested_24h: checks.researchArtifacts24h.count,
+      research_claims_ingested_24h: checks.researchClaims24h.count,
+      research_clusters_ingested_24h: checks.researchClusters24h.count,
+      research_briefs_ingested_24h: checks.researchBriefs24h.count,
+      research_hypotheses_ingested_24h: checks.researchHypotheses24h.count,
+      coverage_gaps_ingested_24h: checks.coverageGaps24h.count,
+      transcript_ingest_failures_24h: transcriptFailures,
+      research_ingest_failures_24h: researchFailures,
+      latest_transcript_ingested_at: checks.latestTranscriptAt.value,
+      latest_knowledge_doc_ingested_at: checks.latestKnowledgeDocAt.value,
+      latest_research_artifact_at: checks.latestResearchArtifactAt.value,
+      latest_research_claim_at: checks.latestResearchClaimAt.value,
+      latest_research_cluster_at: checks.latestResearchClusterAt.value,
+      latest_research_brief_at: checks.latestResearchBriefAt.value,
+      latest_research_hypothesis_at: checks.latestResearchHypothesisAt.value,
+      latest_coverage_gap_at: checks.latestCoverageGapAt.value,
+      summary: {
+        research_total_ingested_24h:
+          checks.researchArtifacts24h.count
+          + checks.researchClaims24h.count
+          + checks.researchClusters24h.count
+          + checks.researchBriefs24h.count
+          + checks.researchHypotheses24h.count
+          + checks.coverageGaps24h.count,
+        total_ingest_failures_24h: transcriptFailures + researchFailures,
+        analyzed_error_rows: errors.length,
       },
       missing_tables,
       warnings: summarizeErrors(checks),
