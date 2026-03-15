@@ -65,3 +65,12 @@ These legacy SQL files informed naming/semantics, but the exact table set reques
 - Adds migration-managed support for `strategy_library` as a master strategy registry.
 - Uses add-only `alter table ... add column if not exists` to avoid overwriting compatible existing schema.
 - Adds index support for common reporting filters (`asset_type`, `status`, `created_by`, `updated_at`).
+
+5. `20260315170000_worker_session_watchdog_scaffold.sql`
+- Adds Worker Session Watchdog v1 tables:
+  - `worker_sessions`
+  - `worker_session_events`
+  - `worker_recovery_policies`
+- Adds indexes for worker state and critical event time-series reads.
+- Enables RLS on watchdog tables (policy changes intentionally deferred).
+- Supports alert + quarantine v1 operations without auto-restart loops.

@@ -482,6 +482,9 @@ export async function systemHealthRoutes(fastify, opts = {}) {
       errors24h: await safeCount(db, 'system_errors', (q) => q.gte('created_at', new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString())),
       oldestPending: await safeOldestPendingJob(db),
       cacheHitRate: await safeCacheHitRate24h(db),
+      watchdogUnhealthy: await safeCount(db, 'worker_sessions', (q) => q.neq('session_state', 'healthy')),
+      watchdogQuarantined: await safeCount(db, 'worker_sessions', (q) => q.eq('session_state', 'quarantined')),
+      watchdogCriticalEvents24h: await safeCount(db, 'worker_session_events', (q) => q.eq('severity', 'critical').gte('created_at', new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString())),
     };
 
     const missing_tables = [];
@@ -528,6 +531,14 @@ export async function systemHealthRoutes(fastify, opts = {}) {
       },
       errors: {
         recent_24h: checks.errors24h.count,
+      },
+      watchdog_unhealthy_workers: checks.watchdogUnhealthy.count,
+      watchdog_quarantined_workers: checks.watchdogQuarantined.count,
+      watchdog_critical_events_24h: checks.watchdogCriticalEvents24h.count,
+      watchdog: {
+        unhealthy_workers: checks.watchdogUnhealthy.count,
+        quarantined_workers: checks.watchdogQuarantined.count,
+        critical_events_24h: checks.watchdogCriticalEvents24h.count,
       },
       missing_tables,
       warnings: summarizeErrors(checks),
@@ -661,6 +672,144 @@ export async function systemHealthRoutes(fastify, opts = {}) {
         oldest_pending_job: oldestPending.row,
       },
       jobs: jobs.rows,
+      missing_tables,
+      warnings: summarizeErrors(checks),
+    });
+  });
+
+  fastify.get('/api/system/worker-sessions', {
+    preHandler: [requireApiKey],
+  }, async (req, reply) => {
+    const limit = clampInt(req?.query?.limit, 20, 200);
+    const staleSeconds = clampInt(req?.query?.stale_seconds, Math.max(30, Number(ENV.WORKER_HEARTBEAT_SECONDS || 60)), 86400);
+    const sessionState = asText(req?.query?.session_state).toLowerCase();
+    const workerType = asText(req?.query?.worker_type);
+    const hostName = asText(req?.query?.host_name);
+    const staleCutoff = new Date(Date.now() - (staleSeconds * 1000)).toISOString();
+
+    let rowsQuery = db
+      .from('worker_sessions')
+      .select('worker_id,worker_type,host_name,session_state,browser_state,process_state,last_heartbeat_at,last_success_at,last_error_at,current_job_id,current_job_started_at,consecutive_failures,recovery_attempt_count,last_page_signature,metadata,updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+
+    if (sessionState) rowsQuery = rowsQuery.eq('session_state', sessionState);
+    if (workerType) rowsQuery = rowsQuery.eq('worker_type', workerType);
+    if (hostName) rowsQuery = rowsQuery.eq('host_name', hostName);
+
+    const rows = await safeRows(rowsQuery);
+
+    const states = ['healthy', 'degraded', 'login_required', 'browser_crashed', 'rate_limited', 'stuck', 'restarting', 'paused', 'quarantined'];
+    const stateChecks = {};
+    for (const state of states) {
+      stateChecks[state] = await safeCount(db, 'worker_sessions', (q) => {
+        let out = q.eq('session_state', state);
+        if (workerType) out = out.eq('worker_type', workerType);
+        if (hostName) out = out.eq('host_name', hostName);
+        return out;
+      });
+    }
+
+    const summaryByState = {};
+    for (const [state, value] of Object.entries(stateChecks)) {
+      summaryByState[state] = Number(value.count || 0);
+    }
+
+    const sessionRows = rows.rows.map((row) => {
+      const lastHeartbeat = asText(row.last_heartbeat_at || row.updated_at);
+      const stale = Boolean(lastHeartbeat && lastHeartbeat < staleCutoff);
+      return {
+        ...row,
+        stale,
+      };
+    });
+
+    const queueRiskWorkers = sessionRows.filter((row) => {
+      const staleLeaseCount = Number(row?.metadata?.probe?.stale_lease_count || 0);
+      return staleLeaseCount > 0 && asText(row.session_state).toLowerCase() !== 'healthy';
+    }).length;
+
+    const checks = { rows, ...stateChecks };
+    const missing_tables = [];
+    for (const [key, value] of Object.entries(checks)) {
+      if (value?.missing) missing_tables.push(key);
+    }
+
+    const unhealthyCount = states
+      .filter((state) => state !== 'healthy')
+      .reduce((acc, state) => acc + Number(summaryByState[state] || 0), 0);
+
+    return reply.send({
+      ok: true,
+      timestamp: new Date().toISOString(),
+      filters: {
+        session_state: sessionState || null,
+        worker_type: workerType || null,
+        host_name: hostName || null,
+        limit,
+        stale_seconds: staleSeconds,
+      },
+      summary: {
+        unhealthy_count: unhealthyCount,
+        quarantined_count: Number(summaryByState.quarantined || 0),
+        state_counts: summaryByState,
+        queue_risk_workers: queueRiskWorkers,
+        total_returned: sessionRows.length,
+      },
+      stale_cutoff: staleCutoff,
+      worker_sessions: sessionRows,
+      missing_tables,
+      warnings: summarizeErrors(checks),
+    });
+  });
+
+  fastify.get('/api/system/worker-session-events', {
+    preHandler: [requireApiKey],
+  }, async (req, reply) => {
+    const limit = clampInt(req?.query?.limit, 20, 500);
+    const hours = clampInt(req?.query?.hours, 24, 720);
+    const severity = asText(req?.query?.severity).toLowerCase();
+    const workerId = asText(req?.query?.worker_id);
+    const workerType = asText(req?.query?.worker_type);
+    const sinceIso = new Date(Date.now() - (hours * 60 * 60 * 1000)).toISOString();
+
+    let query = db
+      .from('worker_session_events')
+      .select('id,worker_id,worker_type,event_type,severity,details,trace_id,created_at')
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (severity) query = query.eq('severity', severity);
+    if (workerId) query = query.eq('worker_id', workerId);
+    if (workerType) query = query.eq('worker_type', workerType);
+
+    const events = await safeRows(query);
+    const severityCounts = groupCounts(events.rows, (row) => row.severity || 'unknown');
+    const eventTypeCounts = groupCounts(events.rows, (row) => row.event_type || 'unknown');
+
+    const checks = { events };
+    const missing_tables = [];
+    for (const [key, value] of Object.entries(checks)) {
+      if (value?.missing) missing_tables.push(key);
+    }
+
+    return reply.send({
+      ok: true,
+      timestamp: new Date().toISOString(),
+      filters: {
+        hours,
+        severity: severity || null,
+        worker_id: workerId || null,
+        worker_type: workerType || null,
+        limit,
+      },
+      summary: {
+        total_events: events.rows.length,
+        severity_counts: severityCounts,
+        top_event_types: topEntries(eventTypeCounts, 10).map((row) => ({ event_type: row.key, count: row.count })),
+      },
+      events: events.rows,
       missing_tables,
       warnings: summarizeErrors(checks),
     });

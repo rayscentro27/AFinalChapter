@@ -155,6 +155,156 @@ async function upsertGlobalSystemConfig(nextState) {
   return { before: null, after: data };
 }
 
+async function readWorkerSession(workerId) {
+  const result = await safeRows(
+    supabaseAdmin
+      .from('worker_sessions')
+      .select('*')
+      .eq('worker_id', workerId)
+      .limit(1)
+  );
+
+  return {
+    row: result.rows[0] || null,
+    missing: result.missing,
+    error: result.error,
+  };
+}
+
+async function upsertWorkerSessionState({ workerId, workerType, sessionState, reason, actor, metadata = {} }) {
+  const existing = await readWorkerSession(workerId);
+  if (existing.error) throw new Error(`worker_sessions read failed: ${existing.error.message}`);
+  if (existing.missing) throw new Error('worker_sessions table missing; run migrations first');
+
+  const current = existing.row || null;
+  const nowIso = new Date().toISOString();
+  const nextMetadata = {
+    ...(current?.metadata && typeof current.metadata === 'object' ? current.metadata : {}),
+    control_plane: {
+      action_reason: reason,
+      actor_user_id: actor?.user_id || null,
+      actor_role: actor?.role || null,
+      updated_at: nowIso,
+      ...metadata,
+    },
+  };
+
+  const payload = {
+    worker_id: workerId,
+    worker_type: workerType || asText(current?.worker_type) || 'unknown_worker',
+    host_name: asText(current?.host_name) || null,
+    session_state: sessionState,
+    browser_state: asText(current?.browser_state) || 'unknown',
+    process_state: asText(current?.process_state) || 'unknown',
+    last_heartbeat_at: current?.last_heartbeat_at || null,
+    last_success_at: current?.last_success_at || null,
+    last_error_at: sessionState === 'healthy' ? null : nowIso,
+    current_job_id: asText(current?.current_job_id) || null,
+    current_job_started_at: current?.current_job_started_at || null,
+    consecutive_failures: sessionState === 'healthy' ? 0 : Number(current?.consecutive_failures || 0),
+    recovery_attempt_count: Number(current?.recovery_attempt_count || 0),
+    last_page_signature: asText(current?.last_page_signature) || null,
+    metadata: nextMetadata,
+    updated_at: nowIso,
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from('worker_sessions')
+    .upsert(payload, { onConflict: 'worker_id' })
+    .select('*')
+    .single();
+
+  if (error) throw new Error(`worker_sessions upsert failed: ${error.message}`);
+
+  return {
+    before: current,
+    after: data || null,
+  };
+}
+
+async function writeWorkerSessionEvent({ workerId, workerType, eventType, severity, traceId, details = {} }) {
+  const { error } = await supabaseAdmin
+    .from('worker_session_events')
+    .insert({
+      worker_id: workerId,
+      worker_type: workerType || null,
+      event_type: eventType,
+      severity,
+      details,
+      trace_id: traceId || null,
+    });
+
+  if (error && !isMissingSchema(error)) {
+    throw new Error(`worker_session_events insert failed: ${error.message}`);
+  }
+}
+
+async function upsertWorkerControl({ workerId, workerType, paused, reason, actor, traceId }) {
+  let readQuery = supabaseAdmin
+    .from('worker_controls')
+    .select('*')
+    .eq('worker_type', workerType)
+    .limit(1);
+
+  readQuery = readQuery.eq('worker_id', workerId);
+
+  const current = await safeRows(readQuery);
+  if (current.error) throw new Error(`worker_controls read failed: ${current.error.message}`);
+  if (current.missing) throw new Error('worker_controls table missing; run migrations first');
+
+  const existing = current.rows[0] || null;
+  const nowIso = new Date().toISOString();
+
+  if (existing) {
+    const { data, error } = await supabaseAdmin
+      .from('worker_controls')
+      .update({
+        paused,
+        quarantine_reason: paused ? reason : null,
+        updated_by: actor?.user_id || null,
+        metadata: {
+          ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+          control_plane_action: {
+            paused,
+            reason,
+            trace_id: traceId || null,
+            at: nowIso,
+          },
+        },
+        updated_at: nowIso,
+      })
+      .eq('id', existing.id)
+      .select('*')
+      .single();
+
+    if (error) throw new Error(`worker_controls update failed: ${error.message}`);
+    return { before: existing, after: data || null };
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('worker_controls')
+    .insert({
+      worker_type: workerType,
+      worker_id: workerId,
+      paused,
+      max_concurrency: 1,
+      quarantine_reason: paused ? reason : null,
+      updated_by: actor?.user_id || null,
+      metadata: {
+        control_plane_action: {
+          paused,
+          reason,
+          trace_id: traceId || null,
+          at: nowIso,
+        },
+      },
+    })
+    .select('*')
+    .single();
+
+  if (error) throw new Error(`worker_controls insert failed: ${error.message}`);
+  return { before: null, after: data || null };
+}
 export async function controlPlaneRoutes(fastify) {
   const ownerAdminRoleGuard = requireTenantRole({
     supabaseAdmin,
@@ -184,7 +334,29 @@ export async function controlPlaneRoutes(fastify) {
         .in('status', ['open', 'investigating', 'mitigated'])
     );
 
-    const checks = { systemConfig, incidentsOpen };
+    const watchdogUnhealthy = await safeCount(
+      supabaseAdmin
+        .from('worker_sessions')
+        .select('*', { count: 'exact', head: true })
+        .neq('session_state', 'healthy')
+    );
+
+    const watchdogQuarantined = await safeCount(
+      supabaseAdmin
+        .from('worker_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_state', 'quarantined')
+    );
+
+    const watchdogCriticalEvents24h = await safeCount(
+      supabaseAdmin
+        .from('worker_session_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('severity', 'critical')
+        .gte('created_at', new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString())
+    );
+
+    const checks = { systemConfig, incidentsOpen, watchdogUnhealthy, watchdogQuarantined, watchdogCriticalEvents24h };
     const missing_tables = Object.entries(checks)
       .filter(([, value]) => Boolean(value?.missing))
       .map(([key]) => key);
@@ -204,10 +376,18 @@ export async function controlPlaneRoutes(fastify) {
         metadata: (current.metadata && typeof current.metadata === 'object') ? current.metadata : {},
       },
       active_incidents: incidentsOpen.count,
+      summary_metrics: {
+        watchdog_unhealthy_workers: watchdogUnhealthy.count,
+        watchdog_quarantined_workers: watchdogQuarantined.count,
+        watchdog_critical_events_24h: watchdogCriticalEvents24h.count,
+      },
       missing_tables,
       warnings: [
         ...(systemConfig.error ? [`system_config: ${asText(systemConfig.error.message || 'query_error')}`] : []),
         ...(incidentsOpen.error ? [`incident_events: ${asText(incidentsOpen.error.message || 'query_error')}`] : []),
+        ...(watchdogUnhealthy.error ? [`worker_sessions: ${asText(watchdogUnhealthy.error.message || 'query_error')}`] : []),
+        ...(watchdogQuarantined.error ? [`worker_sessions: ${asText(watchdogQuarantined.error.message || 'query_error')}`] : []),
+        ...(watchdogCriticalEvents24h.error ? [`worker_session_events: ${asText(watchdogCriticalEvents24h.error.message || 'query_error')}`] : []),
       ],
     });
   });
@@ -432,6 +612,205 @@ export async function controlPlaneRoutes(fastify) {
       return reply.code(500).send({ ok: false, error: asText(error?.message || error) });
     }
   });
+
+  fastify.post('/api/control-plane/workers/:workerId/quarantine', {
+    preHandler: [requireApiKey, ownerAdminRoleGuard, controlPlaneWriteGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    if (!ENV.CONTROL_PLANE_WRITE_ENABLED) return writeModeDisabled(reply);
+
+    const actor = actorFromRequest(req);
+    const workerId = asText(req.params?.workerId);
+    const reason = asText(req.body?.reason);
+    const traceId = asText(req.body?.trace_id) || null;
+
+    if (!workerId) return reply.code(400).send({ ok: false, error: 'missing_worker_id' });
+    if (!reason) return reply.code(400).send({ ok: false, error: 'missing_reason' });
+
+    try {
+      const existing = await readWorkerSession(workerId);
+      if (existing.error) throw new Error(`worker_sessions read failed: ${existing.error.message}`);
+      if (existing.missing) {
+        return reply.code(503).send({ ok: false, error: 'worker_sessions_table_missing' });
+      }
+
+      const resolvedWorkerType = asText(existing.row?.worker_type || req.body?.worker_type);
+      if (!resolvedWorkerType) {
+        return reply.code(400).send({ ok: false, error: 'missing_worker_type' });
+      }
+
+      const session = await upsertWorkerSessionState({
+        workerId,
+        workerType: resolvedWorkerType,
+        sessionState: 'quarantined',
+        reason,
+        actor,
+        metadata: {
+          trace_id: traceId,
+          manual_quarantine: true,
+        },
+      });
+
+      const control = await upsertWorkerControl({
+        workerId,
+        workerType: resolvedWorkerType,
+        paused: true,
+        reason,
+        actor,
+        traceId,
+      });
+
+      await writeWorkerSessionEvent({
+        workerId,
+        workerType: resolvedWorkerType,
+        eventType: 'manual_quarantine',
+        severity: 'critical',
+        traceId,
+        details: {
+          reason,
+          actor_user_id: actor.user_id,
+          actor_role: actor.role,
+        },
+      });
+
+      await writeAudit({
+        actor,
+        action: 'quarantine_worker',
+        targetType: 'worker_session',
+        targetId: workerId,
+        beforeState: {
+          worker_session: session.before || null,
+          worker_control: control.before || null,
+        },
+        afterState: {
+          worker_session: session.after || null,
+          worker_control: control.after || null,
+        },
+        reason,
+        metadata: {
+          trace_id: traceId,
+          tenant_id: asText(req.tenant?.id) || null,
+        },
+      });
+
+      return reply.send({
+        ok: true,
+        timestamp: new Date().toISOString(),
+        action: 'quarantine_worker',
+        worker_id: workerId,
+        worker_type: resolvedWorkerType,
+        session_state: session.after?.session_state || 'quarantined',
+        worker_control_paused: Boolean(control.after?.paused),
+      });
+    } catch (error) {
+      return reply.code(500).send({ ok: false, error: asText(error?.message || error) });
+    }
+  });
+
+  fastify.post('/api/control-plane/workers/:workerId/release', {
+    preHandler: [requireApiKey, ownerAdminRoleGuard, controlPlaneWriteGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    if (!ENV.CONTROL_PLANE_WRITE_ENABLED) return writeModeDisabled(reply);
+
+    const actor = actorFromRequest(req);
+    const workerId = asText(req.params?.workerId);
+    const reason = asText(req.body?.reason);
+    const traceId = asText(req.body?.trace_id) || null;
+    const freshProbePassed = asBool(req.body?.fresh_probe_passed, false);
+
+    if (!workerId) return reply.code(400).send({ ok: false, error: 'missing_worker_id' });
+    if (!reason) return reply.code(400).send({ ok: false, error: 'missing_reason' });
+    if (!freshProbePassed) {
+      return reply.code(409).send({ ok: false, error: 'fresh_probe_required', message: 'Set fresh_probe_passed=true after a successful fresh probe.' });
+    }
+
+    try {
+      const existing = await readWorkerSession(workerId);
+      if (existing.error) throw new Error(`worker_sessions read failed: ${existing.error.message}`);
+      if (existing.missing) {
+        return reply.code(503).send({ ok: false, error: 'worker_sessions_table_missing' });
+      }
+      if (!existing.row) {
+        return reply.code(404).send({ ok: false, error: 'worker_session_not_found' });
+      }
+
+      const resolvedWorkerType = asText(existing.row?.worker_type || req.body?.worker_type);
+      if (!resolvedWorkerType) {
+        return reply.code(400).send({ ok: false, error: 'missing_worker_type' });
+      }
+
+      const session = await upsertWorkerSessionState({
+        workerId,
+        workerType: resolvedWorkerType,
+        sessionState: 'healthy',
+        reason,
+        actor,
+        metadata: {
+          trace_id: traceId,
+          manual_release: true,
+          fresh_probe_passed: true,
+        },
+      });
+
+      const control = await upsertWorkerControl({
+        workerId,
+        workerType: resolvedWorkerType,
+        paused: false,
+        reason,
+        actor,
+        traceId,
+      });
+
+      await writeWorkerSessionEvent({
+        workerId,
+        workerType: resolvedWorkerType,
+        eventType: 'manual_release',
+        severity: 'info',
+        traceId,
+        details: {
+          reason,
+          actor_user_id: actor.user_id,
+          actor_role: actor.role,
+          fresh_probe_passed: true,
+        },
+      });
+
+      await writeAudit({
+        actor,
+        action: 'release_worker',
+        targetType: 'worker_session',
+        targetId: workerId,
+        beforeState: {
+          worker_session: session.before || null,
+          worker_control: control.before || null,
+        },
+        afterState: {
+          worker_session: session.after || null,
+          worker_control: control.after || null,
+        },
+        reason,
+        metadata: {
+          trace_id: traceId,
+          tenant_id: asText(req.tenant?.id) || null,
+          fresh_probe_passed: true,
+        },
+      });
+
+      return reply.send({
+        ok: true,
+        timestamp: new Date().toISOString(),
+        action: 'release_worker',
+        worker_id: workerId,
+        worker_type: resolvedWorkerType,
+        session_state: session.after?.session_state || 'healthy',
+        worker_control_paused: Boolean(control.after?.paused),
+      });
+    } catch (error) {
+      return reply.code(500).send({ ok: false, error: asText(error?.message || error) });
+    }
+  });
+
 
   fastify.post('/api/control-plane/emergency-stop', {
     preHandler: [requireApiKey, ownerAdminRoleGuard, controlPlaneWriteGuard],

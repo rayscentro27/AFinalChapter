@@ -101,6 +101,20 @@ export async function runQueueWorkerOnce({
     return { ok: true, skipped: true, reason: 'schema_missing' };
   }
 
+  if (claim.blocked) {
+    await heartbeat({
+      workerId,
+      workerType,
+      status: 'paused',
+      inFlightJobs: 0,
+      maxConcurrency: concurrency,
+      logger,
+      metadata: { reason: claim.reason || 'worker_paused' },
+    });
+
+    return { ok: true, skipped: true, reason: claim.reason || 'worker_paused' };
+  }
+
   const jobs = claim.jobs || [];
   if (!jobs.length) {
     await heartbeat({

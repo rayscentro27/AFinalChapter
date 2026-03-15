@@ -44,6 +44,27 @@ async function leaseSingleJob({ row, workerId, nowIso, leaseExpiresAt }) {
   return { row: data, schemaMissing: false };
 }
 
+async function workerPauseState(workerId) {
+  const { data, error } = await supabaseAdmin
+    .from('worker_controls')
+    .select('id,worker_id,worker_type,paused,quarantine_reason,updated_at')
+    .eq('worker_id', workerId)
+    .eq('paused', true)
+    .limit(1);
+
+  if (error) {
+    if (isMissingSchema(error)) return { paused: false, schemaMissing: true, row: null };
+    throw new Error(`worker_controls lookup failed: ${error.message}`);
+  }
+
+  const row = Array.isArray(data) ? data[0] : null;
+  return {
+    paused: Boolean(row?.paused),
+    schemaMissing: false,
+    row: row || null,
+  };
+}
+
 export async function claimAvailableJobs({
   workerId,
   jobTypes = [],
@@ -60,6 +81,22 @@ export async function claimAvailableJobs({
 
   if (!normalizedTypes.length) {
     return { jobs: [], schemaMissing: false };
+  }
+
+  const pauseState = await workerPauseState(wid);
+  if (pauseState.paused) {
+    logger.warn({
+      event: 'worker_claim_blocked_quarantined',
+      worker_id: wid,
+      reason: pauseState.row?.quarantine_reason || 'paused_by_control_plane',
+    }, 'worker_claim_blocked_quarantined');
+
+    return {
+      jobs: [],
+      schemaMissing: false,
+      blocked: true,
+      reason: 'worker_paused',
+    };
   }
 
   let query = supabaseAdmin

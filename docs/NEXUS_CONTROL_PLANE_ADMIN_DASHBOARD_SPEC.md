@@ -271,3 +271,36 @@ Phase 3:
 - all destructive controls hidden behind explicit confirmation.
 - no bulk actions without reason.
 - no controls active for non-authorized roles.
+
+### 10) Worker session health (watchdog)
+Purpose:
+- detect browser-session failures that look healthy at process level.
+
+Metrics:
+- counts by `worker_sessions.session_state`
+- quarantined workers
+- critical session events (24h)
+- queue-risk workers (stale leased jobs + unhealthy state)
+
+Actions:
+- quarantine worker
+- release worker (requires fresh probe confirmation)
+
+Confirmations:
+- quarantine/release require reason.
+- release requires explicit `fresh_probe_passed=true`.
+
+Dependencies:
+- `worker_sessions`
+- `worker_session_events`
+- `worker_controls`
+- `/api/system/worker-sessions`
+- `/api/system/worker-session-events`
+- `/api/control-plane/workers/:workerId/quarantine`
+- `/api/control-plane/workers/:workerId/release`
+
+UI components:
+- state distribution cards
+- session/event timeline
+- queue risk table
+- quarantine/release action modal

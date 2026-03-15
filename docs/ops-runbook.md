@@ -45,3 +45,22 @@ Runtime flags:
 2. Convert drafts into Supabase migrations.
 3. Enable queue worker polling in controlled mode (`QUEUE_ENABLED=true`) for one tenant.
 4. Observe `/api/system/health` and error trends.
+
+## Watchdog v1 checks
+Once watchdog migration is applied, verify:
+```bash
+curl -s -H "x-api-key: $INTERNAL_API_KEY" http://127.0.0.1:3000/api/system/worker-sessions | jq
+curl -s -H "x-api-key: $INTERNAL_API_KEY" http://127.0.0.1:3000/api/system/worker-session-events | jq
+curl -s -H "x-api-key: $INTERNAL_API_KEY" http://127.0.0.1:3000/api/control-plane/state | jq '.summary_metrics'
+```
+
+Manual operator controls:
+```bash
+curl -s -X POST -H "content-type: application/json" -H "x-api-key: $INTERNAL_API_KEY" \
+  -d '{"reason":"manual quarantine","worker_type":"openclaw_worker"}' \
+  http://127.0.0.1:3000/api/control-plane/workers/<WORKER_ID>/quarantine | jq
+
+curl -s -X POST -H "content-type: application/json" -H "x-api-key: $INTERNAL_API_KEY" \
+  -d '{"reason":"probe healthy","fresh_probe_passed":true}' \
+  http://127.0.0.1:3000/api/control-plane/workers/<WORKER_ID>/release | jq
+```
