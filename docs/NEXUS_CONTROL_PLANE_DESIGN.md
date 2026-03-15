@@ -1,170 +1,271 @@
 # Nexus Control Plane Design
 
-Status: architecture and operations design. No automatic deployment or schema execution.
+## 1. Executive Summary
+Nexus needs an operational command layer that can change runtime behavior without redeploying code. The Control Plane is a low-cost, Supabase-backed policy and safety layer that keeps Fastify as control plane, Supabase as source of truth, and Mac Mini workers as execution nodes.
 
-## Objective
-Define a safe control plane for:
-- worker orchestration controls
-- AI cost limits
-- feature flags
-- system modes
-- incident containment
+Primary outcome:
+- Operators can throttle, pause, isolate, and recover workers/queues safely.
+- AI usage and fallback behavior can be constrained by policy.
+- Incident handling becomes command-driven and auditable.
 
-Keep current architecture:
-- Fastify on Oracle = control plane
-- Supabase = source of truth
-- Mac Mini = worker/research execution node
+## 2. Control Plane Architecture
+Current baseline used:
+- Frontend: React admin/client portal on Netlify.
+- Backend: Fastify gateway on Oracle VM.
+- Data: Supabase Postgres + RLS + Storage.
+- Workers: Mac Mini (OpenClaw, ChatGPT login workflows, Comet, optional OpenRouter fallback).
 
-## 1) Control Plane Responsibilities
+Control Plane pattern:
+1. Admin writes control state in Supabase Control Plane tables.
+2. Fastify admin routes validate role and write control changes.
+3. `/api/system/*` and future `/api/control-plane/*` expose read models.
+4. Workers poll control state and apply limits locally.
+5. Every state change writes to control-plane audit log.
 
-- centralized feature-flag policy enforcement
-- system mode transitions
-- queue and worker gating
-- AI routing and budget policy checks
-- observability aggregation
-- incident safe-mode controls
+## 3. System Modes
+Recommended modes:
+- `development`: all test features available, non-prod defaults.
+- `research`: research ingestion on, client-facing automation constrained.
+- `production`: normal operations, conservative safeguards enabled.
+- `maintenance`: queue intake paused, background jobs mostly off.
+- `degraded`: reduced concurrency, expensive AI categories blocked.
+- `emergency_stop`: AI and queue execution halted except health + audit.
 
-## 2) System Modes
+Mode effects matrix:
+- `development`: queue optional, wide feature access.
+- `research`: research jobs on, outbound actions off by default.
+- `production`: queue on by policy, retries bounded, alerts enabled.
+- `maintenance`: queue intake off, read/write admin only.
+- `degraded`: queue on with hard caps, fallback providers restricted.
+- `emergency_stop`: queue frozen, workers stop claiming new jobs.
 
-Supported modes:
-- `development`
-- `research`
-- `production`
-- `maintenance`
+## 4. Control Functions
+### Worker control
+- Pause all workers.
+- Pause by worker type.
+- Disable job types.
+- Lower concurrency ceilings.
+- Quarantine unhealthy workers.
+- Mark worker unhealthy with reason + expiry.
 
-Mode behavior matrix:
-- `development`: relaxed limits, test-only tenants
-- `research`: research jobs enabled, CRM-impacting automations constrained
-- `production`: strict policy, full monitoring and guarded throughput
-- `maintenance`: queue paused, async jobs disabled, diagnostics only
+### Queue control
+- Pause intake globally.
+- Pause specific job types.
+- Cap queue depth per job type.
+- Override retry strategy (temporary).
+- Auto-route repetitive failures to dead-letter.
+- Manual requeue with audit trail.
 
-## 3) Feature Flags (Authoritative Set)
+### AI usage control
+- Daily quotas by tenant and job type.
+- Force cache-only mode.
+- Disable OpenRouter fallback.
+- Force OpenClaw-first routing.
+- Restrict max transcript payload sizes.
+- Disable expensive categories (long synthesis, batch generation).
 
-Core flags:
-- `QUEUE_ENABLED`
-- `AI_JOBS_ENABLED`
-- `RESEARCH_JOBS_ENABLED`
-- `NOTIFICATIONS_ENABLED`
-- `TENANT_JOB_LIMIT_ACTIVE`
+### Feature flag control
+- Toggle transcript ingestion.
+- Toggle opportunity engine.
+- Toggle VideoContentWorker.
+- Toggle content generation/export.
+- Toggle admin beta features.
 
-Runtime caps:
-- `WORKER_MAX_CONCURRENCY`
-- `JOB_MAX_RUNTIME_SECONDS`
-- `WORKER_HEARTBEAT_SECONDS`
+### Incident controls
+- Global AI kill switch.
+- Disable outbound messaging actions.
+- Disable new signups.
+- Disable uploads.
+- Force selected modules read-only.
 
-AI policy flags (recommended):
-- `OPENROUTER_ENABLED`
-- `AI_CACHE_ENABLED`
-- `PREMIUM_MODEL_ENABLED`
+## 5. Supabase Schema Design
+Existing operational tables already aligned:
+- `job_queue`
+- `worker_heartbeats`
+- `ai_cache`
+- `system_errors`
 
-## 4) Control Plane API Contracts (Read/Write)
+New control-plane tables:
 
-Read-only:
-- `GET /api/system/health`
-- `GET /api/system/jobs`
-- `GET /api/system/workers`
-- `GET /api/system/errors`
-- `GET /api/system/usage` (recommended)
+### `system_config`
+Purpose: singleton-like runtime config by environment.
+Columns:
+- `id uuid pk`
+- `scope text` (`global`, `tenant`, `worker_group`)
+- `scope_id text null`
+- `system_mode text`
+- `queue_enabled boolean`
+- `ai_jobs_enabled boolean`
+- `research_jobs_enabled boolean`
+- `notifications_enabled boolean`
+- `updated_by uuid`
+- `updated_at timestamptz`
 
-Admin write endpoints (recommended):
-- `POST /api/system/flags/update`
-- `POST /api/system/mode/set`
-- `POST /api/system/safe-pause`
-- `POST /api/system/safe-resume`
+### `feature_flags`
+Purpose: dynamic feature toggles.
+Columns:
+- `id uuid pk`
+- `flag_key text unique`
+- `enabled boolean`
+- `scope text`
+- `scope_id text null`
+- `rollout_pct int null`
+- `expires_at timestamptz null`
+- `updated_by uuid`
+- `updated_at timestamptz`
 
-All write endpoints must require:
-- strong admin auth
-- tenant/platform scope validation
-- audit logging
+### `worker_controls`
+Purpose: per-worker policies.
+Columns:
+- `id uuid pk`
+- `worker_type text`
+- `worker_id text null`
+- `paused boolean`
+- `max_concurrency int`
+- `job_types_disabled text[]`
+- `quarantine_reason text null`
+- `quarantine_until timestamptz null`
+- `updated_by uuid`
+- `updated_at timestamptz`
 
-## 5) Worker Lifecycle Governance
+### `queue_controls`
+Purpose: queue safety and throttles.
+Columns:
+- `id uuid pk`
+- `job_type text`
+- `intake_paused boolean`
+- `queue_depth_cap int`
+- `retry_multiplier numeric`
+- `max_attempts_override int null`
+- `dead_letter_on_error_rate numeric null`
+- `updated_by uuid`
+- `updated_at timestamptz`
 
-For every worker type:
-- enforce lease claim semantics
-- enforce heartbeat freshness
-- enforce retry/dead-letter policy
-- enforce max runtime
-- enforce per-mode permissions
+### `ai_usage_limits`
+Purpose: AI budget policy.
+Columns:
+- `id uuid pk`
+- `scope text`
+- `scope_id text null`
+- `provider text`
+- `task_type text`
+- `daily_request_limit int`
+- `daily_token_limit int`
+- `force_cache_only boolean`
+- `fallback_allowed boolean`
+- `updated_by uuid`
+- `updated_at timestamptz`
 
-Control plane must be able to:
-- pause only selected worker classes
-- drain low-priority queues first
-- resume in staged order
+### `incident_events`
+Purpose: incident state timeline.
+Columns:
+- `id uuid pk`
+- `severity text`
+- `status text`
+- `title text`
+- `details jsonb`
+- `started_at timestamptz`
+- `resolved_at timestamptz null`
+- `owner_user_id uuid null`
 
-## 6) AI Cost Guardrail Policy
+### `control_plane_audit_log`
+Purpose: immutable operational audit.
+Columns:
+- `id uuid pk`
+- `actor_user_id uuid`
+- `actor_role text`
+- `action text`
+- `target_type text`
+- `target_id text`
+- `before_state jsonb`
+- `after_state jsonb`
+- `reason text`
+- `created_at timestamptz`
 
-Per-tenant and global envelopes:
-- requests/day
-- tokens/day
-- estimated cost/day
+## 6. Worker Integration Model
+Worker fetch cycle:
+- Poll effective control state every 10-15s.
+- Cache settings in memory for 30s.
+- Refresh immediately after lease failures.
 
-Actions on threshold breach:
-1. move to cache-first strict mode
-2. disable premium model tier
-3. defer low-priority AI jobs
-4. escalate alert and require admin acknowledgement
+Fail-safe behavior:
+- If control fetch fails: do not increase concurrency; keep last known safe policy.
+- If policy is stale > 5m: auto-enter reduced mode (`concurrency=1`, no expensive tasks).
+- If `emergency_stop`: finish current step safely, stop claiming new jobs.
 
-## 7) Safe Pause and Resume Protocol
+## 7. Admin Dashboard Design
+Sections:
+- Mode & Safeguards: mode selector, global toggles.
+- Worker Health: heartbeat freshness, quarantined workers.
+- Queue Operations: queue depth, per job-type intake control.
+- AI Controls: cache-only toggle, provider fallback policy, usage limits.
+- Feature Flags: scoped toggles with expiration.
+- Incident Panel: start/resolve incidents, kill switches.
+- Audit Log: who changed what and why.
+- Testing & Simulation: run user/load/chaos tests with stop controls.
 
-Safe pause:
-1. set `SYSTEM_MODE=maintenance`
-2. set `QUEUE_ENABLED=false`
-3. set `RESEARCH_JOBS_ENABLED=false`
-4. keep health endpoints active
-5. verify queue depth trend and worker stop state
+Safety confirmations:
+- Two-step confirmation for `maintenance`, `degraded`, `emergency_stop`.
+- Reason required for dangerous operations.
+- Automatic expiry for temporary overrides.
 
-Safe resume:
-1. set target mode (`research` or `production`)
-2. enable `QUEUE_ENABLED=true`
-3. re-enable AI/research flags in order
-4. verify worker freshness and dead-letter trend
+## 8. Safety and Permission Model
+Role policy:
+- `superadmin`: full control plane actions.
+- `admin`: bounded actions (no emergency stop unless delegated).
+- `analyst/operator`: read-only or simulation-only by policy.
 
-## 8) Control Plane Data Model (Optional Additive)
+Rules:
+- Every write action is audit-logged.
+- Production toggles require explicit confirmation text.
+- Emergency actions must include expiry/review.
+- Tenant-scoped actions cannot override global hard-stops.
 
-Optional tables (drafts):
-- `system_feature_flags`
-  - current flag values and source of change
-- `system_mode_history`
-  - mode transitions with actor + reason
-- `system_policy_events`
-  - guardrail actions triggered by thresholds
+## 9. Incident Response Controls
+Standard actions:
+1. Set `system_mode=degraded`.
+2. Disable affected job types.
+3. Cap worker concurrency.
+4. Disable fallback providers if failures spike.
+5. Freeze queue intake if dead-letter surges.
+6. Set `system_mode=maintenance` or `emergency_stop` if blast radius increases.
 
-If these tables are not added yet, persist changes via existing audit/event logs.
+## 10. Testing and Simulation Model
+### User simulation
+- Simulate signup/login/upload/AI flows with synthetic tenant data only.
+- Parameters: simulated users, actions/user, duration, request rate.
 
-## 9) Security and Privacy Rules
+### Load testing
+- Burst queue jobs and API read requests.
+- Validate queue depth controls, stale worker detection, and retry behavior.
 
-- server-enforced tenant boundary checks only
-- no client-side trust for control-plane actions
-- redact secrets and PII in logs
-- AI outputs remain draft unless approved
-- never route sensitive credit PII to external model providers
+### Chaos testing
+- Simulate worker crash.
+- Simulate OpenClaw session expiry.
+- Simulate DB connectivity failures.
+- Simulate API provider rate limits.
 
-## 10) Operational Dashboard Requirements
+Safety for tests:
+- Test data isolated from client production records.
+- Every simulation tagged and logged.
+- Immediate stop button in dashboard.
 
-Essential control plane dashboard sections:
-- Mode + Flag state
-- Queue/Worker health
-- Error and dead-letter trends
-- AI usage + budget posture
-- Incident controls (safe pause/resume)
+## 11. Phased Roadmap
+Phase 1:
+- Control tables + read models + audit log.
+- Dashboard mode panel + worker/queue visibility.
 
-## 11) Rollout Plan
+Phase 2:
+- Write controls (worker/queue/feature flags).
+- AI usage policy enforcement.
 
-Phase A:
-- finalize policy docs and endpoint contracts
-- keep flags env-driven
+Phase 3:
+- Incident workflows + simulation tooling.
+- Launch readiness widgets and runbook links.
 
-Phase B:
-- add admin write endpoints with audit logging
-- add UI controls for mode/flags
-
-Phase C:
-- add automated threshold triggers + policy events
-- add weekly policy compliance report
-
-## 12) Hard Boundaries
-
-- Mac Mini does not become control plane.
-- Supabase remains source of truth.
-- No OpenClaw deployment into Oracle control plane.
-- No live trading and no broker execution.
+## 12. Launch Priority Recommendations
+Highest priority before broad launch:
+1. `system_mode` + queue/worker controls + audit logging.
+2. kill switch + degraded mode flow.
+3. AI fallback/cost controls.
+4. simulation controls (at least user/load v1).

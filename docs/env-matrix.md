@@ -1,80 +1,95 @@
 # Env Matrix (Phase 1)
 
-## A) Netlify Frontend (public)
-Required:
-- `VITE_API_BASE_URL`: Gateway base URL.
-- `VITE_BACKEND_MODE`: runtime adapter selection.
-- `VITE_SUPABASE_URL`: Supabase project URL.
-- `VITE_SUPABASE_ANON_KEY`: public anon key.
+## Backend (Fastify gateway on Oracle VM)
 
-Optional:
-- Feature flags for UI-only modules.
+### Required at startup (secret)
+- `INTERNAL_API_KEY`: internal/system endpoint auth.
+- `SUPABASE_URL`: Supabase project URL.
+- `SUPABASE_SERVICE_ROLE_KEY`: service-role DB access.
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_FROM_NUMBER`
+- `META_APP_SECRET`
+- `META_VERIFY_TOKEN`
+- `WHATSAPP_VERIFY_TOKEN`
+- `WHATSAPP_TOKEN`
+- `META_PAGE_ACCESS_TOKEN`
 
-Validation:
-- Frontend boot check for missing `VITE_*` values.
-- Fail-fast in build for empty placeholders.
+### Recommended for full integrations (secret)
+- `GEMINI_API_KEY`
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+- `TRADINGVIEW_WEBHOOK_SECRET`
 
-## B) Oracle VM Gateway (secret/private)
-Required:
-- `INTERNAL_API_KEY`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- Channel credentials used by enabled providers (`TWILIO_*`, `META_*`, `WHATSAPP_*`).
-
-Recommended runtime controls:
-- `SYSTEM_MODE`
+### Runtime safety controls (non-secret)
+- `SYSTEM_MODE` (`development|research|production|maintenance|degraded|emergency_stop`)
 - `QUEUE_ENABLED`
 - `AI_JOBS_ENABLED`
 - `RESEARCH_JOBS_ENABLED`
 - `NOTIFICATIONS_ENABLED`
+- `CONTROL_PLANE_WRITE_ENABLED` (keep `false` by default)
 - `JOB_MAX_RUNTIME_SECONDS`
 - `WORKER_MAX_CONCURRENCY`
 - `TENANT_JOB_LIMIT_ACTIVE`
 - `WORKER_HEARTBEAT_SECONDS`
 - `ENV_VALIDATE_STRICT`
 
-Proxy trust controls:
+### Proxy trust controls (non-secret)
 - `TRUST_PROXY`
 - `TRUST_PROXY_CIDRS`
 - `TRUST_PROXY_ALLOW_ALL`
 
-Validation:
-- Startup validation module: `gateway/src/config/envValidation.js`.
-- In production (`NODE_ENV=production`), strict validation defaults to enabled unless explicitly overridden.
+### Optional backend settings
+Secret:
+- `OPENROUTER_API_KEY`
+- `NVIDIA_NIM_API_KEY`
+- `SUPABASE_JWT_SECRET`
+
+Non-secret:
+- `LOG_LEVEL`
+- `PORT`
+- `TRUST_PROXY`
+- `ALLOWED_ORIGINS`
+- `AI_PROVIDER`
+
+### Validation implementation
+- Module: `gateway/src/config/envValidation.js`
+- Boot config: `gateway/src/env.js`
+- Strict mode defaults on in production (`ENV_VALIDATE_STRICT=true` recommended everywhere).
 - When `TRUST_PROXY=true`, configure `TRUST_PROXY_CIDRS` (preferred) or explicitly set `TRUST_PROXY_ALLOW_ALL=true`.
 
-## C) Netlify Functions (secret/private)
-Required:
+## Netlify Functions (server-side secret)
+
+### Required
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (required for encrypted `tenant_integrations.credentials` at rest).
+- `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (required for encrypted `tenant_integrations.credentials` at rest)
 
-Optional (recommended for key rotation):
-- `INTEGRATION_CREDENTIALS_ENCRYPTION_ACTIVE_KID` (write key id for new envelopes).
-- `INTEGRATION_CREDENTIALS_ENCRYPTION_KEYRING` (JSON map of key ids to secrets).
-- `INTEGRATION_CREDENTIALS_ENCRYPTION_PREVIOUS_KEY` (legacy read-only fallback during rotation windows).
+### Optional for key rotation
+- `INTEGRATION_CREDENTIALS_ENCRYPTION_ACTIVE_KID`
+- `INTEGRATION_CREDENTIALS_ENCRYPTION_KEYRING` (JSON map of key ids to secrets)
+- `INTEGRATION_CREDENTIALS_ENCRYPTION_PREVIOUS_KEY`
 
-Validation:
+### Validation notes
 - Function-level fail-fast for missing/ambiguous write key when encrypting credentials.
-- Decryption supports multi-key fallback (`kid`, active key, previous key, keyring) to keep legacy rows readable during rotations.
-- Keep these variables server-side only; never expose as `VITE_*`.
+- Decryption should support multi-key fallback (`kid`, active key, previous key, keyring) for rotation windows.
+- Keep these server-side only; never expose as `VITE_*`.
 
-## D) Mac Mini AI Node (secret/private)
-Required (expected):
+## Frontend (Netlify, documentation only)
+
+Public (`VITE_*` only):
+- `VITE_API_BASE_URL`
+- `VITE_BACKEND_MODE`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+## Mac Mini AI node (documentation only)
+
+Expected secret variables:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- provider keys actually used by research workers (`GEMINI_API_KEY`, optional fallback keys)
+- model/provider keys used by research workers
 
-Recommended:
+Expected non-secret controls:
 - `SYSTEM_MODE=research`
-- `QUEUE_ENABLED`
-- worker concurrency and runtime caps aligned with gateway settings.
-
-Validation:
-- Mirror gateway-style startup validation on Mac worker entrypoints.
-- Reject startup when required AI routing vars are missing.
-
-## Naming convention
-- Upper snake case only.
-- `VITE_*` is frontend-public only.
-- all credentials remain non-`VITE_*` and server-side only.
+- queue/runtime caps aligned to gateway policy

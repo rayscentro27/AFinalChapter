@@ -57,6 +57,7 @@ type SendAttemptResult = {
   raw: unknown;
   error: string | null;
   unsupported?: boolean;
+  transport?: "brevo" | "mailerlite" | "resend";
 };
 
 const CORS_HEADERS: Record<string, string> = {
@@ -534,6 +535,7 @@ async function sendViaBrevo(params: {
       providerMessageId,
       raw,
       error: errorMessageFromProviderResponse(response.status, raw, "Brevo send failed"),
+      transport: "brevo",
     };
   }
 
@@ -542,9 +544,78 @@ async function sendViaBrevo(params: {
     providerMessageId,
     raw,
     error: null,
+    transport: "brevo",
   };
 }
 
+async function sendViaResend(params: {
+  apiKey: string;
+  fromEmail: string;
+  fromName: string;
+  toEmail: string;
+  toName: string;
+  subject: string;
+  html: string;
+  text: string;
+  messageType: MessageType;
+  templateKey: string | null;
+  tenantId: string;
+}): Promise<SendAttemptResult> {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Authorization": `Bearer ${params.apiKey}`,
+    },
+    body: JSON.stringify({
+      from: `${params.fromName} <${params.fromEmail}>`,
+      to: [params.toEmail],
+      subject: params.subject,
+      html: params.html,
+      text: params.text || undefined,
+      headers: {
+        "X-Nexus-Message-Type": params.messageType,
+        "X-Nexus-Template-Key": params.templateKey || "",
+        "X-Nexus-Tenant": params.tenantId,
+      },
+      tags: [
+        { name: "message_type", value: params.messageType },
+      ],
+    }),
+  });
+
+  const responseText = await response.text();
+  let raw: unknown = null;
+  if (responseText) {
+    try {
+      raw = JSON.parse(responseText);
+    } catch {
+      raw = { raw: responseText };
+    }
+  }
+
+  const responseRequestId = normalizeString(response.headers.get("x-request-id"));
+  const providerMessageId = extractProviderMessageId(raw) || responseRequestId || null;
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      providerMessageId,
+      raw,
+      error: errorMessageFromProviderResponse(response.status, raw, "Resend send failed"),
+      transport: "resend",
+    };
+  }
+
+  return {
+    ok: true,
+    providerMessageId,
+    raw,
+    error: null,
+    transport: "resend",
+  };
+}
 async function sendViaMailerLite(params: {
   apiKey: string;
   toEmail: string;
@@ -560,6 +631,7 @@ async function sendViaMailerLite(params: {
       raw: syncRaw,
       error: "MailerLite direct send is unsupported for this workflow. Subscriber sync completed.",
       unsupported: true,
+      transport: "mailerlite",
     };
   } catch (error) {
     return {
@@ -568,6 +640,7 @@ async function sendViaMailerLite(params: {
       raw: null,
       error: error instanceof Error ? error.message : "MailerLite subscriber sync failed.",
       unsupported: true,
+      transport: "mailerlite",
     };
   }
 }
@@ -931,6 +1004,8 @@ async function handleSend(req: Request): Promise<Response> {
   }
 
   const brevoApiKey = normalizeString(Deno.env.get("BREVO_API_KEY"));
+  const resendApiKey = normalizeString(Deno.env.get("RESEND_API_KEY"));
+  const transactionalProviderPreference = normalizeString(Deno.env.get("EMAIL_TRANSACTIONAL_PROVIDER")).toLowerCase();
   const mailerLiteApiKey = normalizeString(Deno.env.get("MAILERLITE_API_KEY"));
   const defaultFromEmail = normalizeString(Deno.env.get("DEFAULT_FROM_EMAIL"));
   const defaultFromName = normalizeString(Deno.env.get("DEFAULT_FROM_NAME")) || "Nexus";
@@ -965,14 +1040,24 @@ async function handleSend(req: Request): Promise<Response> {
     let attempt: SendAttemptResult;
 
     if (provider === "brevo") {
-      if (!brevoApiKey) {
-        attempt = {
-          ok: false,
-          providerMessageId: null,
-          raw: null,
-          error: "BREVO_API_KEY is missing.",
-        };
-      } else {
+      const prefersResend = transactionalProviderPreference === "resend" || transactionalProviderPreference === "" || transactionalProviderPreference === "auto";
+      const prefersBrevo = transactionalProviderPreference === "brevo";
+
+      if (prefersResend && resendApiKey) {
+        attempt = await sendViaResend({
+          apiKey: resendApiKey,
+          fromEmail: defaultFromEmail,
+          fromName: defaultFromName,
+          toEmail,
+          toName: normalizeString(body.to_name) || "Recipient",
+          subject,
+          html: withFooter.html,
+          text: withFooter.text,
+          messageType,
+          templateKey,
+          tenantId,
+        });
+      } else if ((prefersBrevo || !resendApiKey) && brevoApiKey) {
         attempt = await sendViaBrevo({
           apiKey: brevoApiKey,
           fromEmail: defaultFromEmail,
@@ -986,6 +1071,27 @@ async function handleSend(req: Request): Promise<Response> {
           templateKey,
           tenantId,
         });
+      } else if (resendApiKey) {
+        attempt = await sendViaResend({
+          apiKey: resendApiKey,
+          fromEmail: defaultFromEmail,
+          fromName: defaultFromName,
+          toEmail,
+          toName: normalizeString(body.to_name) || "Recipient",
+          subject,
+          html: withFooter.html,
+          text: withFooter.text,
+          messageType,
+          templateKey,
+          tenantId,
+        });
+      } else {
+        attempt = {
+          ok: false,
+          providerMessageId: null,
+          raw: null,
+          error: "No transactional provider key configured (set RESEND_API_KEY or BREVO_API_KEY).",
+        };
       }
     } else {
       if (!mailerLiteApiKey) {
@@ -1028,6 +1134,7 @@ async function handleSend(req: Request): Promise<Response> {
       meta: {
         payload_data: (body.data && typeof body.data === "object") ? body.data : {},
         response: attempt.raw,
+        transport: attempt.transport || provider,
         throttle_warning: throttleResult.warning || null,
       },
     });
@@ -1045,6 +1152,7 @@ async function handleSend(req: Request): Promise<Response> {
         success: true,
         message_id: messageId,
         provider,
+        transport: attempt.transport || provider,
         status: "sent",
       });
     }
@@ -1054,6 +1162,7 @@ async function handleSend(req: Request): Promise<Response> {
         success: false,
         message_id: messageId,
         provider,
+        transport: attempt.transport || provider,
         status: "unsupported_send",
         error: attempt.error || "Provider does not support direct send for this message type.",
       });

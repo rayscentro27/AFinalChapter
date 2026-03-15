@@ -39,3 +39,7 @@ netlify/functions/manifest.json
 
 # dotenv
 .env
+
+# Doppler staging env files (local only)
+.doppler.missing.env
+.doppler.missing.template.env

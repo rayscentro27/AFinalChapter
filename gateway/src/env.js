@@ -1,5 +1,7 @@
 import 'dotenv/config';
 
+const VALID_SYSTEM_MODES = new Set(['development', 'research', 'production', 'maintenance', 'degraded', 'emergency_stop']);
+
 function required(name) {
   const value = process.env[name];
   if (!value) throw new Error(`Missing env var: ${name}`);
@@ -13,8 +15,8 @@ function asText(value) {
 function asBool(value, fallback = false) {
   const text = asText(value).toLowerCase();
   if (!text) return fallback;
-  if (text === 'true' || text === '1' || text === 'yes') return true;
-  if (text === 'false' || text === '0' || text === 'no') return false;
+  if (text === 'true' || text === '1' || text === 'yes' || text === 'on') return true;
+  if (text === 'false' || text === '0' || text === 'no' || text === 'off') return false;
   return fallback;
 }
 
@@ -22,6 +24,12 @@ function asCsv(value) {
   const text = asText(value);
   if (!text) return [];
   return text.split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function systemMode(value) {
+  const mode = asText(value || 'development').toLowerCase();
+  if (VALID_SYSTEM_MODES.has(mode)) return mode;
+  return 'development';
 }
 
 const nodeEnv = asText(process.env.NODE_ENV) || 'development';
@@ -42,7 +50,6 @@ export const ENV = {
   ORACLE_CRON_TOKEN: process.env.ORACLE_CRON_TOKEN || '',
   ORACLE_TENANT_IDS: process.env.ORACLE_TENANT_IDS || '',
 
-  ALERTS_WEBHOOK_URL: process.env.ALERTS_WEBHOOK_URL || '',
   ALERTS_NOTIFY_ON_RESOLVE: asBool(process.env.ALERTS_NOTIFY_ON_RESOLVE, true),
   ALERT_NOTIFICATION_COOLDOWN_MINUTES: Number(process.env.ALERT_NOTIFICATION_COOLDOWN_MINUTES || 30),
   ALERT_OUTBOX_FAILED_THRESHOLD: Number(process.env.ALERT_OUTBOX_FAILED_THRESHOLD || 10),
@@ -54,6 +61,15 @@ export const ENV = {
   SUPABASE_URL: required('SUPABASE_URL'),
   SUPABASE_SERVICE_ROLE_KEY: required('SUPABASE_SERVICE_ROLE_KEY'),
   SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || '',
+
+  TRADINGVIEW_WEBHOOK_SECRET: process.env.TRADINGVIEW_WEBHOOK_SECRET || '',
+
+  OANDA_API_KEY: process.env.OANDA_API_KEY || '',
+  OANDA_ACCOUNT_ID: process.env.OANDA_ACCOUNT_ID || '',
+  OANDA_URL: process.env.OANDA_URL || 'https://api-fxpractice.oanda.com',
+
+  TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
+  TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || '',
 
   TWILIO_ACCOUNT_SID: required('TWILIO_ACCOUNT_SID'),
   TWILIO_AUTH_TOKEN: required('TWILIO_AUTH_TOKEN'),
@@ -79,14 +95,21 @@ export const ENV = {
 
   AI_PROVIDER: process.env.AI_PROVIDER || 'heuristic',
   AI_API_KEY: process.env.AI_API_KEY || '',
+  AI_OPENAI_MODEL: process.env.AI_OPENAI_MODEL || 'gpt-4.1-mini',
+  AI_GEMINI_MODEL: process.env.AI_GEMINI_MODEL || 'gemini-1.5-flash',
   AI_MASK_PII: asBool(process.env.AI_MASK_PII, true),
   SAFE_MODE: asBool(process.env.SAFE_MODE, false),
+  AI_MAX_INPUT_CHARS: Number(process.env.AI_MAX_INPUT_CHARS || 12000),
+  AI_MAX_PROVIDER_RETRIES: Number(process.env.AI_MAX_PROVIDER_RETRIES || 2),
+  OPENROUTER_ALLOWED_TASKS: asCsv(process.env.OPENROUTER_ALLOWED_TASKS),
+  OPENROUTER_DENIED_TASKS: asCsv(process.env.OPENROUTER_DENIED_TASKS),
 
-  SYSTEM_MODE: process.env.SYSTEM_MODE || 'development',
+  SYSTEM_MODE: systemMode(process.env.SYSTEM_MODE),
   QUEUE_ENABLED: asBool(process.env.QUEUE_ENABLED, false),
   AI_JOBS_ENABLED: asBool(process.env.AI_JOBS_ENABLED, true),
   RESEARCH_JOBS_ENABLED: asBool(process.env.RESEARCH_JOBS_ENABLED, true),
   NOTIFICATIONS_ENABLED: asBool(process.env.NOTIFICATIONS_ENABLED, true),
+  CONTROL_PLANE_WRITE_ENABLED: asBool(process.env.CONTROL_PLANE_WRITE_ENABLED, false),
   JOB_MAX_RUNTIME_SECONDS: Number(process.env.JOB_MAX_RUNTIME_SECONDS || 300),
   WORKER_MAX_CONCURRENCY: Number(process.env.WORKER_MAX_CONCURRENCY || 4),
   TENANT_JOB_LIMIT_ACTIVE: Number(process.env.TENANT_JOB_LIMIT_ACTIVE || 20),

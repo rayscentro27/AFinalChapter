@@ -42,6 +42,23 @@ curl -s -H "x-api-key: $INTERNAL_API_KEY" http://127.0.0.1:3000/api/system/jobs 
 curl -s -H "x-api-key: $INTERNAL_API_KEY" http://127.0.0.1:3000/api/system/errors | jq
 ```
 
+## Verified Mac Mini Runtime Baseline (2026-03-13)
+- Canonical Mac runtime root is `/Users/raymonddavis/nexus-ai` (not `/opt/nexus-services`).
+- LaunchAgents in active use:
+  - `ai.openclaw.gateway`
+  - `com.nexus.signal-router`
+  - `com.raymonddavis.nexus.telegram`
+  - `com.raymonddavis.nexus.dashboard`
+  - `com.raymonddavis.nexus` (one-shot bootstrap only; no `KeepAlive`)
+- OpenClaw gateway healthy on `127.0.0.1:18789` (`/health` returns `ok: true`).
+- Local dashboard process healthy on `127.0.0.1:3000`.
+- Tailscale peer path confirmed between Windows (`100.78.50.25`) and Mac Mini (`100.89.219.10`).
+
+Admin-only local check on Mac Mini (run manually in local Terminal):
+```bash
+sudo systemsetup -getremotelogin
+```
+
 ## Mac Mini First Validation Steps After Reset
 1. Run existing research ingestion pipeline against same Supabase project.
 2. Confirm new queue/system tables are visible to service-role reads.

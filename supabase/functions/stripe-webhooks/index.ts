@@ -543,51 +543,89 @@ async function sendBrevoEmail(params: {
   metadata: Record<string, unknown>;
 }) {
   const brevoApiKey = normalizeString(Deno.env.get("BREVO_API_KEY"));
+  const resendApiKey = normalizeString(Deno.env.get("RESEND_API_KEY"));
+  const transactionalProviderPreference = normalizeString(Deno.env.get("EMAIL_TRANSACTIONAL_PROVIDER")).toLowerCase();
   const fromEmail = normalizeString(Deno.env.get("DEFAULT_FROM_EMAIL"));
   const fromName = normalizeString(Deno.env.get("DEFAULT_FROM_NAME")) || "Nexus CRM";
 
-  if (!brevoApiKey || !fromEmail) {
-    return { sent: false, reason: "brevo_not_configured" };
+  if (!fromEmail) {
+    return { sent: false, reason: "default_from_email_missing" };
   }
 
   const copy = buildEmailCopy(params.kind, params.tier);
   const educationalFooter = "Educational only. No guarantees of outcomes.";
 
-  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-      "api-key": brevoApiKey,
-    },
-    body: JSON.stringify({
-      sender: {
-        name: fromName,
-        email: fromEmail,
-      },
-      to: [
-        {
-          email: params.toEmail,
-          name: params.toName || undefined,
-        },
-      ],
-      subject: copy.subject,
-      htmlContent: `${copy.html}<hr style="margin-top:24px;border:none;border-top:1px solid #e2e8f0"/><p style="font-size:12px;color:#64748b">${educationalFooter}</p>`,
-      textContent: `${copy.text}\n\n${educationalFooter}`,
-      headers: {
-        "X-Nexus-Message-Type": params.messageType,
-      },
-      params: params.metadata,
-    }),
-  });
+  const prefersResend = transactionalProviderPreference === "resend" || transactionalProviderPreference === "" || transactionalProviderPreference === "auto";
+  const prefersBrevo = transactionalProviderPreference === "brevo";
 
-  if (!response.ok) {
-    return { sent: false, reason: `brevo_http_${response.status}` };
+  if ((prefersResend && resendApiKey) || (!brevoApiKey && resendApiKey)) {
+    const resendResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": `Bearer ${resendApiKey}`,
+      },
+      body: JSON.stringify({
+        from: `${fromName} <${fromEmail}>`,
+        to: [params.toEmail],
+        subject: copy.subject,
+        html: `${copy.html}<hr style="margin-top:24px;border:none;border-top:1px solid #e2e8f0"/><p style="font-size:12px;color:#64748b">${educationalFooter}</p>`,
+        text: `${copy.text}\n\n${educationalFooter}`,
+        headers: {
+          "X-Nexus-Message-Type": params.messageType,
+        },
+        tags: [
+          { name: "message_type", value: params.messageType },
+        ],
+      }),
+    });
+
+    if (!resendResponse.ok) {
+      return { sent: false, reason: `resend_http_${resendResponse.status}` };
+    }
+
+    return { sent: true, reason: "ok_resend" };
   }
 
-  return { sent: true, reason: "ok" };
-}
+  if ((prefersBrevo || !resendApiKey) && brevoApiKey) {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "api-key": brevoApiKey,
+      },
+      body: JSON.stringify({
+        sender: {
+          name: fromName,
+          email: fromEmail,
+        },
+        to: [
+          {
+            email: params.toEmail,
+            name: params.toName || undefined,
+          },
+        ],
+        subject: copy.subject,
+        htmlContent: `${copy.html}<hr style="margin-top:24px;border:none;border-top:1px solid #e2e8f0"/><p style="font-size:12px;color:#64748b">${educationalFooter}</p>`,
+        textContent: `${copy.text}\n\n${educationalFooter}`,
+        headers: {
+          "X-Nexus-Message-Type": params.messageType,
+        },
+        params: params.metadata,
+      }),
+    });
 
+    if (!response.ok) {
+      return { sent: false, reason: `brevo_http_${response.status}` };
+    }
+
+    return { sent: true, reason: "ok_brevo" };
+  }
+
+  return { sent: false, reason: "transactional_email_provider_not_configured" };
+}
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
