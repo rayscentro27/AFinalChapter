@@ -13,9 +13,9 @@ export interface UserProfile {
 }
 
 export interface AuthAdapter {
-  signIn: (email: string, password?: string) => Promise<{ user: UserProfile | null, error: any }> ;
-  signInWithGoogle?: () => Promise<{ user: UserProfile | null, error: any }>;
-  signUp: (data: { 
+  signIn: (email: string, password?: string, captchaToken?: string) => Promise<{ user: UserProfile | null, error: any }> ;
+  signInWithGoogle?: (captchaToken?: string) => Promise<{ user: UserProfile | null, error: any }>;
+  signUp: (data: {
     email: string;
     name: string;
     company: string;
@@ -37,7 +37,7 @@ export interface DataAdapter {
   getContacts: () => Promise<Contact[]>;
   updateContact: (contact: Contact) => Promise<Contact>;
   addContact: (contact: Partial<Contact>) => Promise<Contact>;
-  
+
   // Settings
   getBranding: () => Promise<AgencyBranding>;
   updateBranding: (branding: AgencyBranding) => Promise<AgencyBranding>;

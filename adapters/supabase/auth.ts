@@ -167,12 +167,18 @@ const toUserProfile = async (user: any): Promise<UserProfile> => {
 };
 
 export const supabaseAuthAdapter: AuthAdapter = {
-  signIn: async (email, password) => {
+  signIn: async (email, password, captchaToken) => {
+    const payload: any = {
+      email,
+      password: password || '',
+    };
+
+    if (captchaToken) {
+      payload.options = { captchaToken };
+    }
+
     const result = await withTimeout(
-      supabase.auth.signInWithPassword({
-        email,
-        password: password || '',
-      }),
+      supabase.auth.signInWithPassword(payload),
       12000,
       {
         data: { user: null, session: null },
@@ -192,14 +198,15 @@ export const supabaseAuthAdapter: AuthAdapter = {
     }
   },
 
-  signInWithGoogle: async () => {
+  signInWithGoogle: async (captchaToken) => {
     const redirectTo = `${window.location.origin}${window.location.pathname}${window.location.hash || ''}`;
+
+    const oauthOptions: any = { redirectTo };
+    if (captchaToken) oauthOptions.captchaToken = captchaToken;
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo,
-      },
+      options: oauthOptions,
     });
 
     if (error) return { user: null, error };

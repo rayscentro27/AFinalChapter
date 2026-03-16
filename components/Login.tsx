@@ -1,6 +1,5 @@
-
-import React, { useState, useEffect } from 'react';
-import { Hexagon, Lock, Mail, ArrowRight, User, ShieldCheck, Building2, Phone, UserPlus, Sparkles, Info, X, AlertCircle, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Hexagon, Lock, Mail, ArrowRight, ShieldCheck, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { User as UserType } from '../types';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,14 +11,43 @@ interface LoginProps {
   onBack?: () => void;
 }
 
+type TurnstileWidgetId = string | number;
+
+interface TurnstileRenderOptions {
+  sitekey: string;
+  theme?: 'light' | 'dark' | 'auto';
+  callback?: (token: string) => void;
+  'expired-callback'?: () => void;
+  'error-callback'?: () => void;
+}
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: TurnstileRenderOptions) => TurnstileWidgetId;
+      reset: (widgetId: TurnstileWidgetId) => void;
+      remove: (widgetId: TurnstileWidgetId) => void;
+    };
+  }
+}
+
+const TURNSTILE_SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)
+  || (import.meta.env.VITE_AUTH_TURNSTILE_SITE_KEY as string | undefined)
+  || '';
+
 const Login: React.FC<LoginProps> = ({ onBack }) => {
-  const { signIn, signInWithGoogle, signUp } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   const [isSystemEmpty, setIsSystemEmpty] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState('');
   const [notify, setNotify] = useState({ show: false, message: '', title: '', type: 'info' as 'info' | 'success' | 'error' });
+
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
+  const turnstileWidgetIdRef = useRef<TurnstileWidgetId | null>(null);
+  const captchaEnabled = isSupabaseConfigured && Boolean(TURNSTILE_SITE_KEY);
 
   useEffect(() => {
     const checkGenesis = async () => {
@@ -47,18 +75,101 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
     checkGenesis();
   }, []);
 
+  useEffect(() => {
+    if (!captchaEnabled) return undefined;
+
+    let cancelled = false;
+    const renderWidget = () => {
+      if (cancelled || !window.turnstile || !turnstileContainerRef.current) return;
+      if (turnstileWidgetIdRef.current !== null) return;
+
+      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: TURNSTILE_SITE_KEY,
+        theme: 'dark',
+        callback: (token: string) => {
+          setCaptchaToken(token);
+          setError((prev) => (prev && prev.toLowerCase().includes('captcha') ? null : prev));
+        },
+        'expired-callback': () => {
+          setCaptchaToken('');
+        },
+        'error-callback': () => {
+          setCaptchaToken('');
+          setError('captcha verification process failed');
+        },
+      });
+    };
+
+    if (window.turnstile) {
+      renderWidget();
+      return () => {
+        cancelled = true;
+        if (window.turnstile && turnstileWidgetIdRef.current !== null) {
+          window.turnstile.remove(turnstileWidgetIdRef.current);
+          turnstileWidgetIdRef.current = null;
+        }
+      };
+    }
+
+    let script = document.querySelector('script[data-nexus-turnstile="true"]') as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      script.dataset.nexusTurnstile = 'true';
+      document.head.appendChild(script);
+    }
+
+    const onLoad = () => renderWidget();
+    script.addEventListener('load', onLoad);
+
+    return () => {
+      cancelled = true;
+      script?.removeEventListener('load', onLoad);
+      if (window.turnstile && turnstileWidgetIdRef.current !== null) {
+        window.turnstile.remove(turnstileWidgetIdRef.current);
+        turnstileWidgetIdRef.current = null;
+      }
+    };
+  }, [captchaEnabled]);
+
+  const resetCaptchaWidget = () => {
+    setCaptchaToken('');
+    if (window.turnstile && turnstileWidgetIdRef.current !== null) {
+      window.turnstile.reset(turnstileWidgetIdRef.current);
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    
+
+    if (isSupabaseConfigured && !TURNSTILE_SITE_KEY) {
+      const msg = 'Captcha site key is missing. Set VITE_TURNSTILE_SITE_KEY in frontend env.';
+      setError(msg);
+      setNotify({ show: true, title: 'Auth Config Missing', message: msg, type: 'error' });
+      setLoading(false);
+      return;
+    }
+
+    if (captchaEnabled && !captchaToken) {
+      const msg = 'Complete captcha verification before signing in.';
+      setError(msg);
+      setNotify({ show: true, title: 'Captcha Required', message: msg, type: 'error' });
+      setLoading(false);
+      return;
+    }
+
     try {
-      await signIn(email, password);
+      await signIn(email, password, captchaEnabled ? captchaToken : undefined);
       setNotify({ show: true, title: 'Session Resumed', message: 'Access granted. Synchronizing workspace...', type: 'success' });
     } catch (err: any) {
       const msg = err.message || 'Authentication failed';
       setError(msg);
       setNotify({ show: true, title: 'Auth Failed', message: msg, type: 'error' });
+      if (captchaEnabled) resetCaptchaWidget();
     } finally {
       setLoading(false);
     }
@@ -67,13 +178,31 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
+
+    if (isSupabaseConfigured && !TURNSTILE_SITE_KEY) {
+      const msg = 'Captcha site key is missing. Set VITE_TURNSTILE_SITE_KEY in frontend env.';
+      setError(msg);
+      setNotify({ show: true, title: 'Auth Config Missing', message: msg, type: 'error' });
+      setLoading(false);
+      return;
+    }
+
+    if (captchaEnabled && !captchaToken) {
+      const msg = 'Complete captcha verification before continuing with Google.';
+      setError(msg);
+      setNotify({ show: true, title: 'Captcha Required', message: msg, type: 'error' });
+      setLoading(false);
+      return;
+    }
+
     try {
-      await signInWithGoogle();
+      await signInWithGoogle(captchaEnabled ? captchaToken : undefined);
       setNotify({ show: true, title: 'Redirecting', message: 'Continue with Google in the popup/redirect flow.', type: 'info' });
     } catch (err: any) {
       const msg = err?.message || 'Google sign-in failed';
       setError(msg);
       setNotify({ show: true, title: 'Google SSO Failed', message: msg, type: 'error' });
+      if (captchaEnabled) resetCaptchaWidget();
     } finally {
       setLoading(false);
     }
@@ -123,7 +252,7 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                   <p className="text-xs text-slate-400 leading-relaxed mb-6 font-medium">
                     This instance is currently unmanaged. The first entity to register will be granted master administrative authority.
                   </p>
-                  <button 
+                  <button
                     onClick={handleInitializeAdmin}
                     className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl uppercase tracking-widest text-[10px] hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20 active:scale-95"
                   >
@@ -138,27 +267,38 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
             <form onSubmit={handleAuth} className="space-y-5">
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-emerald-500 transition-colors" size={18} />
-                <input 
-                  type="email" 
-                  value={email} 
-                  onChange={(e) => setEmail(e.target.value)} 
-                  placeholder="name@company.com" 
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com"
                   required
-                  className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-white text-sm font-medium" 
+                  className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-white text-sm font-medium"
                 />
               </div>
 
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-emerald-500 transition-colors" size={18} />
-                <input 
-                  type="password" 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
-                  placeholder="Access Cipher" 
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Access Cipher"
                   required
-                  className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-white text-sm font-medium" 
+                  className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-white text-sm font-medium"
                 />
               </div>
+
+              {captchaEnabled && (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div ref={turnstileContainerRef} className="min-h-[65px]" />
+                  {!captchaToken && (
+                    <p className="mt-2 text-[10px] text-slate-400 font-black uppercase tracking-[0.12em]">
+                      Complete captcha verification to continue.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <button type="submit" disabled={loading} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-[2rem] transition-all flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/10 disabled:opacity-70 mt-8 uppercase tracking-[0.2em] text-xs transform active:scale-95">
                 {loading ? <RefreshCw className="animate-spin" size={18}/> : <>Resume Session <ArrowRight size={18} /></>}

@@ -30,7 +30,7 @@ const seedInitialUsers = () => {
 };
 
 export const mvpAuthAdapter: AuthAdapter = {
-  signIn: async (email) => {
+  signIn: async (email, _password, _captchaToken) => {
     seedInitialUsers();
     await new Promise(resolve => setTimeout(resolve, 800));
     const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
