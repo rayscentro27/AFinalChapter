@@ -5,8 +5,8 @@ import { UserProfile } from '../adapters/types';
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
-  signIn: (email: string, password?: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  signIn: (email: string, password?: string, captchaToken?: string) => Promise<void>;
+  signInWithGoogle: (captchaToken?: string) => Promise<void>;
   signUp: (data: any) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -62,18 +62,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signIn = async (email: string, password?: string) => {
-    const { user: newUser, error } = await auth.signIn(email, password);
+  const signIn = async (email: string, password?: string, captchaToken?: string) => {
+    const { user: newUser, error } = await auth.signIn(email, password, captchaToken);
     if (error) throw error;
     setUser(newUser);
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (captchaToken?: string) => {
     if (!auth.signInWithGoogle) {
       throw new Error('google_sso_not_available');
     }
 
-    const { user: newUser, error } = await auth.signInWithGoogle();
+    const { user: newUser, error } = await auth.signInWithGoogle(captchaToken);
     if (error) throw error;
     if (newUser) setUser(newUser);
   };
