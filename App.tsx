@@ -467,6 +467,7 @@ export const App = () => {
     [ViewMode.FUNDING_FLOW]: { requiredTier: 'PREMIUM', moduleLabel: 'Funding Research' },
     [ViewMode.FUNDING_RESEARCH]: { requiredTier: 'PREMIUM', moduleLabel: 'Funding Research Engine' },
     [ViewMode.FUNDING_OUTCOMES]: { requiredTier: 'PREMIUM', moduleLabel: 'Funding Outcomes' },
+    [ViewMode.SBA_PREP]: { requiredTier: 'PREMIUM', moduleLabel: 'SBA Preparation' },
     [ViewMode.BILLING_COMMISSIONS]: { requiredTier: 'PREMIUM', moduleLabel: 'Commission Billing' },
     [ViewMode.COMMISSIONS]: { requiredTier: 'PREMIUM', moduleLabel: 'Commission Ledger' },
   };
