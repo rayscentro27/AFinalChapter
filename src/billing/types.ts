@@ -9,8 +9,11 @@ export type FeatureKey =
   | 'BUSINESS_FORMATION'
   | 'FUNDING_SEQUENCE'
   | 'DOCUPOST_MAILING'
+  | 'FUNDING_RESEARCH'
+  | 'FUNDING_OUTCOMES'
   | 'GRANTS'
   | 'SBA_PREP'
+  | 'LENDER_ROOM'
   | 'INVESTMENT_LIBRARY';
 
 export interface MembershipPlan {

@@ -471,7 +471,7 @@ export const App = () => {
     [ViewMode.COMMISSIONS]: { requiredTier: 'PREMIUM', moduleLabel: 'Commission Ledger' },
   };
 
-  const shouldBypassTierGate = Boolean(user && ['admin', 'supervisor', 'sales', 'salesperson'].includes(user.role));
+  const shouldBypassTierGate = Boolean(user && ['super_admin', 'admin', 'supervisor', 'sales', 'salesperson'].includes(user.role));
 
   const renderTierGate = (view: ViewMode, element: React.ReactNode) => {
     const requirement = tierGateMap[view];
@@ -614,7 +614,7 @@ export const App = () => {
                     case ViewMode.SITEMAP: return <SystemSitemap onNavigate={navigate} />;
                     case ViewMode.EXPENSES: return <ExpenseTracker />;
                     case ViewMode.GRANTS: return <GrantsPage />;
-                    case ViewMode.SBA_PREP: return <SBAPrepPage />;
+                    case ViewMode.SBA_PREP: return renderTierGate(ViewMode.SBA_PREP, <SBAPrepPage />);
                     case ViewMode.COMMISSIONS: return renderTierGate(ViewMode.COMMISSIONS, <CommissionManager contacts={contacts} />);
                     case ViewMode.RISK_MONITOR: return <RiskMonitor />;
                     case ViewMode.FUNDING_FLOW: return renderTierGate(ViewMode.FUNDING_FLOW, <PGFundingFlow />);
