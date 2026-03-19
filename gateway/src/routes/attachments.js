@@ -19,6 +19,15 @@ const ALLOWED_MIME_TYPES = new Set([
   'text/plain',
 ]);
 
+function isSchemaMissingError(error) {
+  const msg = String(error?.message || '').toLowerCase();
+  return (
+    (msg.includes('relation') && msg.includes('does not exist'))
+    || (msg.includes('column') && msg.includes('does not exist'))
+    || (msg.includes('could not find the table') && msg.includes('schema cache'))
+  );
+}
+
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
   if (value && typeof value === 'object' && !Array.isArray(value) && 'value' in value) {
@@ -89,14 +98,119 @@ async function readPartFile(filePart) {
   };
 }
 
-export async function attachmentsRoutes(fastify) {
+async function loadScopedConversation({ client, tenantId, conversationId }) {
+  if (!conversationId) return null;
+
+  const { data, error } = await client
+    .from('conversations')
+    .select('id,tenant_id,contact_id')
+    .eq('tenant_id', tenantId)
+    .eq('id', conversationId)
+    .maybeSingle();
+
+  if (error) throw new Error(`conversation_lookup_failed: ${error.message}`);
+  if (!data) throw new Error('invalid_conversation_scope');
+  return data;
+}
+
+async function loadScopedMessage({ client, tenantId, messageId }) {
+  if (!messageId) return null;
+
+  const { data, error } = await client
+    .from('messages')
+    .select('id,tenant_id,conversation_id')
+    .eq('tenant_id', tenantId)
+    .eq('id', messageId)
+    .maybeSingle();
+
+  if (error) throw new Error(`message_lookup_failed: ${error.message}`);
+  if (!data) throw new Error('invalid_message_scope');
+  return data;
+}
+
+export async function resolveAttachmentLinkage({
+  client,
+  tenantId,
+  inputContactId,
+  inputConversationId,
+  inputMessageId,
+}) {
+  let contactId = inputContactId && isUuid(inputContactId) ? inputContactId : null;
+  let conversationId = inputConversationId && isUuid(inputConversationId) ? inputConversationId : null;
+  const messageId = inputMessageId && isUuid(inputMessageId) ? inputMessageId : null;
+
+  const scopedMessage = await loadScopedMessage({
+    client,
+    tenantId,
+    messageId,
+  });
+
+  if (!conversationId && scopedMessage?.conversation_id) {
+    conversationId = String(scopedMessage.conversation_id);
+  }
+
+  let scopedConversation = await loadScopedConversation({
+    client,
+    tenantId,
+    conversationId,
+  });
+
+  if (
+    scopedMessage?.conversation_id
+    && scopedConversation
+    && String(scopedMessage.conversation_id) !== String(scopedConversation.id)
+  ) {
+    throw new Error('message_conversation_mismatch');
+  }
+
+  if (contactId && scopedConversation?.contact_id && String(scopedConversation.contact_id) !== String(contactId)) {
+    throw new Error('contact_conversation_mismatch');
+  }
+
+  if (!contactId && scopedConversation?.contact_id) {
+    contactId = String(scopedConversation.contact_id);
+  }
+
+  // Handle mixed-schema deployments where conversation_id/contact_id may not exist yet.
+  if (scopedMessage && !scopedConversation && conversationId) {
+    try {
+      scopedConversation = await loadScopedConversation({
+        client,
+        tenantId,
+        conversationId,
+      });
+      if (contactId && scopedConversation?.contact_id && String(scopedConversation.contact_id) !== String(contactId)) {
+        throw new Error('contact_conversation_mismatch');
+      }
+      if (!contactId && scopedConversation?.contact_id) {
+        contactId = String(scopedConversation.contact_id);
+      }
+    } catch (error) {
+      if (!isSchemaMissingError(error)) throw error;
+    }
+  }
+
+  return {
+    contactId,
+    conversationId,
+    messageId,
+  };
+}
+
+export async function attachmentsRoutes(fastify, opts = {}) {
+  const deps = opts?.deps || {};
+  const db = deps.supabaseAdmin || supabaseAdmin;
+  const evaluatePolicyFn = deps.evaluatePolicy || evaluatePolicy;
+  const checkLimitFn = deps.checkLimit || checkLimit;
+  const logAuditFn = deps.logAudit || logAudit;
+
   const agentRoleGuard = requireTenantRole({
-    supabaseAdmin,
+    supabaseAdmin: db,
     allowedRoles: ['owner', 'admin', 'agent'],
   });
 
   const attachmentUploadGuard = requireTenantPermission({
-    supabaseAdmin,
+    supabaseAdmin: db,
     permission: 'attachments.upload',
   });
 
@@ -150,8 +264,8 @@ export async function attachmentsRoutes(fastify) {
         return reply.code(400).send({ ok: false, error: 'empty_file' });
       }
 
-      const uploadPolicy = await evaluatePolicy({
-        supabaseAdmin,
+      const uploadPolicy = await evaluatePolicyFn({
+        supabaseAdmin: db,
         action: 'attachments.upload',
         context: {
           tenant_id: tenantId,
@@ -172,8 +286,8 @@ export async function attachmentsRoutes(fastify) {
       }
 
       const projectedMb = sizeBytes / (1024 * 1024);
-      const limitCheck = await checkLimit({
-        supabaseAdmin,
+      const limitCheck = await checkLimitFn({
+        supabaseAdmin: db,
         tenant_id: tenantId,
         metric: 'attachments_mb_per_month',
         projected_increment: projectedMb,
@@ -189,6 +303,14 @@ export async function attachmentsRoutes(fastify) {
         });
       }
 
+      const linked = await resolveAttachmentLinkage({
+        client: db,
+        tenantId,
+        inputContactId: asText(fields.contact_id),
+        inputConversationId: asText(fields.conversation_id),
+        inputMessageId: asText(fields.message_id),
+      });
+
       const originalName = sanitizeFilename(filePart.filename || fields.filename || 'upload');
       const ext = path.extname(originalName);
       const basename = ext ? originalName.slice(0, -ext.length) : originalName;
@@ -198,7 +320,7 @@ export async function attachmentsRoutes(fastify) {
       const storageBucket = 'attachments';
       const storagePath = `tenant/${tenantId}/${year}/${month}/${objectName}`;
 
-      const uploadResult = await supabaseAdmin.storage
+      const uploadResult = await db.storage
         .from(storageBucket)
         .upload(storagePath, buffer, {
           contentType: mimeType,
@@ -212,9 +334,9 @@ export async function attachmentsRoutes(fastify) {
       const row = {
         id: randomUUID(),
         tenant_id: tenantId,
-        contact_id: isUuid(fields.contact_id) ? fields.contact_id : null,
-        conversation_id: isUuid(fields.conversation_id) ? fields.conversation_id : null,
-        message_id: isUuid(fields.message_id) ? fields.message_id : null,
+        contact_id: linked.contactId,
+        conversation_id: linked.conversationId,
+        message_id: linked.messageId,
         storage_bucket: storageBucket,
         storage_path: storagePath,
         content_type: mimeType,
@@ -222,7 +344,7 @@ export async function attachmentsRoutes(fastify) {
         sha256,
       };
 
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await db
         .from('attachments')
         .insert(row)
         .select('id,storage_path')
@@ -232,7 +354,7 @@ export async function attachmentsRoutes(fastify) {
         throw new Error(`attachments_insert_failed: ${error.message}`);
       }
 
-      await logAudit({
+      await logAuditFn({
         tenant_id: tenantId,
         actor_user_id: req.user?.id || null,
         actor_type: 'user',
@@ -275,9 +397,9 @@ export async function attachmentsRoutes(fastify) {
     const ttl = Math.min(3600, Math.max(60, asInt(req.query?.ttl, SIGNED_URL_TTL_SEC)));
 
     try {
-      const { data: row, error } = await supabaseAdmin
+      const { data: row, error } = await db
         .from('attachments')
-        .select('id,tenant_id,storage_bucket,storage_path,content_type,size_bytes,created_at')
+        .select('id,tenant_id,storage_bucket,storage_path,content_type,size_bytes,created_at,conversation_id')
         .eq('tenant_id', tenantId)
         .eq('id', attachmentId)
         .maybeSingle();
@@ -285,9 +407,18 @@ export async function attachmentsRoutes(fastify) {
       if (error) throw new Error(`attachments_lookup_failed: ${error.message}`);
       if (!row) return reply.code(404).send({ ok: false, error: 'attachment_not_found' });
 
-      const { data, error: signErr } = await supabaseAdmin.storage
+      const storagePath = asText(row.storage_path);
+      if (!storagePath) return reply.code(404).send({ ok: false, error: 'attachment_storage_path_missing' });
+      if (storagePath.startsWith('tenant/')) {
+        const expectedPrefix = `tenant/${tenantId}/`;
+        if (!storagePath.startsWith(expectedPrefix)) {
+          return reply.code(403).send({ ok: false, error: 'attachment_tenant_storage_mismatch' });
+        }
+      }
+
+      const { data, error: signErr } = await db.storage
         .from(row.storage_bucket || 'attachments')
-        .createSignedUrl(row.storage_path, ttl);
+        .createSignedUrl(storagePath, ttl);
 
       if (signErr) throw new Error(`signed_url_failed: ${signErr.message}`);
 
