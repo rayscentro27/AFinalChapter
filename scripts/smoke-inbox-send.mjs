@@ -33,18 +33,21 @@ const supabaseServiceRoleKey = required('SUPABASE_SERVICE_ROLE_KEY', process.env
 
 required('tenant-id / SMOKE_TENANT_ID', tenantId);
 required('conversation-id / SMOKE_CONVERSATION_ID', conversationId);
-required('recipient-id / SMOKE_RECIPIENT_ID', recipientId);
 
 if (provider !== 'meta') {
   throw new Error(`provider must be meta, got ${provider}`);
+}
+
+if (!recipientId) {
+  throw new Error('recipient-id is required for meta');
 }
 
 const route = '/send/meta';
 const payload = {
   tenant_id: tenantId,
   conversation_id: conversationId,
-  recipient_id: recipientId,
   text,
+  recipient_id: recipientId,
 };
 
 console.log('[smoke] sending', { route, provider, tenantId, conversationId });
