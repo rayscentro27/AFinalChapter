@@ -10,9 +10,7 @@ import { isOriginAllowed } from './config/aiGatewayConfig.js';
 import { validateGatewayEnv } from './config/envValidation.js';
 import { healthRoutes } from './routes/health.js';
 import { aiGatewayRoutes } from './routes/ai_gateway.js';
-import { twilioRoutes } from './routes/twilio.js';
 import { metaRoutes } from './routes/meta.js';
-import { whatsappRoutes } from './routes/whatsapp.js';
 import { matrixRoutes } from './routes/matrix.js';
 import { sendRoutes } from './routes/send.js';
 import { routingRoutes } from './routes/routing.js';
@@ -51,8 +49,6 @@ function requestTenantId(req) {
 function requestProvider(req) {
   const path = asText(req?.routeOptions?.url || req?.routerPath || req?.raw?.url).toLowerCase();
   if (path.includes('/webhooks/meta')) return 'meta';
-  if (path.includes('/webhooks/whatsapp')) return 'whatsapp';
-  if (path.includes('/webhooks/twilio')) return 'twilio';
   if (path.includes('/webhooks/matrix')) return 'matrix';
   if (path.includes('/webhooks/tradingview')) return 'tradingview';
   return null;
@@ -173,9 +169,7 @@ await fastify.register(multipart, {
 await fastify.register(healthRoutes);
 await fastify.register(systemHealthRoutes);
 await fastify.register(aiGatewayRoutes);
-await fastify.register(twilioRoutes);
 await fastify.register(metaRoutes);
-await fastify.register(whatsappRoutes);
 await fastify.register(matrixRoutes);
 await fastify.register(tradingviewRoutes);
 await fastify.register(sendRoutes);

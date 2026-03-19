@@ -19,13 +19,8 @@ const REQUIRED = {
     'ALLOWED_ORIGINS',
   ],
   channel_integrations: [
-    'TWILIO_ACCOUNT_SID',
-    'TWILIO_AUTH_TOKEN',
-    'TWILIO_FROM_NUMBER',
     'META_APP_SECRET',
     'META_VERIFY_TOKEN',
-    'WHATSAPP_VERIFY_TOKEN',
-    'WHATSAPP_TOKEN',
     'META_PAGE_ACCESS_TOKEN',
   ],
 };

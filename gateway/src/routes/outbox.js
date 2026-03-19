@@ -6,8 +6,6 @@ import {
   getConversationOrThrow,
   getChannelAccountOrThrow,
 } from '../db_send.js';
-import { twilioSendSMS } from '../providers/twilio.js';
-import { whatsappSendText } from '../providers/whatsapp.js';
 import { metaSendOutbox } from '../providers/meta_send_outbox.js';
 import { requireTenantPermission } from '../lib/auth/requireTenantPermission.js';
 import { evaluatePolicy } from '../lib/policy/policyEngine.js';
@@ -29,7 +27,7 @@ import { checkLimit } from '../lib/billing/planEnforcer.js';
 import { logAudit } from '../lib/audit/auditLog.js';
 import { buildWebhookEventKey, queueOutgoingWebhookEvent } from '../lib/public-api/webhookDispatcher.js';
 
-const SUPPORTED_PROVIDERS = new Set(['twilio', 'whatsapp', 'meta']);
+const SUPPORTED_PROVIDERS = new Set(['meta']);
 const BACKOFF_MINUTES = [1, 5, 15, 60, 360];
 const NO_HEALTHY_ROUTE_BACKOFF_MINUTES = 5;
 
@@ -332,40 +330,6 @@ function appendLinksToBody(bodyText, urls) {
 }
 
 async function sendViaProvider(outbox) {
-  const content = asObject(outbox.content);
-  const attachments = asArray(outbox.attachments).length > 0
-    ? asArray(outbox.attachments)
-    : asArray(content.attachments);
-
-  const bodyText = asText(outbox.body_text) || asText(outbox.body);
-  const fallbackUrls = attachments.length > 0 && outbox.provider !== 'meta'
-    ? await signedAttachmentUrls(attachments)
-    : [];
-
-  const effectiveBody = appendLinksToBody(bodyText, fallbackUrls);
-
-  if (outbox.provider === 'twilio') {
-    if (!effectiveBody) throw new Error('Missing outbound body_text for Twilio');
-    return twilioSendSMS({
-      to: outbox.to_address,
-      body: effectiveBody,
-      from: asText(outbox.from_address) || asText(ENV.TWILIO_FROM_NUMBER),
-    });
-  }
-
-  if (outbox.provider === 'whatsapp') {
-    if (!effectiveBody) throw new Error('Missing outbound body_text for WhatsApp');
-
-    const phoneNumberId = asText(outbox.from_address);
-    if (!phoneNumberId) throw new Error('Missing WhatsApp phone_number_id for outbound send');
-
-    return whatsappSendText({
-      phone_number_id: phoneNumberId,
-      to: outbox.to_address,
-      body: effectiveBody,
-    });
-  }
-
   if (outbox.provider === 'meta') {
     return metaSendOutbox(outbox, { supabaseAdmin });
   }
@@ -631,10 +595,8 @@ async function buildOutboxInput(body) {
   }
 
   let fromAddress = asText(body.from_address);
-  if (!fromAddress) {
-    if (provider === 'twilio') fromAddress = asText(channel.external_account_id) || asText(ENV.TWILIO_FROM_NUMBER);
-    if (provider === 'whatsapp') fromAddress = asText(channel.external_account_id);
-    if (provider === 'meta') fromAddress = asText(channel.external_account_id);
+  if (!fromAddress && provider === 'meta') {
+    fromAddress = asText(channel.external_account_id);
   }
 
   const idempotencyKey = computeIdempotencyKey({
@@ -672,10 +634,9 @@ async function buildOutboxInput(body) {
 async function buildQueueOnlyInput(body) {
   const tenantId = String(body.tenant_id);
   const preferredProvider = lower(body.provider || body.channel_preference || '');
-  if (preferredProvider && !SUPPORTED_PROVIDERS.has(preferredProvider) && preferredProvider !== 'sms') {
+  if (preferredProvider && !SUPPORTED_PROVIDERS.has(preferredProvider)) {
     throw new Error(`Unsupported provider: ${preferredProvider}`);
   }
-
   const conversationId = asText(body.conversation_id);
   let conversation = null;
   if (conversationId) {
@@ -707,7 +668,7 @@ async function buildQueueOnlyInput(body) {
     tenant_id: tenantId,
     contact_id: contactId,
     conversation_id: conversationId,
-    preferred_provider: preferredProvider === 'sms' ? 'twilio' : preferredProvider,
+    preferred_provider: preferredProvider,
     channel_preference: preference,
     to_address: toAddressOverride,
     identity_id: asText(body.identity_id) || null,

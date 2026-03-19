@@ -3,23 +3,14 @@ import { z } from 'zod';
 import { getUserSupabaseClient } from './_shared/supabase_user_client';
 import { proxyToOracle } from './_shared/oracle_proxy';
 
-type Provider = 'sms' | 'whatsapp' | 'meta';
-
 const BodySchema = z.object({
   tenant_id: z.string().uuid().optional(),
   conversation_id: z.string().uuid(),
-  provider: z.enum(['sms', 'whatsapp', 'meta']),
+  provider: z.enum(['meta']),
   text: z.string().min(1).max(4000),
-  to: z.string().min(3).max(64).optional(),
-  recipient_id: z.string().min(3).max(128).optional(),
+  recipient_id: z.string().min(3).max(128),
   client_request_id: z.string().min(8).max(128).optional(),
 });
-
-const CHANNEL_PROVIDER_MAP: Record<Provider, 'twilio' | 'whatsapp' | 'meta'> = {
-  sms: 'twilio',
-  whatsapp: 'whatsapp',
-  meta: 'meta',
-};
 
 export const handler: Handler = async (event) => {
   try {
@@ -34,19 +25,10 @@ export const handler: Handler = async (event) => {
     const tenantId = await resolveTenantForUser(supabase as any, authData.user.id, body.tenant_id);
     const convo = await loadConversationWithChannel(supabase as any, tenantId, body.conversation_id);
 
-    const expectedChannelProvider = CHANNEL_PROVIDER_MAP[body.provider];
-    if (convo.channel_provider !== expectedChannelProvider) {
+    if (convo.channel_provider !== 'meta') {
       return json(400, {
-        error: `Provider/channel mismatch. conversation channel is ${convo.channel_provider}, request provider is ${body.provider}`,
+        error: `Provider/channel mismatch. conversation channel is ${convo.channel_provider}, request provider is meta`,
       });
-    }
-
-    if (body.provider !== 'meta' && !body.to) {
-      return json(400, { error: `Missing to for ${body.provider}` });
-    }
-
-    if (body.provider === 'meta' && !body.recipient_id) {
-      return json(400, { error: 'Missing recipient_id for meta' });
     }
 
     const proxyResponse = await proxyToOracle({
@@ -55,11 +37,11 @@ export const handler: Handler = async (event) => {
       body: {
         tenant_id: tenantId,
         conversation_id: body.conversation_id,
-        provider: expectedChannelProvider,
-        channel_preference: expectedChannelProvider,
+        provider: 'meta',
+        channel_preference: 'meta',
         body_text: body.text,
         text: body.text,
-        to: body.to,
+        to_address: body.recipient_id,
         recipient_id: body.recipient_id,
         client_request_id: body.client_request_id,
       },
@@ -81,7 +63,7 @@ export const handler: Handler = async (event) => {
       ok: true,
       tenant_id: tenantId,
       conversation_id: body.conversation_id,
-      provider: body.provider,
+      provider: 'meta',
       outbox_id: responseJson?.outbox_id || null,
       status: responseJson?.status || null,
       deduped: Boolean(responseJson?.deduped),

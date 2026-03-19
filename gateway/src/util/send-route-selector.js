@@ -1,7 +1,6 @@
-import { ENV } from '../env.js';
 import { supabaseAdmin as defaultSupabaseAdmin } from '../supabase.js';
 
-const SUPPORTED_PROVIDERS = new Set(['twilio', 'whatsapp', 'meta']);
+const SUPPORTED_PROVIDERS = new Set(['meta']);
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -15,7 +14,6 @@ function lower(value) {
 
 function normalizeProvider(value) {
   const raw = lower(value);
-  if (raw === 'sms') return 'twilio';
   return raw;
 }
 
@@ -36,7 +34,6 @@ function normalizeIdentityValue(provider, identityType, rawValue) {
 
   const normalizedProvider = normalizeProvider(provider);
   if (normalizedProvider === 'meta') return value;
-  if (normalizedProvider === 'whatsapp' || normalizedProvider === 'twilio') return normalizePhone(value);
 
   return value;
 }
@@ -291,11 +288,7 @@ function asProviderPreference(value) {
 
 function computeFromAddress(provider, selectedChannel, fallbackFromAddress = null) {
   const explicit = asText(fallbackFromAddress);
-  if (provider === 'twilio') {
-    return explicit || asText(selectedChannel?.external_account_id) || asText(ENV.TWILIO_FROM_NUMBER) || null;
-  }
-
-  if (provider === 'whatsapp' || provider === 'meta') {
+  if (provider === 'meta') {
     return explicit || asText(selectedChannel?.external_account_id) || null;
   }
 
@@ -493,6 +486,15 @@ export async function resolveBestIdentityForSend({
     };
   }
 
+  if (!SUPPORTED_PROVIDERS.has(provider)) {
+    return {
+      ok: false,
+      reason: 'unsupported_provider',
+      candidates_total: 0,
+      eligible_total: 0,
+    };
+  }
+
   const channels = await loadProviderChannels({ supabaseAdmin, tenant_id: tenantId, provider });
   const nowMs = new Date(now).getTime();
 
@@ -540,10 +542,8 @@ export async function resolveBestIdentityForSend({
   }
 
   let fromAddress = asText(outbox?.from_address);
-  if (provider === 'whatsapp' || provider === 'meta') {
+  if (provider === 'meta') {
     fromAddress = asText(selected.external_account_id);
-  } else if (provider === 'twilio') {
-    fromAddress = fromAddress || asText(selected.external_account_id) || asText(ENV.TWILIO_FROM_NUMBER);
   }
 
   return {

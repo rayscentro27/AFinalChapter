@@ -4,26 +4,16 @@ import { z } from 'zod';
 import { getUserSupabaseClient } from './_shared/supabase_user_client';
 import { proxyToOracle } from './_shared/oracle_proxy';
 
-type ProviderInput = 'sms' | 'whatsapp' | 'meta';
-type ProviderGateway = 'twilio' | 'whatsapp' | 'meta';
-
 const BodySchema = z.object({
   tenant_id: z.string().uuid().optional(),
   conversation_id: z.string().uuid(),
-  provider: z.enum(['sms', 'whatsapp', 'meta']),
+  provider: z.enum(['meta']),
   text: z.string().max(4000).optional(),
-  to: z.string().min(3).max(64).optional(),
   recipient_id: z.string().min(3).max(128).optional(),
   content: z.record(z.any()).optional(),
   attachments: z.array(z.any()).optional(),
   client_request_id: z.string().min(8).max(128).optional(),
 });
-
-const CHANNEL_PROVIDER_MAP: Record<ProviderInput, ProviderGateway> = {
-  sms: 'twilio',
-  whatsapp: 'whatsapp',
-  meta: 'meta',
-};
 
 function hasAttachments(content: unknown): boolean {
   if (!content || typeof content !== 'object' || Array.isArray(content)) return false;
@@ -49,23 +39,15 @@ export const handler: Handler = async (event) => {
     const tenantId = await resolveTenantForUser(supabase as any, authData.user.id, body.tenant_id);
     const convo = await loadConversationWithChannel(supabase as any, tenantId, body.conversation_id);
 
-    const expectedChannelProvider = CHANNEL_PROVIDER_MAP[body.provider];
-    if (convo.channel_provider !== expectedChannelProvider) {
+    if (convo.channel_provider !== 'meta') {
       return json(400, {
-        error: `Provider/channel mismatch. conversation channel is ${convo.channel_provider}, request provider is ${body.provider}`,
+        error: `Provider/channel mismatch. conversation channel is ${convo.channel_provider}, request provider is meta`,
       });
     }
 
-    const toAddress = body.provider === 'meta'
-      ? (body.recipient_id || body.to || '').trim()
-      : (body.to || '').trim();
-
-    if (!toAddress) {
-      return json(400, {
-        error: body.provider === 'meta'
-          ? 'Missing recipient_id for meta'
-          : `Missing to for ${body.provider}`,
-      });
+    const recipientId = (body.recipient_id || '').trim();
+    if (!recipientId) {
+      return json(400, { error: 'Missing recipient_id for meta' });
     }
 
     const clientRequestId = body.client_request_id || randomUUID();
@@ -76,16 +58,15 @@ export const handler: Handler = async (event) => {
       body: {
         tenant_id: tenantId,
         conversation_id: body.conversation_id,
-        provider: expectedChannelProvider,
-        channel_preference: expectedChannelProvider,
+        provider: 'meta',
+        channel_preference: 'meta',
         body_text: text || null,
         text: text || null,
         content: body.content || { type: 'text' },
         attachments: body.attachments || undefined,
         client_request_id: clientRequestId,
-        to: body.provider === 'meta' ? undefined : toAddress,
-        to_address: toAddress,
-        recipient_id: body.provider === 'meta' ? toAddress : undefined,
+        to_address: recipientId,
+        recipient_id: recipientId,
       },
       forwardAuth: true,
       event,
@@ -104,7 +85,7 @@ export const handler: Handler = async (event) => {
       ok: true,
       tenant_id: tenantId,
       conversation_id: body.conversation_id,
-      provider: body.provider,
+      provider: 'meta',
       client_request_id: clientRequestId,
       outbox_id: responseJson?.outbox_id || null,
       status: responseJson?.status || null,

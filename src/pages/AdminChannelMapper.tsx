@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 
-type ChannelProvider = 'twilio' | 'whatsapp' | 'meta' | 'matrix' | 'google_voice';
+type ChannelProvider = 'meta' | 'matrix' | 'google_voice';
 type MetaObject = 'page' | 'instagram';
 
 type Tenant = {
@@ -21,11 +21,9 @@ type ChannelAccountRow = {
   created_at?: string;
 };
 
-const PROVIDERS: ChannelProvider[] = ['twilio', 'whatsapp', 'meta', 'matrix', 'google_voice'];
+const PROVIDERS: ChannelProvider[] = ['meta', 'matrix', 'google_voice'];
 
 const helperTextByProvider: Record<ChannelProvider, string> = {
-  twilio: "Twilio: external_account_id is your Twilio inbound 'To' number in E.164 (example: +15551234567).",
-  whatsapp: 'WhatsApp Cloud: external_account_id is phone_number_id (Meta), not E.164.',
   meta: 'Meta: external_account_id is Page ID (Messenger) or IG business/user ID (Instagram DMs).',
   matrix: 'Matrix: external_account_id is your bot user ID or routing key (example: @nexusbot:server).',
   google_voice: 'Google Voice: define your routing key for later bridge support.',
@@ -55,7 +53,7 @@ export default function AdminChannelMapper() {
   const [rows, setRows] = useState<ChannelAccountRow[]>([]);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [provider, setProvider] = useState<ChannelProvider>('twilio');
+  const [provider, setProvider] = useState<ChannelProvider>('meta');
   const [externalAccountId, setExternalAccountId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -132,7 +130,7 @@ export default function AdminChannelMapper() {
 
   function resetForm() {
     setEditingId(null);
-    setProvider('twilio');
+    setProvider('meta');
     setExternalAccountId('');
     setDisplayName('');
     setIsActive(true);
@@ -293,7 +291,7 @@ export default function AdminChannelMapper() {
             <input
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Twilio SMS Main"
+              placeholder="Messenger Main"
               className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2"
             />
           </div>

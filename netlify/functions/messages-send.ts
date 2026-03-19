@@ -10,7 +10,7 @@ const BodySchema = z.object({
   text: z.string().max(4000).optional(),
   attachments: z.array(z.any()).optional(),
   content: z.record(z.any()).optional(),
-  provider: z.enum(['twilio', 'whatsapp', 'meta', 'sms']).optional(),
+  provider: z.enum(['meta']).optional(),
   channel_preference: z.string().max(120).optional(),
   identity_id: z.union([z.string(), z.number()]).optional(),
   idempotency_key: z.string().min(8).max(256).optional(),

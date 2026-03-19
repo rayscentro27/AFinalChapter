@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, RefreshCw, Shield, AlertTriangle, Link2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
-type Provider = 'facebook' | 'whatsapp' | 'mailerlite' | 'stripe';
+type Provider = 'facebook' | 'mailerlite' | 'stripe';
 
 type Integration = {
   id: string;
@@ -16,21 +16,18 @@ type Integration = {
 
 type ProviderForm = {
   facebook: { access_token: string; page_id: string };
-  whatsapp: { access_token: string; phone_number_id: string; business_account_id: string };
   mailerlite: { api_key: string; group_id: string };
   stripe: { secret_key: string; publishable_key: string };
 };
 
 const providerLabels: Record<Provider, string> = {
   facebook: 'Facebook',
-  whatsapp: 'WhatsApp',
   mailerlite: 'MailerLite',
   stripe: 'Stripe',
 };
 
 const initialForm: ProviderForm = {
   facebook: { access_token: '', page_id: '' },
-  whatsapp: { access_token: '', phone_number_id: '', business_account_id: '' },
   mailerlite: { api_key: '', group_id: '' },
   stripe: { secret_key: '', publishable_key: '' },
 };
@@ -205,7 +202,7 @@ export default function AccountIntegrationsPanel() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {(['facebook', 'whatsapp', 'mailerlite', 'stripe'] as Provider[]).map((provider) => {
+        {(['facebook', 'mailerlite', 'stripe'] as Provider[]).map((provider) => {
           const row = byProvider[provider];
           const badgeColor = row?.status === 'connected'
             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -240,33 +237,6 @@ export default function AccountIntegrationsPanel() {
                   />
                 </>
               )}
-
-              {provider === 'whatsapp' && (
-                <>
-                  <input
-                    type="password"
-                    placeholder="WhatsApp Access Token"
-                    value={form.whatsapp.access_token}
-                    onChange={(e) => setForm((prev) => ({ ...prev, whatsapp: { ...prev.whatsapp, access_token: e.target.value } }))}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Phone Number ID"
-                    value={form.whatsapp.phone_number_id}
-                    onChange={(e) => setForm((prev) => ({ ...prev, whatsapp: { ...prev.whatsapp, phone_number_id: e.target.value } }))}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Business Account ID (optional)"
-                    value={form.whatsapp.business_account_id}
-                    onChange={(e) => setForm((prev) => ({ ...prev, whatsapp: { ...prev.whatsapp, business_account_id: e.target.value } }))}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm"
-                  />
-                </>
-              )}
-
               {provider === 'mailerlite' && (
                 <>
                   <input

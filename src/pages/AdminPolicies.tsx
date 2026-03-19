@@ -61,7 +61,7 @@ export default function AdminPolicies() {
   const [draftAction, setDraftAction] = useState('messages.send');
   const [draftEffect, setDraftEffect] = useState<'allow' | 'deny'>('deny');
   const [draftPriority, setDraftPriority] = useState(100);
-  const [draftConditions, setDraftConditions] = useState('{"providers_blocked":["twilio"]}');
+  const [draftConditions, setDraftConditions] = useState('{"providers_blocked":[]}');
 
   async function loadData(nextTenantId = tenantId) {
     if (!nextTenantId) return;

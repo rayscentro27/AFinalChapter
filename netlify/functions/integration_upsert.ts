@@ -4,7 +4,7 @@ import { getUserSupabaseClient } from './_shared/supabase_user_client';
 import { resolveTenantId } from './_shared/tenant_resolve';
 import { encryptIntegrationCredentials, maskIntegrationCredentials } from './_shared/integration_credentials_crypto';
 
-const ProviderSchema = z.enum(['facebook', 'whatsapp', 'mailerlite', 'stripe']);
+const ProviderSchema = z.enum(['facebook', 'mailerlite', 'stripe']);
 
 const BodySchema = z.object({
   tenant_id: z.string().uuid().optional(),
@@ -68,17 +68,6 @@ function normalizeCredentials(provider: z.infer<typeof ProviderSchema>, credenti
       page_id: c.page_id ? String(c.page_id) : '',
     };
   }
-
-  if (provider === 'whatsapp') {
-    if (!c.access_token) throw new Error('whatsapp credentials require access_token');
-    if (!c.phone_number_id) throw new Error('whatsapp credentials require phone_number_id');
-    return {
-      access_token: String(c.access_token),
-      phone_number_id: String(c.phone_number_id),
-      business_account_id: c.business_account_id ? String(c.business_account_id) : '',
-    };
-  }
-
   if (provider === 'mailerlite') {
     if (!c.api_key) throw new Error('mailerlite credentials require api_key');
     return {

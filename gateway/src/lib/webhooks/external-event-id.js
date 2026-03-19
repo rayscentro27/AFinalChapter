@@ -20,35 +20,8 @@ function makeHashed(prefix, pieces, rawBody) {
   return `${prefix}:h:${sha256Hex(String(rawBody || ''))}`;
 }
 
-export function extractTwilioExternalEventId(payload, rawBody = '') {
-  return makeHashed('twilio', [payload?.MessageSid, payload?.SmsSid], rawBody || JSON.stringify(payload || {}));
-}
-
 export function extractMatrixExternalEventId(payload, rawBody = '') {
   return makeHashed('matrix', [payload?.event_id, payload?.id], rawBody || JSON.stringify(payload || {}));
-}
-
-export function extractWhatsAppExternalEventId(payload, rawBody = '') {
-  const ids = [];
-  const entries = Array.isArray(payload?.entry) ? payload.entry : [];
-
-  for (const entry of entries) {
-    const changes = Array.isArray(entry?.changes) ? entry.changes : [];
-    for (const change of changes) {
-      const value = change?.value || {};
-      const messages = Array.isArray(value?.messages) ? value.messages : [];
-      for (const msg of messages) {
-        ids.push(msg?.id);
-      }
-
-      const statuses = Array.isArray(value?.statuses) ? value.statuses : [];
-      for (const st of statuses) {
-        ids.push(st?.id);
-      }
-    }
-  }
-
-  return makeHashed('whatsapp', ids, rawBody || JSON.stringify(payload || {}));
 }
 
 export function extractMetaExternalEventId(payload, rawBody = '') {

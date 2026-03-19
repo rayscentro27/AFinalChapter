@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 
-const PROVIDERS = ['twilio', 'whatsapp', 'meta', 'matrix', 'google_voice'] as const;
+const PROVIDERS = ['meta', 'matrix', 'google_voice'] as const;
 const AGENT_ROLES = ['owner', 'admin', 'agent'] as const;
 
 type Provider = (typeof PROVIDERS)[number];
@@ -97,7 +97,7 @@ export default function AdminChannelPools() {
   const [tenantId, setTenantId] = useState('');
 
   const [agents, setAgents] = useState<AgentOption[]>([]);
-  const [provider, setProvider] = useState<Provider>('whatsapp');
+  const [provider, setProvider] = useState<Provider>('meta');
   const [selectedUser, setSelectedUser] = useState('');
   const [rows, setRows] = useState<ChannelPoolRow[]>([]);
 

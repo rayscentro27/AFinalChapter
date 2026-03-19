@@ -4,7 +4,7 @@ import { getUserSupabaseClient } from './_shared/supabase_user_client';
 import { resolveTenantId } from './_shared/tenant_resolve';
 import { decryptIntegrationCredentials, maskIntegrationCredentials } from './_shared/integration_credentials_crypto';
 
-const ProviderSchema = z.enum(['facebook', 'whatsapp', 'mailerlite', 'stripe']);
+const ProviderSchema = z.enum(['facebook', 'mailerlite', 'stripe']);
 
 const BodySchema = z.object({
   tenant_id: z.string().uuid().optional(),
@@ -94,27 +94,6 @@ async function runProviderTest(provider: z.infer<typeof ProviderSchema>, c: Reco
       },
     };
   }
-
-  if (provider === 'whatsapp') {
-    const token = String(c.access_token || '').trim();
-    const phoneNumberId = String(c.phone_number_id || '').trim();
-    if (!token) return { ok: false, error: 'Missing whatsapp access_token' };
-    if (!phoneNumberId) return { ok: false, error: 'Missing whatsapp phone_number_id' };
-
-    const url = `https://graph.facebook.com/v20.0/${encodeURIComponent(phoneNumberId)}?fields=id,display_phone_number,verified_name&access_token=${encodeURIComponent(token)}`;
-    const res = await safeFetchJson(url);
-    if (!res.ok) return { ok: false, error: `WhatsApp test failed: ${res.error}`, details: res.details };
-
-    return {
-      ok: true,
-      details: {
-        phone_number_id: res.data?.id || phoneNumberId,
-        display_phone_number: res.data?.display_phone_number || null,
-        verified_name: res.data?.verified_name || null,
-      },
-    };
-  }
-
   if (provider === 'mailerlite') {
     const apiKey = String(c.api_key || '').trim();
     if (!apiKey) return { ok: false, error: 'Missing mailerlite api_key' };

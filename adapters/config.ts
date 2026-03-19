@@ -37,10 +37,6 @@ export const BACKEND_CONFIG = {
     publicKey: getEnvVar('VITE_STRIPE_PUBLIC_KEY', 'YOUR_STRIPE_PUBLIC_KEY'),
     secretKey: localStorage.getItem('nexus_stripe_sk') || ''
   },
-  twilio: {
-    sid: getEnvVar('VITE_TWILIO_SID', ''),
-    token: getEnvVar('VITE_TWILIO_TOKEN', '')
-  },
   plaid: {
     clientId: getEnvVar('VITE_PLAID_CLIENT_ID', ''),
     secret: getEnvVar('VITE_PLAID_SECRET', '')

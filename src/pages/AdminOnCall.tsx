@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 
-const CHANNELS = ['all', 'twilio', 'whatsapp', 'meta', 'matrix', 'google_voice'] as const;
+const CHANNELS = ['all', 'meta', 'matrix', 'google_voice'] as const;
 const AGENT_ROLES = ['owner', 'admin', 'agent'] as const;
 
 type Channel = (typeof CHANNELS)[number];

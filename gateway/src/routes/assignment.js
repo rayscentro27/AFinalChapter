@@ -135,7 +135,7 @@ function normalizePriority(row) {
 
 function normalizeProvider(value) {
   const normalized = lower(value);
-  if (normalized === 'sms') return 'twilio';
+
   return normalized;
 }
 

@@ -84,7 +84,6 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
   // API Override State
   const [apiKeys, setApiKeys] = useState({
     STRIPE_PK: localStorage.getItem('nexus_override_VITE_STRIPE_PUBLIC_KEY') || '',
-    TWILIO_SID: localStorage.getItem('nexus_override_TWILIO_SID') || '',
     PLAID_CLIENT: localStorage.getItem('nexus_override_PLAID_CLIENT_ID') || ''
   });
 
@@ -217,14 +216,6 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
                             icon={<CreditCard size={18}/>}
                             status={apiKeys.STRIPE_PK ? 'Authenticated' : 'Unlinked'}
                             placeholder="pk_live_..."
-                        />
-                        <ApiField 
-                            label="Twilio (Dialer & SMS)" 
-                            value={apiKeys.TWILIO_SID} 
-                            onChange={(val) => handleUpdateApiKey('TWILIO_SID', val)}
-                            icon={<Phone size={18}/>}
-                            status={apiKeys.TWILIO_SID ? 'Authenticated' : 'Unlinked'}
-                            placeholder="Account SID"
                         />
                         <ApiField 
                             label="Plaid (Bank Spreading)" 

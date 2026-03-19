@@ -32,16 +32,7 @@ const MAP = {
 export function normalizeDeliveryStatus(provider, rawStatus) {
   const status = text(rawStatus);
   if (!status) return 'pending';
-
-  if (provider === 'twilio') {
-    if (status === 'queued' || status === 'accepted' || status === 'sending') return 'pending';
-    if (status === 'sent') return 'sent';
-    if (status === 'delivered') return 'delivered';
-    if (status === 'read') return 'read';
-    if (status === 'undelivered' || status === 'failed') return 'failed';
-  }
-
-  if (provider === 'meta' || provider === 'whatsapp' || provider === 'matrix') {
+  if (provider === 'meta' || provider === 'matrix') {
     if (status === 'sent') return 'sent';
     if (status === 'delivered') return 'delivered';
     if (status === 'read' || status === 'seen') return 'read';

@@ -14,7 +14,7 @@ const DEFAULTS = {
   tagsToAdd: ['sla_breach', 'sla_escalated', 'urgent'],
 };
 
-type ChannelProvider = 'twilio' | 'whatsapp' | 'meta' | 'matrix' | 'google_voice';
+type ChannelProvider = 'meta' | 'matrix' | 'google_voice';
 
 type TenantRow = { id: string };
 
@@ -51,7 +51,7 @@ type ConversationCandidate = {
   provider?: string | null;
 };
 
-const KNOWN_PROVIDERS: ChannelProvider[] = ['twilio', 'whatsapp', 'meta', 'matrix', 'google_voice'];
+const KNOWN_PROVIDERS: ChannelProvider[] = ['meta', 'matrix', 'google_voice'];
 const KNOWN_PROVIDER_SET = new Set<string>(KNOWN_PROVIDERS);
 
 function json(statusCode: number, body: unknown) {
@@ -84,7 +84,6 @@ function norm(value: unknown): string {
 function normalizeProvider(value: unknown): ChannelProvider | null {
   const candidate = norm(value);
   if (!candidate) return null;
-  if (candidate === 'sms') return 'twilio';
   if (KNOWN_PROVIDER_SET.has(candidate)) return candidate as ChannelProvider;
   return null;
 }
