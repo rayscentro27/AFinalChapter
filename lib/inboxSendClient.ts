@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 
-export type SendProvider = 'sms' | 'whatsapp' | 'meta';
+export type SendProvider = 'meta';
 
 export type SendMessageInput = {
   tenant_id?: string;
@@ -22,7 +22,7 @@ export type SendMessageResult = {
   tenant_id?: string;
   conversation_id?: string | null;
   contact_id?: string | null;
-  provider?: SendProvider | 'twilio' | 'whatsapp' | 'meta' | null;
+  provider?: SendProvider | null;
   channel_account_id?: string | null;
   outbox_id?: string | number | null;
   message_id?: string | number | null;
@@ -38,6 +38,7 @@ export type SendMessageResult = {
 };
 
 const SEND_ENDPOINT = '/.netlify/functions/messages-send';
+const PARTICIPANT_NOTIFY_ENDPOINT = '/.netlify/functions/messaging-notify-participants';
 
 export async function sendInboxMessage(input: SendMessageInput): Promise<SendMessageResult> {
   const { data } = await supabase.auth.getSession();
@@ -65,5 +66,44 @@ export async function sendInboxMessage(input: SendMessageInput): Promise<SendMes
     throw new Error(String(json?.error || `messages-send failed (${res.status})`));
   }
 
-  return json as SendMessageResult;
+  const result = json as SendMessageResult;
+
+  // Best-effort participant notifications (Phase 2): do not block send success.
+  if (result.ok && result.message_id && (result.tenant_id || input.tenant_id) && (result.conversation_id || input.conversation_id)) {
+    void notifyParticipantsBestEffort({
+      token,
+      tenant_id: String(result.tenant_id || input.tenant_id),
+      conversation_id: String(result.conversation_id || input.conversation_id),
+      message_id: String(result.message_id),
+      preview: bodyText.slice(0, 180),
+    });
+  }
+
+  return result;
+}
+
+async function notifyParticipantsBestEffort(input: {
+  token: string;
+  tenant_id: string;
+  conversation_id: string;
+  message_id: string;
+  preview?: string;
+}) {
+  try {
+    await fetch(PARTICIPANT_NOTIFY_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${input.token}`,
+      },
+      body: JSON.stringify({
+        tenant_id: input.tenant_id,
+        conversation_id: input.conversation_id,
+        message_id: input.message_id,
+        preview: input.preview,
+      }),
+    });
+  } catch {
+    // Non-fatal: message send must remain the source of truth.
+  }
 }

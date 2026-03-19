@@ -150,7 +150,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <SidebarItem id={ViewMode.ADMIN_CONTROL_PLANE} label="Control Plane" icon={ShieldAlert} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_SUBSCRIPTIONS} label="Subscriptions" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_CONSENTS} label="Consent Ledger" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_SMS_TEMPLATES} label="SMS Templates" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_MAILING_QUEUE} label="Mailing Queue" icon={FileText} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_MAILING_DASHBOARD} label="Mailing Dashboard" icon={FileText} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_LEGAL_DOCS} label="Legal Publisher" icon={FileText} currentView={currentView} onViewChange={handleNav} />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Contact, InboxThread, UnifiedMessage, Message, InboxRouting } from '../types';
-import { MessageSquare, Archive, Send, Zap, Bot, Eye, Ghost } from 'lucide-react';
+import { MessageSquare, Archive, Send, Zap, Bot, Eye, Ghost, Sparkles, FileText, Route, Loader2 } from 'lucide-react';
 import { sendInboxMessage, SendProvider } from '../lib/inboxSendClient';
 import { claimConversation } from '../lib/claimConversation';
 import { supabase } from '../lib/supabaseClient';
@@ -48,11 +48,22 @@ type ConversationSlaMeta = {
   status?: string | null;
 };
 
+type RoutingRecommendation = {
+  recommended_queue: string;
+  confidence: number;
+  reason: string;
+  next_action: string;
+  priority: 'normal' | 'high' | 'urgent';
+};
+
+const MARK_READ_ENDPOINT = '/.netlify/functions/messaging-mark-read';
+const UNREAD_COUNTS_ENDPOINT = '/.netlify/functions/messaging-unread-counts';
+const AI_SUGGESTIONS_ENDPOINT = '/.netlify/functions/messaging-ai-suggestions';
+const SUMMARY_ENDPOINT = '/.netlify/functions/messaging-summary';
+const ROUTING_RECOMMENDATION_ENDPOINT = '/.netlify/functions/messaging-routing-recommendation';
 function toSendProvider(provider: InboxRouting['provider']): SendProvider | null {
   if (!provider) return null;
-  if (provider === 'twilio') return 'sms';
-  if (provider === 'sms' || provider === 'whatsapp' || provider === 'meta') return provider;
-  return null;
+  return provider === 'meta' ? 'meta' : null;
 }
 
 function resolveOutboundRouting(contact: Contact) {
@@ -123,9 +134,7 @@ function isBreach(meta?: ConversationSlaMeta | null, breachMinutes = 240, priori
 }
 
 function normalizeProviderForFilter(provider: SendProvider | null): string {
-  if (!provider) return '';
-  if (provider === 'sms') return 'twilio';
-  return provider;
+  return provider || '';
 }
 
 const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }) => {
@@ -151,6 +160,16 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
     assigned: 'any',
     sla: 'any',
   });
+  const [dbUnreadCounts, setDbUnreadCounts] = useState<Record<string, number>>({});
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false);
+  const [aiSuggestionsError, setAiSuggestionsError] = useState<string | null>(null);
+  const [summaryByConversation, setSummaryByConversation] = useState<Record<string, string>>({});
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [routingByConversation, setRoutingByConversation] = useState<Record<string, RoutingRecommendation>>({});
+  const [routingLoading, setRoutingLoading] = useState(false);
+  const [routingError, setRoutingError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const contactsRef = useRef<Contact[]>(contacts);
 
@@ -221,8 +240,6 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
     const history = selectedContact?.messageHistory || [];
     for (const msg of history) {
       const provider = String(msg.provider || '').toLowerCase();
-      if (provider === 'twilio' || provider === 'sms') set.add('sms');
-      if (provider === 'whatsapp') set.add('whatsapp');
       if (provider === 'meta') set.add('meta');
     }
 
@@ -240,6 +257,10 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
   const selectedConversationPriority = selectedConversationId
     ? (conversationPriorities[selectedConversationId] || 3)
     : 3;
+  const selectedSummary = selectedConversationId ? (summaryByConversation[selectedConversationId] || '') : '';
+  const selectedRoutingRecommendation = selectedConversationId
+    ? (routingByConversation[selectedConversationId] || null)
+    : null;
 
   const selectedAssignmentLabel = selectedConversationAssignment
     ? selectedConversationAssignment.assignee_type === 'ai'
@@ -249,9 +270,202 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
         : 'Unassigned'
     : 'Unassigned';
 
+  const postAuthedJson = async <T,>(endpoint: string, payload: Record<string, any>): Promise<T> => {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) throw new Error('Sign in required');
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok || !(json as any)?.ok) {
+      throw new Error(String((json as any)?.error || (endpoint + ' failed (' + response.status + ')')));
+    }
+
+    return json as T;
+  };
+
+  const markConversationRead = async (tenantId: string | undefined, conversationId: string, lastReadMessageId?: string) => {
+    try {
+      await postAuthedJson(MARK_READ_ENDPOINT, {
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        last_read_message_id: lastReadMessageId || undefined,
+      });
+      setDbUnreadCounts((prev) => ({ ...prev, [conversationId]: 0 }));
+    } catch (error: any) {
+      console.warn('UnifiedInbox: mark read failed', String(error?.message || error));
+    }
+  };
+
+  const requestAiSuggestions = async () => {
+    if (!selectedConversationId || !selectedTenantId) return;
+    setAiSuggestionsLoading(true);
+    setAiSuggestionsError(null);
+
+    try {
+      const response = await postAuthedJson<{ suggestions?: string[] }>(AI_SUGGESTIONS_ENDPOINT, {
+        tenant_id: selectedTenantId,
+        conversation_id: selectedConversationId,
+        count: 3,
+      });
+
+      const suggestions = Array.isArray(response?.suggestions)
+        ? response.suggestions.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
+        : [];
+
+      setAiSuggestions(suggestions);
+      if (!suggestions.length) setAiSuggestionsError('No suggestions returned for this thread.');
+    } catch (error: any) {
+      setAiSuggestionsError(String(error?.message || 'Failed to fetch suggestions'));
+    } finally {
+      setAiSuggestionsLoading(false);
+    }
+  };
+
+  const requestThreadSummary = async () => {
+    if (!selectedConversationId || !selectedTenantId) return;
+    setSummaryLoading(true);
+    setSummaryError(null);
+
+    try {
+      const response = await postAuthedJson<{ summary?: string }>(SUMMARY_ENDPOINT, {
+        tenant_id: selectedTenantId,
+        conversation_id: selectedConversationId,
+        persist: true,
+      });
+
+      const summary = String(response?.summary || '').trim();
+      setSummaryByConversation((prev) => ({
+        ...prev,
+        [selectedConversationId]: summary,
+      }));
+
+      if (!summary) setSummaryError('Summary generation returned no content.');
+    } catch (error: any) {
+      setSummaryError(String(error?.message || 'Failed to generate summary'));
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  const requestRoutingRecommendation = async () => {
+    if (!selectedConversationId || !selectedTenantId) return;
+    setRoutingLoading(true);
+    setRoutingError(null);
+
+    try {
+      const response = await postAuthedJson<{ recommendation?: RoutingRecommendation }>(ROUTING_RECOMMENDATION_ENDPOINT, {
+        tenant_id: selectedTenantId,
+        conversation_id: selectedConversationId,
+        persist: true,
+      });
+
+      const recommendation = response?.recommendation;
+      if (!recommendation) throw new Error('No routing recommendation returned');
+
+      setRoutingByConversation((prev) => ({
+        ...prev,
+        [selectedConversationId]: recommendation,
+      }));
+    } catch (error: any) {
+      setRoutingError(String(error?.message || 'Failed to generate routing recommendation'));
+    } finally {
+      setRoutingLoading(false);
+    }
+  };
+
+  const handleSelectThread = (thread: InboxThread) => {
+    setSelectedThreadId(thread.id);
+
+    const threadContact = contactsById.get(thread.contactId);
+    const routing = threadContact ? resolveOutboundRouting(threadContact) : null;
+    if (!routing?.conversation_id) return;
+
+    const latestDbMessageId = [...(thread.messages || [])]
+      .map((msg) => String(msg.id || ''))
+      .reverse()
+      .find((id) => id.startsWith('db:'));
+
+    void markConversationRead(
+      routing.tenant_id,
+      routing.conversation_id,
+      latestDbMessageId ? latestDbMessageId.slice(3) : undefined
+    );
+  };
+
   useEffect(() => {
     setChannelPreference('auto');
   }, [selectedThreadId]);
+
+  useEffect(() => {
+    setAiSuggestions([]);
+    setAiSuggestionsError(null);
+    setSummaryError(null);
+    setRoutingError(null);
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    const routingTargets = contacts
+      .map((contact) => resolveOutboundRouting(contact))
+      .filter((routing): routing is NonNullable<ReturnType<typeof resolveOutboundRouting>> => !!routing?.conversation_id);
+
+    if (!routingTargets.length) {
+      setDbUnreadCounts({});
+      return;
+    }
+
+    let active = true;
+
+    const loadUnreadCounts = async () => {
+      try {
+        const grouped = new Map<string, { tenantId?: string; conversationIds: string[] }>();
+
+        for (const routing of routingTargets) {
+          const tenantId = routing.tenant_id;
+          const key = tenantId || '__auto__';
+          const entry = grouped.get(key) || { tenantId, conversationIds: [] };
+          entry.conversationIds.push(routing.conversation_id);
+          grouped.set(key, entry);
+        }
+
+        const merged: Record<string, number> = {};
+
+        for (const entry of grouped.values()) {
+          const uniqueIds = Array.from(new Set(entry.conversationIds)).filter(Boolean);
+          if (!uniqueIds.length) continue;
+
+          const response = await postAuthedJson<{ unread_counts?: Record<string, number> }>(UNREAD_COUNTS_ENDPOINT, {
+            tenant_id: entry.tenantId,
+            conversation_ids: uniqueIds,
+          });
+
+          const unread = response?.unread_counts || {};
+          for (const [conversationId, unreadCount] of Object.entries(unread)) {
+            merged[String(conversationId)] = Number(unreadCount || 0);
+          }
+        }
+
+        if (!active) return;
+        setDbUnreadCounts((prev) => ({ ...prev, ...merged }));
+      } catch (error: any) {
+        console.warn('UnifiedInbox: unread count sync failed', String(error?.message || error));
+      }
+    };
+
+    void loadUnreadCounts();
+
+    return () => {
+      active = false;
+    };
+  }, [contacts]);
 
   useEffect(() => {
     const routingTargets = contacts
@@ -576,6 +790,14 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
 
         onUpdateContact({ ...latest, messageHistory: upgradedHistory });
       }
+
+      if (routing.conversation_id) {
+        void markConversationRead(
+          routing.tenant_id,
+          routing.conversation_id,
+          response.message_id ? String(response.message_id) : undefined
+        );
+      }
     } catch (err: any) {
       const message = String(err?.message || 'Failed to send outbound message');
       setSendError(message);
@@ -737,11 +959,12 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
             const threadAssignment = threadConversationId ? conversationAssignments[threadConversationId] || null : null;
             const alreadyHumanAssigned = Boolean(threadAssignment?.assignee_user_id && threadAssignment?.assignee_type === 'agent');
             const canClaim = Boolean(threadRouting?.tenant_id && threadConversationId && !alreadyHumanAssigned);
+            const unreadCount = threadConversationId ? (dbUnreadCounts[threadConversationId] ?? thread.unreadCount) : thread.unreadCount;
 
             return (
               <div
                 key={thread.id}
-                onClick={() => setSelectedThreadId(thread.id)}
+                onClick={() => handleSelectThread(thread)}
                 className={`p-6 border-b border-slate-50 cursor-pointer transition-all relative group ${selectedThreadId === thread.id ? 'bg-blue-50/50 border-l-4 border-l-indigo-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
               >
                 <div className="flex justify-between items-start mb-2">
@@ -754,7 +977,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap mb-1">{thread.lastMessage.timestamp}</span>
-                    {thread.unreadCount > 0 && <span className="bg-red-500 text-white w-4 h-4 rounded-full text-[8px] font-black flex items-center justify-center animate-bounce">{thread.unreadCount}</span>}
+                    {unreadCount > 0 && <span className="bg-red-500 text-white w-4 h-4 rounded-full text-[8px] font-black flex items-center justify-center animate-bounce">{unreadCount}</span>}
                   </div>
                 </div>
                 <p className="text-xs text-slate-500 line-clamp-1 font-medium italic">"{thread.lastMessage.content}"</p>
@@ -948,6 +1171,72 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                     }
                   }}
                 />
+              </div>
+            ) : null}
+            {selectedTenantId && selectedConversationId ? (
+              <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => void requestAiSuggestions()}
+                    disabled={aiSuggestionsLoading}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
+                  >
+                    {aiSuggestionsLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                    Suggest Reply
+                  </button>
+                  <button
+                    onClick={() => void requestThreadSummary()}
+                    disabled={summaryLoading}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
+                  >
+                    {summaryLoading ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
+                    Summarize
+                  </button>
+                  <button
+                    onClick={() => void requestRoutingRecommendation()}
+                    disabled={routingLoading}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
+                  >
+                    {routingLoading ? <Loader2 size={12} className="animate-spin" /> : <Route size={12} />}
+                    Route Suggestion
+                  </button>
+                </div>
+
+                {aiSuggestionsError ? <p className="text-[11px] font-bold text-amber-700">{aiSuggestionsError}</p> : null}
+                {summaryError ? <p className="text-[11px] font-bold text-amber-700">{summaryError}</p> : null}
+                {routingError ? <p className="text-[11px] font-bold text-amber-700">{routingError}</p> : null}
+
+                {aiSuggestions.length > 0 ? (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {aiSuggestions.map((suggestion, index) => (
+                      <button
+                        key={selectedConversationId + '-suggestion-' + index}
+                        onClick={() => setInputText(suggestion)}
+                        className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1.5 text-left text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {selectedSummary ? (
+                  <div className="mb-2 rounded-lg border border-slate-200 bg-white p-2">
+                    <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-500">Thread Summary</p>
+                    <p className="whitespace-pre-wrap text-[11px] font-medium text-slate-700">{selectedSummary}</p>
+                  </div>
+                ) : null}
+
+                {selectedRoutingRecommendation ? (
+                  <div className="rounded-lg border border-slate-200 bg-white p-2">
+                    <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-500">Routing Recommendation</p>
+                    <p className="text-[11px] font-semibold text-slate-700">
+                      Queue: {selectedRoutingRecommendation.recommended_queue} · Priority: {selectedRoutingRecommendation.priority} · Confidence: {selectedRoutingRecommendation.confidence}%
+                    </p>
+                    <p className="mt-1 text-[11px] font-medium text-slate-600">Reason: {selectedRoutingRecommendation.reason}</p>
+                    <p className="mt-1 text-[11px] font-medium text-slate-600">Next: {selectedRoutingRecommendation.next_action}</p>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

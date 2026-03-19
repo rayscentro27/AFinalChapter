@@ -447,7 +447,7 @@ export default function CommunicationPreferencesPage() {
         </div>
 
         <p className="text-xs text-slate-500">
-          SMS consent is optional and no purchase is required. Review full terms: <a href="/sms-terms" className="text-cyan-300 hover:text-cyan-200">SMS Terms</a>.
+          SMS consent is optional and no purchase is required.
         </p>
       </section>
 

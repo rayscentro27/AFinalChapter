@@ -14,7 +14,6 @@ const links = [
   { href: '/membership-agreement', label: 'Membership Agreement' },
   { href: '/mailing-authorization', label: 'Mailing Authorization' },
   { href: '/mailing-approvals', label: 'Mailing Approvals' },
-  { href: '/sms-terms', label: 'SMS Terms' },
   { href: '/communication-preferences', label: 'Communication Preferences' },
 ];
 
