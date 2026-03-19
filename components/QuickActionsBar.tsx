@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabaseClient';
 
 const DEFAULT_TAGS = ['new_lead', 'billing', 'support', 'credit_repair', 'funding', 'documents', 'urgent'];
 
+type ConversationStatus = 'open' | 'pending' | 'pending_client' | 'pending_staff' | 'escalated' | 'closed';
+
 type ConversationRow = {
   id: string;
   tenant_id?: string;
@@ -35,7 +37,7 @@ function normalizeTag(input: string): string {
 
 function roleAllowed(role: string | null | undefined): boolean {
   const normalized = String(role || '').toLowerCase();
-  return normalized === 'owner' || normalized === 'admin' || normalized === 'agent';
+  return ['owner', 'super_admin', 'admin', 'supervisor', 'agent', 'sales', 'salesperson'].includes(normalized);
 }
 
 export default function QuickActionsBar({ tenantId, conversation, onUpdated }: QuickActionsBarProps) {
@@ -159,7 +161,7 @@ export default function QuickActionsBar({ tenantId, conversation, onUpdated }: Q
     }
   }
 
-  async function setStatus(status: 'open' | 'pending' | 'closed') {
+  async function setStatus(status: ConversationStatus) {
     await patchConversation({ status });
   }
 
@@ -183,7 +185,7 @@ export default function QuickActionsBar({ tenantId, conversation, onUpdated }: Q
 
   async function urgent() {
     const next = Array.from(new Set([...(tags || []), 'urgent']));
-    await patchConversation({ priority: 1, status: 'open', tags: next });
+    await patchConversation({ priority: 1, status: 'escalated', tags: next });
   }
 
   async function escalateToHuman() {
@@ -248,8 +250,14 @@ export default function QuickActionsBar({ tenantId, conversation, onUpdated }: Q
         <button disabled={busy} onClick={() => void setStatus('open')} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
           Open
         </button>
-        <button disabled={busy} onClick={() => void setStatus('pending')} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
-          Pending
+        <button disabled={busy} onClick={() => void setStatus('pending_client')} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
+          Pending Client
+        </button>
+        <button disabled={busy} onClick={() => void setStatus('pending_staff')} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
+          Pending Staff
+        </button>
+        <button disabled={busy} onClick={() => void setStatus('escalated')} className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-800">
+          Escalated
         </button>
         <button disabled={busy} onClick={() => void setStatus('closed')} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
           Closed

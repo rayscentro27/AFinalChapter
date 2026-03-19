@@ -100,7 +100,6 @@ import DocumentsPage from './src/pages/DocumentsPage';
 import MembershipAgreementPage from './src/pages/MembershipAgreementPage';
 import AdminSubscriptionManager from './src/pages/AdminSubscriptionManager';
 import AdminDocumentsPage from './src/pages/AdminDocumentsPage';
-import SmsTermsPage from './src/pages/SmsTermsPage';
 import CommunicationPreferencesPage from './src/pages/CommunicationPreferencesPage';
 import SecuritySettingsPage from './src/pages/SecuritySettingsPage';
 import AdminControlPlanePage from './src/pages/AdminControlPlanePage';
@@ -108,7 +107,6 @@ import UploadCreditReportPage from './src/pages/UploadCreditReportPage';
 import DisputeFactsReviewPage from './src/pages/DisputeFactsReviewPage';
 import DraftPreviewPage from './src/pages/DraftPreviewPage';
 import FinalLetterPage from './src/pages/FinalLetterPage';
-import AdminSmsTemplateEditor from './src/pages/AdminSmsTemplateEditor';
 import MailingAuthorizationPage from './src/pages/MailingAuthorizationPage';
 import ClientMailingApprovalsPage from './src/pages/ClientMailingApprovalsPage';
 import AdminMailingQueuePage from './src/pages/AdminMailingQueuePage';
@@ -148,6 +146,7 @@ import { PlanCode } from './src/billing/types';
 import { getUserTier, hasTierAccess, isSubscriptionEntitled, UserTierState } from './src/billing/tier';
 import OfferBanner from './src/components/funnel/OfferBanner';
 import { linkSignupLead } from './src/services/funnelService';
+import { supabase } from './lib/supabaseClient';
 
 const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/dashboard': ViewMode.DASHBOARD,
@@ -186,14 +185,12 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/membership-agreement': ViewMode.MEMBERSHIP_AGREEMENT,
   '/admin/subscriptions': ViewMode.ADMIN_SUBSCRIPTIONS,
   '/admin/documents': ViewMode.ADMIN_DOCUMENTS,
-  '/sms-terms': ViewMode.SMS_TERMS,
   '/communication-preferences': ViewMode.COMMUNICATION_PREFERENCES,
   '/credit-report-upload': ViewMode.UPLOAD_CREDIT_REPORT,
   '/dispute-facts-review': ViewMode.DISPUTE_FACTS_REVIEW,
   '/draft-preview': ViewMode.DRAFT_PREVIEW,
   '/final-letter': ViewMode.FINAL_LETTER,
   '/dispute-letter-preview': ViewMode.DISPUTE_LETTER_PREVIEW,
-  '/admin/sms-templates': ViewMode.ADMIN_SMS_TEMPLATES,
   '/mailing-authorization': ViewMode.MAILING_AUTHORIZATION,
   '/mailing-approvals': ViewMode.CLIENT_MAILING_APPROVALS,
   '/admin/mailing-queue': ViewMode.ADMIN_MAILING_QUEUE,
@@ -226,7 +223,6 @@ const LEGAL_VIEWS: ViewMode[] = [
   ViewMode.DISCLAIMERS,
   ViewMode.MEMBERSHIP_AGREEMENT,
   ViewMode.MAILING_AUTHORIZATION,
-  ViewMode.SMS_TERMS,
 ];
 
 function isLegalViewMode(view: ViewMode): boolean {
@@ -238,6 +234,9 @@ function normalizePathname(pathname: string): string {
   if (raw === '/') return '/';
   return raw.replace(/\/+$/, '');
 }
+
+const STAFF_BOOTSTRAP_ROLES = new Set(['admin', 'supervisor', 'sales', 'salesperson']);
+const AUTO_LINK_SIGNUP_ROLES = new Set(['client', 'partner']);
 
 export const App = () => {
   const { user, loading, signOut } = useAuth();
@@ -298,33 +297,95 @@ export const App = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!user?.id) {
-      linkedUserRef.current = null;
-      return;
-    }
+    let active = true;
 
-    if (linkedUserRef.current === user.id) {
-      return;
-    }
+    const syncSignupLead = async () => {
+      if (loading) return;
 
-    linkedUserRef.current = user.id;
-    void linkSignupLead().catch(() => {
+      if (!user?.id) {
+        linkedUserRef.current = null;
+        return;
+      }
+
+      if (!AUTO_LINK_SIGNUP_ROLES.has(user.role)) {
+        linkedUserRef.current = user.id;
+        return;
+      }
+
+      if (linkedUserRef.current === user.id) {
+        return;
+      }
+
+      const sessionRes = await supabase.auth.getSession();
+      if (!active) return;
+
+      const session = sessionRes.data.session;
+      if (sessionRes.error || !session?.access_token || String(session.user?.id || '') !== user.id) {
+        return;
+      }
+
+      if (typeof session.expires_at === 'number' && session.expires_at <= Math.floor(Date.now() / 1000) + 30) {
+        return;
+      }
+
       linkedUserRef.current = user.id;
-    });
-  }, [user?.id, user?.email]);
+      await linkSignupLead(session.access_token).catch(() => {
+        linkedUserRef.current = user.id;
+      });
+    };
+
+    void syncSignupLead();
+
+    return () => {
+      active = false;
+    };
+  }, [loading, user?.id, user?.role, user?.email]);
 
   useEffect(() => {
+    let active = true;
+
     const initData = async () => {
-      const [c, b] = await Promise.all([data.getContacts(), data.getBranding()]);
-      setContacts(c || []);
-      if (b) {
-        setBranding(b);
-        const isSetupRequired = b.name === 'Nexus OS' && (!c || c.length === 0);
-        setIsSystemReady(!isSetupRequired);
+      if (loading) return;
+
+      if (!user?.id) {
+        if (!active) return;
+        setContacts([]);
+        setIsSystemReady(true);
+        return;
+      }
+
+      if (!STAFF_BOOTSTRAP_ROLES.has(user.role)) {
+        if (!active) return;
+        setContacts([]);
+        setIsSystemReady(true);
+        return;
+      }
+
+      try {
+        const [c, b] = await Promise.all([data.getContacts(), data.getBranding()]);
+        if (!active) return;
+
+        setContacts(c || []);
+        if (b) {
+          setBranding(b);
+          const isSetupRequired = b.name === 'Nexus OS' && (!c || c.length === 0);
+          setIsSystemReady(!isSetupRequired);
+        } else {
+          setIsSystemReady(true);
+        }
+      } catch {
+        if (!active) return;
+        setContacts([]);
+        setIsSystemReady(true);
       }
     };
-    initData();
-  }, []);
+
+    void initData();
+
+    return () => {
+      active = false;
+    };
+  }, [loading, user?.id, user?.role]);
 
   useEffect(() => {
     const runAutomations = async () => {
@@ -418,12 +479,12 @@ export const App = () => {
       } else {
         if (isValidView) {
           if ([ViewMode.CLIENT_LANDING, ViewMode.LOGIN, ViewMode.SIGNUP].includes(hash)) {
-            window.location.hash = (user.role === 'admin' || user.role === 'supervisor' || user.role === 'sales') ? 'dashboard' : 'training';
+            window.location.hash = (user.role === 'admin' || user.role === 'super_admin' || user.role === 'supervisor' || user.role === 'sales') ? 'dashboard' : 'training';
           } else {
             setCurrentView(hash);
           }
         } else {
-          window.location.hash = (user.role === 'admin' || user.role === 'supervisor' || user.role === 'sales') ? 'dashboard' : 'training';
+          window.location.hash = (user.role === 'admin' || user.role === 'super_admin' || user.role === 'supervisor' || user.role === 'sales') ? 'dashboard' : 'training';
         }
       }
     };
@@ -471,7 +532,7 @@ export const App = () => {
     [ViewMode.COMMISSIONS]: { requiredTier: 'PREMIUM', moduleLabel: 'Commission Ledger' },
   };
 
-  const shouldBypassTierGate = Boolean(user && ['admin', 'supervisor', 'sales', 'salesperson'].includes(user.role));
+  const shouldBypassTierGate = Boolean(user && ['admin', 'super_admin', 'supervisor', 'sales', 'salesperson'].includes(user.role));
 
   const renderTierGate = (view: ViewMode, element: React.ReactNode) => {
     const requirement = tierGateMap[view];
@@ -531,8 +592,6 @@ export const App = () => {
           return <MembershipAgreementPage />;
         case ViewMode.MAILING_AUTHORIZATION:
           return <MailingAuthorizationPage />;
-        case ViewMode.SMS_TERMS:
-          return <SmsTermsPage />;
         default:
           return <DisclaimersPage />;
       }
@@ -584,7 +643,7 @@ export const App = () => {
       return <PortalView contact={myContact || skeletonContact} branding={branding} onLogout={signOut} onUpdateContact={updateContact} availableCourses={courses} />;
     }
 
-    if (!isSystemReady && user.role === 'admin') {
+    if (!isSystemReady && (user.role === 'admin' || user.role === 'super_admin')) {
       return <AdminSetupWizard onNavigate={navigate} branding={branding} onUpdateBranding={updateBranding} />;
     }
 
@@ -656,7 +715,6 @@ export const App = () => {
                     case ViewMode.ADMIN_CONSENTS: return <AdminConsentViewer />;
                     case ViewMode.ADMIN_SUBSCRIPTIONS: return <AdminSubscriptionManager />;
                     case ViewMode.ADMIN_DOCUMENTS: return <AdminDocumentsPage />;
-                    case ViewMode.ADMIN_SMS_TEMPLATES: return <AdminSmsTemplateEditor />;
                     case ViewMode.CLIENT_MAILING_APPROVALS: return <ClientMailingApprovalsPage />;
                     case ViewMode.DISPUTE_LETTER_PREVIEW: return <DisputeLetterPreviewPage />;
                     case ViewMode.ADMIN_MAILING_QUEUE: return <AdminMailingQueuePage />;

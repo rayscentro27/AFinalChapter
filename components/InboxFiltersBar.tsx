@@ -4,8 +4,8 @@ const STORAGE_KEY = 'nexus_inbox_saved_views_v1';
 
 type AssignedFilter = 'any' | 'unassigned' | 'mine' | 'ai' | 'agent';
 type SlaFilter = 'any' | 'stale' | 'breach';
-type StatusFilter = 'any' | 'open' | 'pending' | 'closed';
-type ProviderFilter = 'any' | 'twilio' | 'whatsapp' | 'meta' | 'matrix' | 'google_voice';
+type StatusFilter = 'any' | 'open' | 'pending' | 'pending_client' | 'pending_staff' | 'escalated' | 'closed';
+type ProviderFilter = 'any' | 'meta' | 'matrix' | 'google_voice';
 
 export type InboxFilters = {
   q: string;
@@ -25,7 +25,8 @@ const DEFAULT_VIEWS: SavedView[] = [
   { name: 'Unassigned', filters: { q: '', status: 'any', provider: 'any', assigned: 'unassigned', sla: 'any' } },
   { name: 'My Conversations', filters: { q: '', status: 'any', provider: 'any', assigned: 'mine', sla: 'any' } },
   { name: 'Breach Only', filters: { q: '', status: 'any', provider: 'any', assigned: 'any', sla: 'breach' } },
-  { name: 'WhatsApp', filters: { q: '', status: 'any', provider: 'whatsapp', assigned: 'any', sla: 'any' } },
+  { name: 'Messenger', filters: { q: '', status: 'any', provider: 'meta', assigned: 'any', sla: 'any' } },
+  { name: 'Pending Client', filters: { q: '', status: 'pending_client', provider: 'any', assigned: 'any', sla: 'any' } },
 ];
 
 function readSavedViews(): SavedView[] {
@@ -125,14 +126,15 @@ export default function InboxFiltersBar({
           <option value="any">Status: Any</option>
           <option value="open">Open</option>
           <option value="pending">Pending</option>
+          <option value="pending_client">Pending Client</option>
+          <option value="pending_staff">Pending Staff</option>
+          <option value="escalated">Escalated</option>
           <option value="closed">Closed</option>
         </select>
 
         <select value={provider} onChange={(event) => setProvider(event.target.value as ProviderFilter)} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold uppercase tracking-widest text-slate-700">
           <option value="any">Channel: Any</option>
-          <option value="twilio">Twilio</option>
-          <option value="whatsapp">WhatsApp</option>
-          <option value="meta">Meta</option>
+          <option value="meta">Facebook/Instagram Messenger</option>
           <option value="matrix">Matrix</option>
           <option value="google_voice">Google Voice</option>
         </select>
