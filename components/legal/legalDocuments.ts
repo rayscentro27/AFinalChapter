@@ -35,7 +35,6 @@ export type LegalDocumentKey =
   | 'ai_disclosure'
   | 'disclaimers'
   | 'refund_policy'
-  | 'sms_terms'
   | 'commission_disclosure'
   | 'docupost_mailing_auth'
   | 'membership_agreement';
@@ -46,7 +45,6 @@ export const LEGAL_DOCUMENT_KEYS: LegalDocumentKey[] = [
   'ai_disclosure',
   'disclaimers',
   'refund_policy',
-  'sms_terms',
   'commission_disclosure',
   'docupost_mailing_auth',
   'membership_agreement',
@@ -58,7 +56,6 @@ export const LEGAL_DOCUMENT_LABELS: Record<LegalDocumentKey, string> = {
   ai_disclosure: 'AI Disclosure',
   disclaimers: 'Required Disclaimers',
   refund_policy: 'Refund Policy',
-  sms_terms: 'SMS Terms',
   commission_disclosure: 'Commission Disclosure',
   docupost_mailing_auth: 'DocuPost Mailing Authorization',
   membership_agreement: 'Membership Agreement',
