@@ -2,8 +2,6 @@ import type { Handler } from '@netlify/functions';
 import { z } from 'zod';
 import { getAdminSupabaseClient } from './_shared/supabase_admin_client';
 
-const E164_RE = /^\+[1-9][0-9]{7,14}$/;
-
 const ThresholdsSchema = z
   .object({
     fico_delta: z.number().int().min(1).max(200).optional(),
@@ -18,7 +16,8 @@ const ThresholdsSchema = z
 const BodySchema = z.object({
   tenant_id: z.string().uuid(),
   user_id: z.string().uuid(),
-  sms_opt_in: z.boolean(),
+  portal_message_opt_in: z.boolean().optional(),
+  email_opt_in: z.boolean().optional(),
   phone_e164: z.string().optional().nullable(),
   similarity_threshold: z.number().int().min(0).max(100).optional(),
   thresholds: ThresholdsSchema,
@@ -41,11 +40,8 @@ export const handler: Handler = async (event) => {
     const body = BodySchema.parse(JSON.parse(event.body || '{}'));
 
     const phone = (body.phone_e164 || '').trim() || null;
-    if (body.sms_opt_in && (!phone || !E164_RE.test(phone))) {
-      return json(400, {
-        error: 'sms_opt_in=true requires valid phone_e164 in E.164 format (e.g., +15551234567)',
-      });
-    }
+    const portalMessageOptIn = Boolean(body.portal_message_opt_in ?? false);
+    const emailOptIn = Boolean(body.email_opt_in ?? false);
 
     const mergedThresholds = {
       ...DEFAULT_THRESHOLDS,
@@ -56,13 +52,14 @@ export const handler: Handler = async (event) => {
     const payload = {
       tenant_id: body.tenant_id,
       user_id: body.user_id,
-      sms_opt_in: body.sms_opt_in,
+      portal_message_opt_in: portalMessageOptIn,
+      email_opt_in: emailOptIn,
       phone_e164: phone,
       similarity_threshold:
         body.similarity_threshold ?? mergedThresholds.actionable_similarity_min ?? DEFAULT_THRESHOLDS.actionable_similarity_min,
       thresholds: mergedThresholds,
       consent_captured_at:
-        body.sms_opt_in
+        portalMessageOptIn
           ? body.consent_captured_at || new Date().toISOString()
           : body.consent_captured_at || null,
       updated_at: new Date().toISOString(),
@@ -81,7 +78,8 @@ export const handler: Handler = async (event) => {
       prefs: data,
       compliance: {
         consent_required: true,
-        sms_opt_in: Boolean(data?.sms_opt_in),
+        portal_message_opt_in: Boolean((data as any)?.portal_message_opt_in),
+        email_opt_in: Boolean((data as any)?.email_opt_in),
       },
     });
   } catch (e: any) {

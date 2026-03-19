@@ -82,7 +82,7 @@ const KnowledgeHub: React.FC = () => {
   const [summary, setSummary] = useState('');
   const [rulesText, setRulesText] = useState('');
   const [checklistText, setChecklistText] = useState('');
-  const [templatesJson, setTemplatesJson] = useState('{"email":[],"sms":[],"call_script":[]}');
+  const [templatesJson, setTemplatesJson] = useState('{"email":[],"portal_message":[],"call_script":[]}');
 
   const [patchAgentName, setPatchAgentName] = useState('Ghost Hunter');
   const [patchTitle, setPatchTitle] = useState('');

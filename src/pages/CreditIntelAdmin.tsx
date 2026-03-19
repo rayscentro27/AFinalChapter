@@ -84,7 +84,7 @@ export default function CreditIntelAdmin() {
     }
   }
 
-  async function onMatchAndAlert() {
+  async function onMatchAndNotify() {
     setError(null);
     setMatchResult(null);
 
@@ -105,11 +105,11 @@ export default function CreditIntelAdmin() {
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || `Match & alert failed (${res.status})`);
+      if (!res.ok) throw new Error(json?.error || `Match & notify failed (${res.status})`);
 
       setMatchResult(json);
     } catch (e: any) {
-      setError(e?.message || 'Match & alert failed');
+      setError(e?.message || 'Match & notify failed');
     } finally {
       setLoadingMatch(false);
     }
@@ -120,7 +120,7 @@ export default function CreditIntelAdmin() {
       <div className="bg-slate-900 border border-white/10 rounded-3xl p-6">
         <h1 className="text-2xl font-black uppercase tracking-tight">Credit Intel Admin</h1>
         <p className="text-sm text-slate-400 mt-2">
-          Manual intake only. Verified/redacted datapoints are matched against ready clients and consent-based SMS alerts are sent.
+          Manual intake only. Verified/redacted datapoints are matched against ready clients and consent-based portal notifications are queued.
         </p>
       </div>
 
@@ -164,11 +164,11 @@ export default function CreditIntelAdmin() {
           </button>
 
           <button
-            onClick={onMatchAndAlert}
+            onClick={onMatchAndNotify}
             disabled={loadingMatch}
             className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-black uppercase tracking-widest"
           >
-            {loadingMatch ? 'Matching…' : 'Match & Alert'}
+            {loadingMatch ? 'Matching…' : 'Match & Notify'}
           </button>
         </div>
 
@@ -194,7 +194,7 @@ export default function CreditIntelAdmin() {
         </div>
 
         <div className="bg-slate-900 border border-white/10 rounded-3xl p-6">
-          <h2 className="text-sm font-black uppercase tracking-widest text-slate-300 mb-3">Match & Alert Result</h2>
+          <h2 className="text-sm font-black uppercase tracking-widest text-slate-300 mb-3">Match & Notify Result</h2>
           <pre className="text-xs text-slate-200 bg-black/30 border border-white/10 rounded-xl p-3 overflow-auto max-h-[340px]">
             {JSON.stringify(matchResult, null, 2) || 'No match result yet.'}
           </pre>

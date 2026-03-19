@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
-import { getSmsConsentStatus, normalizePhoneToE164, SmsConsentStatus } from '../../utils/smsConsent';
 
 type TenantMembershipRow = { tenant_id: string };
 
@@ -54,11 +53,6 @@ export default function CommunicationPreferencesPage() {
   const [marketingEmailOptIn, setMarketingEmailOptIn] = useState(false);
   const [unsubscribeAllEmails, setUnsubscribeAllEmails] = useState(false);
 
-  const [smsStatus, setSmsStatus] = useState<SmsConsentStatus | null>(null);
-  const [smsOptIn, setSmsOptIn] = useState(false);
-  const [smsPhone, setSmsPhone] = useState('');
-  const [smsMarketingPurpose, setSmsMarketingPurpose] = useState(false);
-
   useEffect(() => {
     let active = true;
 
@@ -76,13 +70,12 @@ export default function CommunicationPreferencesPage() {
         if (!active) return;
         setTenantId(resolvedTenantId);
 
-        const [prefRes, status, contactRes] = await Promise.all([
+        const [prefRes, contactRes] = await Promise.all([
           supabase
             .from('communication_preferences')
             .select('marketing_email_opt_in')
             .eq('user_id', user.id)
             .maybeSingle(),
-          getSmsConsentStatus(user.id),
           resolvedTenantId
             ? supabase
               .from('esp_contacts')
@@ -112,11 +105,6 @@ export default function CommunicationPreferencesPage() {
         const marketingFromContact = Boolean(contact?.consent_marketing);
         const nextMarketing = marketingFromPref || marketingFromContact;
         setMarketingEmailOptIn(unsubscribed ? false : nextMarketing);
-
-        setSmsStatus(status);
-        setSmsOptIn(Boolean(status?.is_opted_in));
-        setSmsPhone(status?.phone_e164 || '');
-        setSmsMarketingPurpose(Boolean(status?.purpose?.includes('marketing')));
       } catch (e: any) {
         if (active) setError(String(e?.message || e));
       } finally {
@@ -129,7 +117,7 @@ export default function CommunicationPreferencesPage() {
     return () => {
       active = false;
     };
-  }, [user?.id]);
+  }, [user?.id, user?.email]);
 
   async function savePreferences() {
     if (!user?.id) return;
@@ -270,75 +258,20 @@ export default function CommunicationPreferencesPage() {
         }
       }
 
-      const normalizedPhone = normalizePhoneToE164(smsPhone);
-      if (smsOptIn && !normalizedPhone) {
-        throw new Error('Enter a valid phone number in E.164 format (example: +15551234567).');
-      }
-
-      if (smsOptIn) {
-        const purpose = smsMarketingPurpose ? ['transactional', 'marketing'] : ['transactional'];
-
-        const { error: smsError } = await supabase.from('consents').upsert({
-          user_id: user.id,
-          tenant_id: tenantId,
-          consent_type: 'sms_opt_in',
-          version: 'v1',
-          accepted_at: now,
-          ip_hash: ipHash,
-          user_agent: userAgent,
-          metadata: {
-            phone_e164: normalizedPhone,
-            purpose,
-          },
-        }, {
-          onConflict: 'user_id,consent_type,version',
-        });
-
-        if (smsError) {
-          throw new Error(smsError.message || 'Unable to save SMS opt-in consent.');
-        }
-      } else {
-        const fallbackPhone = normalizePhoneToE164(smsPhone) || smsStatus?.phone_e164 || null;
-
-        const { error: smsOutError } = await supabase.from('consents').insert({
-          user_id: user.id,
-          tenant_id: tenantId,
-          consent_type: 'sms_opt_out',
-          version: 'v1',
-          accepted_at: now,
-          ip_hash: ipHash,
-          user_agent: userAgent,
-          metadata: {
-            phone_e164: fallbackPhone,
-            method: 'settings',
-            timestamp: now,
-          },
-        });
-
-        if (smsOutError) {
-          throw new Error(smsOutError.message || 'Unable to save SMS opt-out record.');
-        }
-      }
-
       if (tenantId) {
         await supabase.from('audit_events').insert({
           tenant_id: tenantId,
           actor_user_id: user.id,
           event_type: 'communication_preferences.updated',
           metadata: {
-            phone_e164: normalizePhoneToE164(smsPhone) || smsStatus?.phone_e164 || null,
             source: 'communication_preferences',
             marketing_email_opt_in: effectiveMarketingOptIn,
             unsubscribe_all_emails: unsubscribeAllEmails,
-            sms_opt_in: smsOptIn,
+            channels: ['portal_message', 'email', 'facebook_messenger', 'instagram_messenger'],
           },
         });
       }
 
-      const refreshed = await getSmsConsentStatus(user.id);
-      setSmsStatus(refreshed);
-      setSmsOptIn(Boolean(refreshed?.is_opted_in));
-      setSmsPhone(refreshed?.phone_e164 || smsPhone);
       setMarketingEmailOptIn(effectiveMarketingOptIn);
       setSuccess('Communication preferences updated.');
     } catch (e: any) {
@@ -365,7 +298,7 @@ export default function CommunicationPreferencesPage() {
       <div>
         <h1 className="text-3xl font-black text-white">Communication Preferences</h1>
         <p className="text-sm text-slate-400 mt-2">
-          Transactional email is enabled by default for account and security notices. Marketing channels are optional.
+          Nexus uses portal messages as the primary secure channel, plus email for alerts and reminders.
         </p>
       </div>
 
@@ -407,48 +340,13 @@ export default function CommunicationPreferencesPage() {
         </p>
       </section>
 
-      <section className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
-        <h2 className="text-lg font-bold text-white">SMS</h2>
-
-        <label className="block text-xs uppercase tracking-widest text-slate-400">Phone Number (E.164)</label>
-        <input
-          type="tel"
-          value={smsPhone}
-          onChange={(e) => setSmsPhone(e.target.value)}
-          placeholder="+15551234567"
-          className="w-full rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-400"
-        />
-
-        <label className="flex items-start gap-3 text-sm text-slate-200">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={smsOptIn}
-            onChange={() => setSmsOptIn((v) => !v)}
-          />
-          <span>
-            I agree to receive SMS notifications from Nexus regarding my account, tasks, and service updates. Message and data rates may apply. Reply STOP to opt out.
-          </span>
-        </label>
-
-        <label className="flex items-start gap-3 text-sm text-slate-300">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={smsMarketingPurpose}
-            onChange={() => setSmsMarketingPurpose((v) => !v)}
-            disabled={!smsOptIn}
-          />
-          <span>Also allow optional marketing SMS notices.</span>
-        </label>
-
-        <div className="text-xs text-slate-500">
-          Current status: {smsStatus?.is_opted_in ? 'Opted in' : 'Opted out'}{smsStatus?.phone_e164 ? ` (${smsStatus.phone_e164})` : ''}
-        </div>
-
-        <p className="text-xs text-slate-500">
-          SMS consent is optional and no purchase is required.
-        </p>
+      <section className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-3">
+        <h2 className="text-lg font-bold text-white">Primary Channels</h2>
+        <ul className="text-sm text-slate-300 space-y-1">
+          <li>Portal messages: secure primary client communication.</li>
+          <li>Email: alerts, reminders, and document notices.</li>
+          <li>Facebook/Instagram Messenger: external lead/support touchpoints.</li>
+        </ul>
       </section>
 
       <div className="flex justify-end">
