@@ -18,10 +18,9 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const provider = readArg('provider', process.env.SMOKE_PROVIDER || 'sms');
+const provider = readArg('provider', process.env.SMOKE_PROVIDER || 'meta');
 const tenantId = readArg('tenant-id', process.env.SMOKE_TENANT_ID);
 const conversationId = readArg('conversation-id', process.env.SMOKE_CONVERSATION_ID);
-const to = readArg('to', process.env.SMOKE_TO);
 const recipientId = readArg('recipient-id', process.env.SMOKE_RECIPIENT_ID);
 const text = readArg('text', process.env.SMOKE_TEXT || `Smoke test ${new Date().toISOString()}`);
 const timeoutSeconds = Number(readArg('timeout-seconds', process.env.SMOKE_TIMEOUT_SECONDS || '60'));
@@ -35,24 +34,20 @@ const supabaseServiceRoleKey = required('SUPABASE_SERVICE_ROLE_KEY', process.env
 required('tenant-id / SMOKE_TENANT_ID', tenantId);
 required('conversation-id / SMOKE_CONVERSATION_ID', conversationId);
 
-if (!['sms', 'whatsapp', 'meta'].includes(provider)) {
-  throw new Error(`provider must be sms|whatsapp|meta, got ${provider}`);
+if (provider !== 'meta') {
+  throw new Error(`provider must be meta, got ${provider}`);
 }
 
-if ((provider === 'sms' || provider === 'whatsapp') && !to) {
-  throw new Error('to is required for sms/whatsapp');
-}
-
-if (provider === 'meta' && !recipientId) {
+if (!recipientId) {
   throw new Error('recipient-id is required for meta');
 }
 
-const route = provider === 'sms' ? '/send/sms' : provider === 'whatsapp' ? '/send/whatsapp' : '/send/meta';
+const route = '/send/meta';
 const payload = {
   tenant_id: tenantId,
   conversation_id: conversationId,
   text,
-  ...(provider === 'meta' ? { recipient_id: recipientId } : { to }),
+  recipient_id: recipientId,
 };
 
 console.log('[smoke] sending', { route, provider, tenantId, conversationId });
