@@ -14,7 +14,7 @@ export interface InboxRouting {
   tenantId?: string;
   conversation_id?: string;
   conversationId?: string;
-  provider?: 'sms' | 'whatsapp' | 'meta' | 'twilio';
+  provider?: 'meta' | 'matrix' | 'google_voice';
   to?: string;
   recipient_id?: string;
   recipientId?: string;
@@ -328,8 +328,6 @@ export enum ViewMode {
   REFUND_POLICY = 'REFUND_POLICY',
   DISCLAIMERS = 'DISCLAIMERS',
   MEMBERSHIP_AGREEMENT = 'MEMBERSHIP_AGREEMENT',
-  SMS_TERMS = 'SMS_TERMS',
-  ADMIN_SMS_TEMPLATES = 'ADMIN_SMS_TEMPLATES',
   ADMIN_MAILING_QUEUE = 'ADMIN_MAILING_QUEUE',
   ADMIN_MAILING_DASHBOARD = 'ADMIN_MAILING_DASHBOARD',
   ADMIN_LEGAL_DOCS = 'ADMIN_LEGAL_DOCS',
