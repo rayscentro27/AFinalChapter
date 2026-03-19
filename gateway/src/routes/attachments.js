@@ -43,6 +43,18 @@ function sanitizeFilename(value) {
   return base || 'upload';
 }
 
+function isMissingColumnError(error) {
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('column')
+    && (msg.includes('does not exist') || msg.includes('schema cache') || msg.includes("could not find the '"));
+}
+
+function isNotNullConstraint(error, column) {
+  const msg = String(error?.message || '').toLowerCase();
+  const col = String(column || '').toLowerCase();
+  return msg.includes('null value in column') && msg.includes(col) && msg.includes('not-null');
+}
+
 function yyyymm(date) {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -87,6 +99,133 @@ async function readPartFile(filePart) {
     sizeBytes: total,
     sha256: hash.digest('hex'),
   };
+}
+
+async function insertAttachmentRecord({
+  tenantId,
+  fields,
+  mimeType,
+  sizeBytes,
+  sha256,
+  originalName,
+  storageBucket,
+  storagePath,
+}) {
+  const attachmentId = randomUUID();
+  const messageId = isUuid(fields.message_id) ? fields.message_id : null;
+  const provider = (asText(fields.provider) || 'meta').toLowerCase();
+
+  const candidates = [
+    {
+      id: attachmentId,
+      tenant_id: tenantId,
+      contact_id: isUuid(fields.contact_id) ? fields.contact_id : null,
+      conversation_id: isUuid(fields.conversation_id) ? fields.conversation_id : null,
+      message_id: messageId,
+      storage_bucket: storageBucket,
+      storage_path: storagePath,
+      content_type: mimeType,
+      size_bytes: sizeBytes,
+      sha256,
+    },
+    {
+      id: attachmentId,
+      tenant_id: tenantId,
+      message_id: messageId,
+      storage_bucket: storageBucket,
+      storage_path: storagePath,
+      content_type: mimeType,
+      size_bytes: sizeBytes,
+    },
+    {
+      id: attachmentId,
+      tenant_id: tenantId,
+      message_id: messageId,
+      provider,
+      provider_media_id: null,
+      mime_type: mimeType,
+      filename: originalName,
+      storage_bucket: storageBucket,
+      storage_path: storagePath,
+      size_bytes: sizeBytes,
+    },
+    {
+      id: attachmentId,
+      tenant_id: tenantId,
+      message_id: messageId,
+      provider,
+      mime_type: mimeType,
+      filename: originalName,
+      storage_bucket: storageBucket,
+      storage_path: storagePath,
+      size_bytes: sizeBytes,
+    },
+  ];
+
+  let lastError = null;
+
+  for (const row of candidates) {
+    const { data, error } = await supabaseAdmin
+      .from('attachments')
+      .insert(row)
+      .select('id')
+      .single();
+
+    if (!error) {
+      return {
+        id: data?.id || attachmentId,
+        storage_path: storagePath,
+      };
+    }
+
+    if (isNotNullConstraint(error, 'message_id') && !messageId) {
+      throw new Error('attachments_insert_failed: message_id_required_for_legacy_attachment_schema');
+    }
+
+    if (isMissingColumnError(error)) {
+      lastError = error;
+      continue;
+    }
+
+    lastError = error;
+  }
+
+  throw new Error(`attachments_insert_failed: ${lastError?.message || 'unknown_error'}`);
+}
+
+async function loadAttachmentForSignedUrl({ tenantId, attachmentId }) {
+  const selectCandidates = [
+    'id,tenant_id,storage_bucket,storage_path,content_type,size_bytes,created_at',
+    'id,tenant_id,storage_bucket,storage_path,mime_type,size_bytes,created_at',
+    'id,tenant_id,storage_path,mime_type,size_bytes,created_at',
+    'id,tenant_id,storage_path,content_type,size_bytes,created_at',
+  ];
+
+  let lastError = null;
+
+  for (const select of selectCandidates) {
+    const { data, error } = await supabaseAdmin
+      .from('attachments')
+      .select(select)
+      .eq('tenant_id', tenantId)
+      .eq('id', attachmentId)
+      .maybeSingle();
+
+    if (!error) return data || null;
+
+    if (isMissingColumnError(error)) {
+      lastError = error;
+      continue;
+    }
+
+    throw new Error(`attachments_lookup_failed: ${error.message}`);
+  }
+
+  if (lastError) {
+    throw new Error(`attachments_lookup_failed: ${lastError.message}`);
+  }
+
+  return null;
 }
 
 export async function attachmentsRoutes(fastify) {
@@ -209,28 +348,16 @@ export async function attachmentsRoutes(fastify) {
         throw new Error(`storage_upload_failed: ${uploadResult.error.message}`);
       }
 
-      const row = {
-        id: randomUUID(),
-        tenant_id: tenantId,
-        contact_id: isUuid(fields.contact_id) ? fields.contact_id : null,
-        conversation_id: isUuid(fields.conversation_id) ? fields.conversation_id : null,
-        message_id: isUuid(fields.message_id) ? fields.message_id : null,
-        storage_bucket: storageBucket,
-        storage_path: storagePath,
-        content_type: mimeType,
-        size_bytes: sizeBytes,
+      const data = await insertAttachmentRecord({
+        tenantId,
+        fields,
+        mimeType,
+        sizeBytes,
         sha256,
-      };
-
-      const { data, error } = await supabaseAdmin
-        .from('attachments')
-        .insert(row)
-        .select('id,storage_path')
-        .single();
-
-      if (error) {
-        throw new Error(`attachments_insert_failed: ${error.message}`);
-      }
+        originalName,
+        storageBucket,
+        storagePath,
+      });
 
       await logAudit({
         tenant_id: tenantId,
@@ -275,19 +402,18 @@ export async function attachmentsRoutes(fastify) {
     const ttl = Math.min(3600, Math.max(60, asInt(req.query?.ttl, SIGNED_URL_TTL_SEC)));
 
     try {
-      const { data: row, error } = await supabaseAdmin
-        .from('attachments')
-        .select('id,tenant_id,storage_bucket,storage_path,content_type,size_bytes,created_at')
-        .eq('tenant_id', tenantId)
-        .eq('id', attachmentId)
-        .maybeSingle();
-
-      if (error) throw new Error(`attachments_lookup_failed: ${error.message}`);
+      const row = await loadAttachmentForSignedUrl({ tenantId, attachmentId });
       if (!row) return reply.code(404).send({ ok: false, error: 'attachment_not_found' });
 
+      const storageBucket = asText(row.storage_bucket) || 'attachments';
+      const storagePath = asText(row.storage_path);
+      if (!storagePath) {
+        return reply.code(400).send({ ok: false, error: 'attachment_missing_storage_path' });
+      }
+
       const { data, error: signErr } = await supabaseAdmin.storage
-        .from(row.storage_bucket || 'attachments')
-        .createSignedUrl(row.storage_path, ttl);
+        .from(storageBucket)
+        .createSignedUrl(storagePath, ttl);
 
       if (signErr) throw new Error(`signed_url_failed: ${signErr.message}`);
 
