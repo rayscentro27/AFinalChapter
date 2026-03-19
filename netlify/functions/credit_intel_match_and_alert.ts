@@ -29,13 +29,12 @@ type Datapoint = {
 type AlertPrefs = {
   tenant_id: string;
   user_id: string;
-  sms_opt_in: boolean;
-  phone_e164: string | null;
+  portal_message_opt_in?: boolean | null;
+  email_opt_in?: boolean | null;
   similarity_threshold: number | null;
   thresholds: Record<string, unknown> | null;
 };
 
-const E164_RE = /^\+[1-9][0-9]{7,14}$/;
 
 const ThresholdsSchema = z
   .object({
@@ -92,7 +91,7 @@ export const handler: Handler = async (event) => {
           datapoints_considered: datapoints.length,
           profiles_considered: 0,
           matches_written: 0,
-          sms_sent: 0,
+          alerts_sent: 0,
           blocked_human_review: 0,
           suppressed: 0,
         },
@@ -104,15 +103,8 @@ export const handler: Handler = async (event) => {
     const prefs = await fetchAlertPrefs(supabase, body.tenant_id, userIds);
     const prefsByUser = new Map<string, AlertPrefs>();
     for (const pref of prefs) prefsByUser.set(pref.user_id, pref);
-
-    const twilioEnv = {
-      sid: process.env.TWILIO_ACCOUNT_SID || '',
-      token: process.env.TWILIO_AUTH_TOKEN || '',
-      from: process.env.TWILIO_FROM_NUMBER || '',
-    };
-
     const written: any[] = [];
-    let smsSent = 0;
+    let alertsSent = 0;
     let blockedHumanReview = 0;
     let suppressed = 0;
 
@@ -156,48 +148,26 @@ export const handler: Handler = async (event) => {
         let humanReviewRequired = false;
         let alertSent = false;
         let alertMessage: string | null = null;
-        let twilioSid: string | null = null;
-
+        
         if (similarity >= actionableMin) {
           if (highRisk) {
             status = 'blocked_human_review';
             humanReviewRequired = true;
             blockedHumanReview += 1;
           } else {
-            const phone = normalizePhone(pref?.phone_e164 || profile.phone_e164 || null);
-            const optedIn = Boolean(pref?.sms_opt_in);
+            const optedIn = Boolean(pref?.portal_message_opt_in);
 
             if (!optedIn) {
               status = 'suppressed';
               suppressed += 1;
-              reasons.push('SMS not sent: client has not opted in.');
-            } else if (!phone || !E164_RE.test(phone)) {
-              status = 'suppressed';
-              suppressed += 1;
-              reasons.push('SMS not sent: valid E.164 phone number missing.');
+              reasons.push('Alert not sent: client has not opted in for outreach alerts.');
             } else {
-              const message = buildCompliantSms(dp.source_name);
-              const twilio = await sendTwilioSms({
-                to: phone,
-                body: message,
-                accountSid: twilioEnv.sid,
-                authToken: twilioEnv.token,
-                from: twilioEnv.from,
-              });
-
-              if (twilio.ok) {
-                status = 'alerted';
-                alertSent = true;
-                smsSent += 1;
-                alertMessage = message;
-                twilioSid = twilio.sid;
-                reasons.push('Consent-based educational SMS alert sent.');
-              } else {
-                status = 'suppressed';
-                suppressed += 1;
-                const twilioError = 'error' in twilio ? twilio.error : 'Unknown Twilio error';
-                reasons.push(`SMS not sent: ${twilioError}`);
-              }
+              const message = buildPortalAlertMessage(dp.source_name);
+              status = 'alerted';
+              alertSent = true;
+              alertsSent += 1;
+              alertMessage = message;
+              reasons.push('Consent-based portal follow-up notification queued.');
             }
           }
         }
@@ -216,9 +186,8 @@ export const handler: Handler = async (event) => {
           high_risk_gate: highRisk,
           human_review_required: humanReviewRequired,
           alert_sent: alertSent,
-          alert_channel: 'sms',
+          alert_channel: 'portal_message',
           alert_message: alertMessage,
-          twilio_sid: twilioSid,
           alerted_at: alertSent ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
         };
@@ -240,7 +209,7 @@ export const handler: Handler = async (event) => {
         datapoints_considered: datapoints.length,
         profiles_considered: profiles.length,
         matches_written: written.length,
-        sms_sent: smsSent,
+        alerts_sent: alertsSent,
         blocked_human_review: blockedHumanReview,
         suppressed,
       },
@@ -277,7 +246,7 @@ async function fetchReadyProfiles(supabase: any, tenantId: string): Promise<Prof
   const { data, error } = await supabase
     .from('client_profiles')
     .select(
-      'tenant_id,user_id,status,fico,inquiries_6_12,inquiries_12_24,oldest_account_months,total_income_annual,case_complexity,recent_denials,phone_e164'
+      'tenant_id,user_id,status,fico,inquiries_6_12,inquiries_12_24,oldest_account_months,total_income_annual,case_complexity,recent_denials'
     )
     .eq('tenant_id', tenantId);
 
@@ -294,7 +263,7 @@ async function fetchAlertPrefs(supabase: any, tenantId: string, userIds: string[
 
   const { data, error } = await supabase
     .from('client_alert_prefs')
-    .select('tenant_id,user_id,sms_opt_in,phone_e164,similarity_threshold,thresholds')
+    .select('tenant_id,user_id,portal_message_opt_in,email_opt_in,similarity_threshold,thresholds')
     .eq('tenant_id', tenantId)
     .in('user_id', userIds);
 
@@ -395,69 +364,20 @@ function normalizeStatus(status: string | null | undefined): string {
     .replace(/\s+/g, ' ');
 }
 
-function normalizePhone(phone: string | null | undefined): string | null {
-  const p = String(phone || '').trim();
-  return p || null;
-}
-
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
-function buildCompliantSms(sourceName: string): string {
+function buildPortalAlertMessage(sourceName: string): string {
   const source = sourceName?.trim() || 'community source';
   return [
     'Nexus Credit Intel update.',
     `A verified community datapoint from ${source} may be relevant to your readiness profile.`,
     'This is educational information only and not a guarantee of approval, limits, terms, or timing.',
-    'Reply HELP for support or STOP to opt out.',
+    'Review and respond inside your secure portal inbox.',
   ].join(' ');
-}
-
-async function sendTwilioSms(input: {
-  to: string;
-  body: string;
-  accountSid: string;
-  authToken: string;
-  from: string;
-}): Promise<{ ok: true; sid: string } | { ok: false; error: string }> {
-  if (!input.accountSid || !input.authToken || !input.from) {
-    return { ok: false, error: 'Twilio environment variables missing' };
-  }
-
-  const auth = Buffer.from(`${input.accountSid}:${input.authToken}`).toString('base64');
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(input.accountSid)}/Messages.json`;
-
-  const form = new URLSearchParams();
-  form.set('From', input.from);
-  form.set('To', input.to);
-  form.set('Body', input.body);
-
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: form.toString(),
-  });
-
-  const text = await resp.text();
-  let payload: any = null;
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {
-    payload = null;
-  }
-
-  if (!resp.ok) {
-    const msg = payload?.message || payload?.detail || text || `Twilio API error (${resp.status})`;
-    return { ok: false, error: msg };
-  }
-
-  return { ok: true, sid: String(payload?.sid || '') };
 }
 
 function json(statusCode: number, body: unknown) {

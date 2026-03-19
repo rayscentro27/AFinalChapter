@@ -175,6 +175,16 @@ export interface Message {
   provider?: string;
   conversationId?: string;
   providerMessageIdReal?: string;
+  attachments?: MessageAttachment[];
+}
+
+export interface MessageAttachment {
+  attachmentId?: string;
+  storagePath?: string;
+  storageBucket?: string;
+  contentType?: string;
+  sizeBytes?: number;
+  signedUrl?: string;
 }
 
 export interface Invoice {

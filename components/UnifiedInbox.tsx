@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Contact, InboxThread, UnifiedMessage, Message, InboxRouting } from '../types';
-import { MessageSquare, Archive, Send, Zap, Bot, Eye, Ghost, Sparkles, FileText, Route, Loader2 } from 'lucide-react';
+import { Contact, InboxThread, UnifiedMessage, Message, InboxRouting, MessageAttachment } from '../types';
+import { MessageSquare, Archive, Send, Zap, Bot, Eye, Ghost, Sparkles, FileText, Route, Loader2, Paperclip, X } from 'lucide-react';
 import { sendInboxMessage, SendProvider } from '../lib/inboxSendClient';
 import { claimConversation } from '../lib/claimConversation';
 import { supabase } from '../lib/supabaseClient';
+import { useAttachmentUpload, UploadAttachmentResult } from '../lib/useAttachmentUpload';
 import AssignmentDrawer from './AssignmentDrawer';
 import TagsPanel from './TagsPanel';
 import QuickActionsBar from './QuickActionsBar';
@@ -25,6 +26,7 @@ type DbMessageRow = {
   provider?: string;
   provider_message_id_real?: string | null;
   body?: string | null;
+  content?: Record<string, unknown> | null;
   status?: string | null;
   received_at?: string | null;
   sent_at?: string | null;
@@ -85,19 +87,59 @@ function formatTime(value?: string | null) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function normalizeMessageAttachments(content: unknown): MessageAttachment[] {
+  if (!content || typeof content !== 'object' || Array.isArray(content)) return [];
+  const raw = (content as any).attachments;
+  if (!Array.isArray(raw)) return [];
+
+  const attachments: MessageAttachment[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const attachmentId = String((item as any).attachment_id || (item as any).id || '').trim();
+    const storagePath = String((item as any).storage_path || '').trim();
+    const storageBucket = String((item as any).storage_bucket || '').trim();
+    const contentType = String((item as any).content_type || (item as any).mime_type || '').trim();
+    const sizeValue = Number((item as any).size_bytes || (item as any).file_size || 0);
+
+    if (!attachmentId && !storagePath) continue;
+    attachments.push({
+      attachmentId: attachmentId || undefined,
+      storagePath: storagePath || undefined,
+      storageBucket: storageBucket || undefined,
+      contentType: contentType || undefined,
+      sizeBytes: Number.isFinite(sizeValue) && sizeValue > 0 ? sizeValue : undefined,
+    });
+  }
+
+  return attachments;
+}
+
+function attachmentLabel(attachment: MessageAttachment, index: number) {
+  if (attachment.storagePath) {
+    const parts = attachment.storagePath.split('/').filter(Boolean);
+    const tail = parts[parts.length - 1] || attachment.storagePath;
+    return tail;
+  }
+  if (attachment.attachmentId) return `Attachment ${index + 1}`;
+  return 'Attachment';
+}
+
 function mapDbMessage(row: DbMessageRow, contactName: string): Message {
   const isInbound = row.direction === 'in';
+  const attachments = normalizeMessageAttachments(row.content);
+  const body = String(row.body || '').trim();
   return {
     id: `db:${row.id}`,
     sender: isInbound ? 'client' : 'admin',
     senderName: isInbound ? contactName : 'Advisor',
-    content: String(row.body || '').trim() || '[No text body]',
+    content: body || (attachments.length > 0 ? '[Attachment]' : '[No text body]'),
     timestamp: formatTime(row.received_at || row.sent_at || row.created_at),
     read: true,
     deliveryStatus: row.status || undefined,
     provider: row.provider || undefined,
     conversationId: row.conversation_id || undefined,
     providerMessageIdReal: row.provider_message_id_real || undefined,
+    attachments,
   };
 }
 
@@ -170,8 +212,14 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
   const [routingByConversation, setRoutingByConversation] = useState<Record<string, RoutingRecommendation>>({});
   const [routingLoading, setRoutingLoading] = useState(false);
   const [routingError, setRoutingError] = useState<string | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<UploadAttachmentResult[]>([]);
+  const [attachmentsBusy, setAttachmentsBusy] = useState(false);
+  const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const contactsRef = useRef<Contact[]>(contacts);
+  const { uploadAttachment, getSignedUrl } = useAttachmentUpload();
 
   useEffect(() => {
     contactsRef.current = contacts;
@@ -403,6 +451,8 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
 
   useEffect(() => {
     setChannelPreference('auto');
+    setPendingAttachments([]);
+    setAttachmentsError(null);
   }, [selectedThreadId]);
 
   useEffect(() => {
@@ -688,7 +738,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
     const loadExisting = async () => {
       let query: any = supabase
         .from('messages')
-        .select('id, tenant_id, conversation_id, direction, provider, provider_message_id_real, body, status, received_at, sent_at, created_at')
+        .select('id, tenant_id, conversation_id, direction, provider, provider_message_id_real, body, content, status, received_at, sent_at, created_at')
         .eq('conversation_id', conversationId)
         .order('received_at', { ascending: true })
         .limit(300);
@@ -726,8 +776,81 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
     };
   }, [onUpdateContact, selectedContact?.id, selectedContact?.name, selectedRouting?.conversation_id, selectedRouting?.tenant_id]);
 
+  const handleAttachmentFilesPicked = async (files: FileList | null) => {
+    if (!files?.length) return;
+    if (!selectedRouting?.tenant_id || !selectedRouting?.conversation_id || !selectedContact?.id) {
+      setAttachmentsError('Select a routed thread before uploading attachments.');
+      return;
+    }
+
+    setAttachmentsBusy(true);
+    setAttachmentsError(null);
+
+    try {
+      const uploads: UploadAttachmentResult[] = [];
+      for (const file of Array.from(files)) {
+        const uploaded = await uploadAttachment({
+          file,
+          tenantId: selectedRouting.tenant_id,
+          contactId: selectedContact.id,
+          conversationId: selectedRouting.conversation_id,
+        });
+        uploads.push(uploaded);
+      }
+
+      setPendingAttachments((prev) => {
+        const merged = [...prev, ...uploads];
+        const dedup = new Map<string, UploadAttachmentResult>();
+        for (const item of merged) dedup.set(String(item.attachment_id), item);
+        return Array.from(dedup.values());
+      });
+    } catch (error: any) {
+      setAttachmentsError(String(error?.message || 'Attachment upload failed'));
+    } finally {
+      setAttachmentsBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removePendingAttachment = (attachmentId: string) => {
+    setPendingAttachments((prev) => prev.filter((item) => String(item.attachment_id) !== String(attachmentId)));
+  };
+
+  const openAttachment = async (attachment: MessageAttachment) => {
+    if (!selectedTenantId) {
+      setSendError('Missing tenant context for attachment access.');
+      return;
+    }
+
+    if (!attachment.attachmentId) {
+      setSendError('Attachment is missing an attachment ID.');
+      return;
+    }
+
+    setOpeningAttachmentId(attachment.attachmentId);
+    setSendError(null);
+
+    try {
+      const signedUrl = await getSignedUrl(selectedTenantId, attachment.attachmentId, 600);
+      if (!signedUrl) throw new Error('Signed URL missing from response');
+      window.open(signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (error: any) {
+      setSendError(String(error?.message || 'Unable to open attachment'));
+    } finally {
+      setOpeningAttachmentId(null);
+    }
+  };
+
   const handleSendMessage = async (text: string, isBot = false) => {
-    if (!text.trim() || !selectedThreadId || !onUpdateContact || isSending) return;
+    if (!selectedThreadId || !onUpdateContact || isSending || attachmentsBusy) return;
+
+    const trimmed = String(text || '').trim();
+    const outboundAttachments = pendingAttachments.map((item) => ({
+      attachment_id: item.attachment_id,
+      storage_path: item.storage_path,
+    }));
+
+    if (!trimmed && outboundAttachments.length === 0) return;
 
     const thread = threads.find((t) => t.id === selectedThreadId);
     if (!thread) return;
@@ -736,20 +859,26 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
     if (!contact) return;
 
     setSendError(null);
+    setAttachmentsError(null);
 
     const optimisticMessage: Message = {
       id: `tmp_${Date.now()}`,
       sender: isBot ? 'bot' : 'admin',
       senderName: isBot ? 'Nexus Concierge' : 'Advisor',
-      content: text,
+      content: trimmed || '[Attachment]',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       read: true,
       deliveryStatus: isBot ? 'sent' : 'queued',
+      attachments: outboundAttachments.map((item) => ({
+        attachmentId: String(item.attachment_id),
+        storagePath: String(item.storage_path),
+      })),
     };
 
     const nextHistory = [...(contact.messageHistory || []), optimisticMessage];
     onUpdateContact({ ...contact, messageHistory: nextHistory });
     setInputText('');
+    setPendingAttachments([]);
 
     if (isBot) return;
 
@@ -765,7 +894,8 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
         tenant_id: routing.tenant_id,
         conversation_id: routing.conversation_id,
         contact_id: contact.id,
-        body_text: text,
+        body_text: trimmed,
+        attachments: outboundAttachments.length > 0 ? outboundAttachments : undefined,
         channel_preference: channelPreference === 'auto' ? undefined : channelPreference,
       });
 
@@ -820,7 +950,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
   };
 
   const retryFailedMessage = async (msg: Message) => {
-    if (!msg?.content || isSending) return;
+    if (!msg?.content || isSending || attachmentsBusy) return;
     await handleSendMessage(String(msg.content), false);
   };
 
@@ -1102,6 +1232,29 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                     <div className="flex items-center gap-1.5 text-[8px] font-black uppercase text-indigo-400 mb-3 border-b border-white/10 pb-2"><Bot size={12} /> Nexus Autonomous Proxy</div>
                   )}
                   <p className="whitespace-pre-wrap">{msg.content}</p>
+                  {Array.isArray(msg.attachments) && msg.attachments.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {msg.attachments.map((attachment, index) => {
+                        const key = `${msg.id}-att-${attachment.attachmentId || attachment.storagePath || index}`;
+                        const canOpen = Boolean(attachment.attachmentId);
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => void openAttachment(attachment)}
+                            disabled={!canOpen || openingAttachmentId === attachment.attachmentId}
+                            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 ${
+                              msg.sender !== 'client'
+                                ? 'border-white/20 bg-white/10 text-white'
+                                : 'border-slate-200 bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            <Paperclip size={11} />
+                            {attachmentLabel(attachment, index)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                   <div className={`text-[9px] mt-4 font-black uppercase opacity-50 text-right ${msg.sender !== 'client' ? 'text-slate-300' : 'text-slate-400'}`}>
                     {msg.timestamp}{msg.deliveryStatus ? ` • ${msg.deliveryStatus}` : ''}
                   </div>
@@ -1258,29 +1411,73 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
               ) : null}
             </div>
 
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                void handleAttachmentFilesPicked(event.target.files);
+              }}
+            />
+
+            {pendingAttachments.length > 0 ? (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {pendingAttachments.map((attachment, index) => (
+                  <span
+                    key={`pending-${attachment.attachment_id}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-cyan-700"
+                  >
+                    <Paperclip size={11} />
+                    {attachmentLabel({
+                      attachmentId: String(attachment.attachment_id),
+                      storagePath: String(attachment.storage_path || ''),
+                    }, index)}
+                    <button
+                      onClick={() => removePendingAttachment(String(attachment.attachment_id))}
+                      className="rounded p-0.5 hover:bg-cyan-100"
+                      aria-label="Remove attachment"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
             <div className="flex gap-4 items-center">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSending || attachmentsBusy || !selectedRouting?.tenant_id || !selectedRouting?.conversation_id}
+                className="inline-flex h-12 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-700 shadow-sm disabled:opacity-50"
+              >
+                {attachmentsBusy ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
+                Attach
+              </button>
               <div className="flex-1 relative">
                 <input
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(inputText)}
-                  placeholder="Type an intervention message... (AI monitoring will pause)"
-                  disabled={isSending}
+                  placeholder="Type an intervention message or send attachments..."
+                  disabled={isSending || attachmentsBusy}
                   className="w-full pl-6 pr-16 py-5 bg-slate-100 border-none rounded-[2rem] text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none shadow-inner disabled:opacity-60"
                 />
                 <button
                   onClick={() => handleSendMessage(inputText)}
-                  disabled={isSending}
+                  disabled={isSending || attachmentsBusy || (!String(inputText || '').trim() && pendingAttachments.length === 0)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all shadow-xl active:scale-95 disabled:opacity-60"
                 >
                   <Send size={20} />
                 </button>
               </div>
             </div>
-            {(isSending || sendError) && (
+            {(isSending || attachmentsBusy || sendError || attachmentsError) && (
               <div className="mt-3 text-xs font-bold">
                 {isSending && <span className="text-blue-600">Sending through unified gateway...</span>}
+                {attachmentsBusy && <span className="text-blue-600"> Uploading attachments...</span>}
+                {!attachmentsBusy && attachmentsError && <span className="text-amber-700">{attachmentsError}</span>}
                 {!isSending && sendError && <span className="text-amber-700">{sendError}</span>}
               </div>
             )}
