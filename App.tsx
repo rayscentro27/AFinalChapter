@@ -1,132 +1,20 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import CRMTable from './components/CRMTable';
 import PortalView from './components/PortalView';
-import AdminResources from './components/AdminResources';
 import SignUp from './components/SignUp';
 import Settings from './components/Settings';
-import AICommandCenter from './components/AICommandCenter';
-import DocumentQueue from './components/DocumentQueue';
-import MarketingCampaigns from './components/MarketingCampaigns';
-import NeuralFloor from './components/NeuralFloor';
 import Login from './components/Login';
 import ClientLandingPage from './components/ClientLandingPage';
 import UnifiedInbox from './components/UnifiedInbox';
-import PowerDialer from './components/PowerDialer';
-import SalesTrainer from './components/SalesTrainer';
-import VoiceReceptionist from './components/VoiceReceptionist';
-import LeadDiscoveryMap from './components/LeadDiscoveryMap';
-import FormBuilder from './components/FormBuilder';
-import MarketIntelligence from './components/MarketIntelligence';
-import LenderMarketplace from './components/LenderMarketplace';
-import DocumentGenerator from './components/DocumentGenerator';
-import RenewalTracker from './components/RenewalTracker';
-import SmartCalendar from './components/SmartCalendar';
-import WorkflowAutomation from './components/WorkflowAutomation';
-import SyndicationManager from './components/SyndicationManager';
-import ApplicationSubmitter from './components/ApplicationSubmitter';
 import CommandPalette from './components/CommandPalette';
-import MobileNav from './components/MobileNav';
-import ReputationManager from './components/ReputationManager';
-import PGFundingFlow from './components/PGFundingFlow';
-import ExpenseTracker from './components/ExpenseTracker';
-import CommissionManager from './components/CommissionManager';
-import RiskMonitor from './components/RiskMonitor';
-import SalesLeaderboard from './components/SalesLeaderboard';
-import FundingResearchPage from './src/pages/FundingResearchPage';
-import ResearchDashboardPage from './src/pages/ResearchDashboardPage';
-import AdminFundingCatalogPage from './src/pages/AdminFundingCatalogPage';
-import GrantsPage from './src/pages/GrantsPage';
-import AdminGrantsCatalogPage from './src/pages/AdminGrantsCatalogPage';
-import AdminGrantsTrackingPage from './src/pages/AdminGrantsTrackingPage';
-import SBAPrepPage from './src/pages/SBAPrepPage';
-import AdminSBAPrepPage from './src/pages/AdminSBAPrepPage';
-import FundingOutcomesPage from './src/pages/FundingOutcomesPage';
-import BillingCommissionsPage from './src/pages/BillingCommissionsPage';
-import AdminCommissionsPage from './src/pages/AdminCommissionsPage';
-import CourseBuilder from './components/CourseBuilder';
-import LoanServicing from './components/LoanServicing';
-import CreditMemoBuilder from './components/CreditMemoBuilder';
-import AdminCMS from './components/AdminCMS';
 import SystemSitemap from './components/SystemSitemap';
 import AdminSetupWizard from './components/AdminSetupWizard';
-import NotificationCenter from './components/NotificationCenter';
 import PhoneNotification from './components/PhoneNotification';
-import LiveAutomationMonitor from './components/LiveAutomationMonitor';
-import InvoicingHub from './components/InvoicingHub';
-import StaffTraining from './components/StaffTraining';
-import CreditCardMatcher from './components/CreditCardMatcher';
-import WealthPortfolio from './components/WealthPortfolio';
-import SalesOnboarding from './components/SalesOnboarding';
 import VoiceAssistant from './components/VoiceAssistant';
-import InfraMonitor from './components/InfraMonitor';
-import LeadScout from './components/LeadScout';
-import LenderRoom from './components/LenderRoom';
-import KnowledgeHub from './components/KnowledgeHub';
-import ScenarioRunner from './components/ScenarioRunner';
-import YouTubeVideoAnalyzer from './components/YouTubeVideoAnalyzer';
-import AffiliateMarketplace from './components/AffiliateMarketplace';
-import ForensicHub from './components/ForensicHub';
-import MessagingBridge from './components/MessagingBridge';
-import AdminChannelMapper from './src/pages/AdminChannelMapper';
-import AdminContactsMerge from './src/pages/AdminContactsMerge';
-import AdminMergeJobs from './src/pages/AdminMergeJobs';
-import AdminMergeQueue from './src/pages/AdminMergeQueue';
-import AdminSuggestions from './src/pages/AdminSuggestions';
-import AdminTeamMembers from './src/pages/AdminTeamMembers';
-import AdminOnCall from './src/pages/AdminOnCall';
-import AdminChannelPools from './src/pages/AdminChannelPools';
-import AdminDeadLetters from './src/pages/AdminDeadLetters';
-import AdminOutbox from './src/pages/AdminOutbox';
-import AdminMonitoring from './src/pages/AdminMonitoring';
-import AdminSRE from './src/pages/AdminSRE';
-import AdminChannelHealth from './src/pages/AdminChannelHealth';
-import AdminPublicApi from './src/pages/AdminPublicApi';
-import AdminRoles from './src/pages/AdminRoles';
-import AdminMembers from './src/pages/AdminMembers';
-import AdminPolicies from './src/pages/AdminPolicies';
-import InviteAccept from './src/pages/InviteAccept';
-import TermsPage from './src/pages/TermsPage';
-import PrivacyPage from './src/pages/PrivacyPage';
-import AIDisclosurePage from './src/pages/AIDisclosurePage';
-import RefundPolicyPage from './src/pages/RefundPolicyPage';
-import DisclaimersPage from './src/pages/DisclaimersPage';
-import AdminConsentViewer from './src/pages/AdminConsentViewer';
-import PricingPage from './src/pages/PricingPage';
-import BillingPage from './src/pages/BillingPage';
-import DocumentsPage from './src/pages/DocumentsPage';
-import MembershipAgreementPage from './src/pages/MembershipAgreementPage';
-import AdminSubscriptionManager from './src/pages/AdminSubscriptionManager';
-import AdminDocumentsPage from './src/pages/AdminDocumentsPage';
-import CommunicationPreferencesPage from './src/pages/CommunicationPreferencesPage';
-import SecuritySettingsPage from './src/pages/SecuritySettingsPage';
-import AdminControlPlanePage from './src/pages/AdminControlPlanePage';
-import UploadCreditReportPage from './src/pages/UploadCreditReportPage';
-import DisputeFactsReviewPage from './src/pages/DisputeFactsReviewPage';
-import DraftPreviewPage from './src/pages/DraftPreviewPage';
-import FinalLetterPage from './src/pages/FinalLetterPage';
-import MailingAuthorizationPage from './src/pages/MailingAuthorizationPage';
-import ClientMailingApprovalsPage from './src/pages/ClientMailingApprovalsPage';
-import AdminMailingQueuePage from './src/pages/AdminMailingQueuePage';
-import DisputeLetterPreviewPage from './src/pages/DisputeLetterPreviewPage';
-import AdminMailingDashboard from './src/pages/AdminMailingDashboard';
-import AdminLegalPublisher from './src/pages/AdminLegalPublisher';
-import AdminEmailProvidersPage from './src/pages/AdminEmailProvidersPage';
-import AdminEmailRoutingPage from './src/pages/AdminEmailRoutingPage';
-import AdminEmailLogsPage from './src/pages/AdminEmailLogsPage';
-import WorkflowDetailPage from './src/pages/WorkflowDetailPage';
-import AdminWorkflowsPage from './src/pages/AdminWorkflowsPage';
-import FreeScorePage from './src/pages/FreeScorePage';
-import FreeChecklistPage from './src/pages/FreeChecklistPage';
-import UnsubscribePage from './src/pages/UnsubscribePage';
-import AdminFunnelSequencesPage from './src/pages/AdminFunnelSequencesPage';
-import AdminFunnelLeadsPage from './src/pages/AdminFunnelLeadsPage';
-import AdminFunnelMetricsPage from './src/pages/AdminFunnelMetricsPage';
-import SupervisorTriage from './components/SupervisorTriage';
 import AgenticHUD from './components/AgenticHUD';
-import NeuralStrategySandbox from './components/NeuralStrategySandbox';
 import UserHeader from './components/UserHeader';
 import { ViewMode, Contact, AgencyBranding, Course, Notification, ClientTask } from './types';
 // Added RefreshCw to imports
@@ -147,6 +35,96 @@ import { getUserTier, hasTierAccess, isSubscriptionEntitled, UserTierState } fro
 import OfferBanner from './src/components/funnel/OfferBanner';
 import { linkSignupLead } from './src/services/funnelService';
 import { supabase } from './lib/supabaseClient';
+
+const MarketingCampaigns = lazy(() => import('./components/MarketingCampaigns'));
+const NeuralFloor = lazy(() => import('./components/NeuralFloor'));
+const PowerDialer = lazy(() => import('./components/PowerDialer'));
+const LenderMarketplace = lazy(() => import('./components/LenderMarketplace'));
+const DocumentGenerator = lazy(() => import('./components/DocumentGenerator'));
+const DocumentQueue = lazy(() => import('./components/DocumentQueue'));
+const ReputationManager = lazy(() => import('./components/ReputationManager'));
+const PGFundingFlow = lazy(() => import('./components/PGFundingFlow'));
+const ExpenseTracker = lazy(() => import('./components/ExpenseTracker'));
+const CommissionManager = lazy(() => import('./components/CommissionManager'));
+const RiskMonitor = lazy(() => import('./components/RiskMonitor'));
+const LiveAutomationMonitor = lazy(() => import('./components/LiveAutomationMonitor'));
+const InvoicingHub = lazy(() => import('./components/InvoicingHub'));
+const WealthPortfolio = lazy(() => import('./components/WealthPortfolio'));
+const InfraMonitor = lazy(() => import('./components/InfraMonitor'));
+const LeadScout = lazy(() => import('./components/LeadScout'));
+const LenderRoom = lazy(() => import('./components/LenderRoom'));
+const KnowledgeHub = lazy(() => import('./components/KnowledgeHub'));
+const ScenarioRunner = lazy(() => import('./components/ScenarioRunner'));
+const AffiliateMarketplace = lazy(() => import('./components/AffiliateMarketplace'));
+const ForensicHub = lazy(() => import('./components/ForensicHub'));
+const SupervisorTriage = lazy(() => import('./components/SupervisorTriage'));
+const NeuralStrategySandbox = lazy(() => import('./components/NeuralStrategySandbox'));
+
+const FundingResearchPage = lazy(() => import('./src/pages/FundingResearchPage'));
+const ResearchDashboardPage = lazy(() => import('./src/pages/ResearchDashboardPage'));
+const AdminFundingCatalogPage = lazy(() => import('./src/pages/AdminFundingCatalogPage'));
+const GrantsPage = lazy(() => import('./src/pages/GrantsPage'));
+const AdminGrantsCatalogPage = lazy(() => import('./src/pages/AdminGrantsCatalogPage'));
+const AdminGrantsTrackingPage = lazy(() => import('./src/pages/AdminGrantsTrackingPage'));
+const SBAPrepPage = lazy(() => import('./src/pages/SBAPrepPage'));
+const AdminSBAPrepPage = lazy(() => import('./src/pages/AdminSBAPrepPage'));
+const FundingOutcomesPage = lazy(() => import('./src/pages/FundingOutcomesPage'));
+const BillingCommissionsPage = lazy(() => import('./src/pages/BillingCommissionsPage'));
+const AdminCommissionsPage = lazy(() => import('./src/pages/AdminCommissionsPage'));
+const AdminChannelMapper = lazy(() => import('./src/pages/AdminChannelMapper'));
+const AdminContactsMerge = lazy(() => import('./src/pages/AdminContactsMerge'));
+const AdminMergeJobs = lazy(() => import('./src/pages/AdminMergeJobs'));
+const AdminMergeQueue = lazy(() => import('./src/pages/AdminMergeQueue'));
+const AdminSuggestions = lazy(() => import('./src/pages/AdminSuggestions'));
+const AdminTeamMembers = lazy(() => import('./src/pages/AdminTeamMembers'));
+const AdminOnCall = lazy(() => import('./src/pages/AdminOnCall'));
+const AdminChannelPools = lazy(() => import('./src/pages/AdminChannelPools'));
+const AdminDeadLetters = lazy(() => import('./src/pages/AdminDeadLetters'));
+const AdminOutbox = lazy(() => import('./src/pages/AdminOutbox'));
+const AdminMonitoring = lazy(() => import('./src/pages/AdminMonitoring'));
+const AdminSRE = lazy(() => import('./src/pages/AdminSRE'));
+const AdminChannelHealth = lazy(() => import('./src/pages/AdminChannelHealth'));
+const AdminPublicApi = lazy(() => import('./src/pages/AdminPublicApi'));
+const AdminRoles = lazy(() => import('./src/pages/AdminRoles'));
+const AdminMembers = lazy(() => import('./src/pages/AdminMembers'));
+const AdminPolicies = lazy(() => import('./src/pages/AdminPolicies'));
+const InviteAccept = lazy(() => import('./src/pages/InviteAccept'));
+const TermsPage = lazy(() => import('./src/pages/TermsPage'));
+const PrivacyPage = lazy(() => import('./src/pages/PrivacyPage'));
+const AIDisclosurePage = lazy(() => import('./src/pages/AIDisclosurePage'));
+const RefundPolicyPage = lazy(() => import('./src/pages/RefundPolicyPage'));
+const DisclaimersPage = lazy(() => import('./src/pages/DisclaimersPage'));
+const AdminConsentViewer = lazy(() => import('./src/pages/AdminConsentViewer'));
+const PricingPage = lazy(() => import('./src/pages/PricingPage'));
+const BillingPage = lazy(() => import('./src/pages/BillingPage'));
+const DocumentsPage = lazy(() => import('./src/pages/DocumentsPage'));
+const MembershipAgreementPage = lazy(() => import('./src/pages/MembershipAgreementPage'));
+const AdminSubscriptionManager = lazy(() => import('./src/pages/AdminSubscriptionManager'));
+const AdminDocumentsPage = lazy(() => import('./src/pages/AdminDocumentsPage'));
+const CommunicationPreferencesPage = lazy(() => import('./src/pages/CommunicationPreferencesPage'));
+const SecuritySettingsPage = lazy(() => import('./src/pages/SecuritySettingsPage'));
+const AdminControlPlanePage = lazy(() => import('./src/pages/AdminControlPlanePage'));
+const UploadCreditReportPage = lazy(() => import('./src/pages/UploadCreditReportPage'));
+const DisputeFactsReviewPage = lazy(() => import('./src/pages/DisputeFactsReviewPage'));
+const DraftPreviewPage = lazy(() => import('./src/pages/DraftPreviewPage'));
+const FinalLetterPage = lazy(() => import('./src/pages/FinalLetterPage'));
+const MailingAuthorizationPage = lazy(() => import('./src/pages/MailingAuthorizationPage'));
+const ClientMailingApprovalsPage = lazy(() => import('./src/pages/ClientMailingApprovalsPage'));
+const AdminMailingQueuePage = lazy(() => import('./src/pages/AdminMailingQueuePage'));
+const DisputeLetterPreviewPage = lazy(() => import('./src/pages/DisputeLetterPreviewPage'));
+const AdminMailingDashboard = lazy(() => import('./src/pages/AdminMailingDashboard'));
+const AdminLegalPublisher = lazy(() => import('./src/pages/AdminLegalPublisher'));
+const AdminEmailProvidersPage = lazy(() => import('./src/pages/AdminEmailProvidersPage'));
+const AdminEmailRoutingPage = lazy(() => import('./src/pages/AdminEmailRoutingPage'));
+const AdminEmailLogsPage = lazy(() => import('./src/pages/AdminEmailLogsPage'));
+const WorkflowDetailPage = lazy(() => import('./src/pages/WorkflowDetailPage'));
+const AdminWorkflowsPage = lazy(() => import('./src/pages/AdminWorkflowsPage'));
+const FreeScorePage = lazy(() => import('./src/pages/FreeScorePage'));
+const FreeChecklistPage = lazy(() => import('./src/pages/FreeChecklistPage'));
+const UnsubscribePage = lazy(() => import('./src/pages/UnsubscribePage'));
+const AdminFunnelSequencesPage = lazy(() => import('./src/pages/AdminFunnelSequencesPage'));
+const AdminFunnelLeadsPage = lazy(() => import('./src/pages/AdminFunnelLeadsPage'));
+const AdminFunnelMetricsPage = lazy(() => import('./src/pages/AdminFunnelMetricsPage'));
 
 const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/dashboard': ViewMode.DASHBOARD,
@@ -224,6 +202,15 @@ const LEGAL_VIEWS: ViewMode[] = [
   ViewMode.MEMBERSHIP_AGREEMENT,
   ViewMode.MAILING_AUTHORIZATION,
 ];
+
+const RouteFallback = () => (
+  <div className="min-h-[50vh] flex items-center justify-center bg-slate-950 text-slate-300">
+    <div className="flex items-center gap-3 text-sm font-medium">
+      <RefreshCw className="h-4 w-4 animate-spin text-cyan-400" />
+      Loading module...
+    </div>
+  </div>
+);
 
 function isLegalViewMode(view: ViewMode): boolean {
   return LEGAL_VIEWS.includes(view);
@@ -771,7 +758,9 @@ export const App = () => {
         )}
         <div className={`flex-1 overflow-auto custom-scrollbar relative ${showNavigation ? 'p-6' : ''}`}>
            {user && !isLegalView && !consentGate.needsAcceptance ? <OfferBanner onUpgrade={() => navigate(ViewMode.BILLING)} /> : null}
-           {renderContent()}
+          <Suspense fallback={<RouteFallback />}>
+            {renderContent()}
+          </Suspense>
         </div>
         {!isLegalView && (
           <div className={showNavigation ? "border-t border-white/10 bg-slate-900 px-6" : "border-t border-white/10 bg-slate-950 px-4 sm:px-6"}>

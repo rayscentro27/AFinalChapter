@@ -345,11 +345,4 @@ export default function ResearchDashboardPage() {
       </div>
     </div>
   );
-=======
-import React from 'react';
-import FundingResearchPage from './FundingResearchPage';
-
-export default function ResearchDashboardPage() {
-  return <FundingResearchPage />;
->>>>>>> 3568bd0 (chore: sync local changes and sanitize repo)
 }
