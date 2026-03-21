@@ -9,8 +9,9 @@ import {
   YAxis,
   Legend,
 } from 'recharts';
-import { AlertTriangle, Info, PieChart, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, Lock, PieChart, RefreshCw } from 'lucide-react';
 import type { Contact } from '../types';
+import useTradingAccess from '../hooks/useTradingAccess';
 
 interface CapitalAllocationSimulatorProps {
   contact: Contact;
@@ -141,6 +142,8 @@ const CapitalAllocationSimulator: React.FC<CapitalAllocationSimulatorProps> = ({
   }, [capitalAmount, alloc, reserveBuffer, startingMonthlyRevenue, payment]);
 
   const allocSum = allocMarketing + allocEquipment + allocWorking;
+  const funded = contact.status === 'Closed' || (contact.fundedDeals?.length || 0) > 0;
+  const tradingAccess = useTradingAccess(contact.id, { reconcileOnFetch: true });
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
@@ -151,6 +154,109 @@ const CapitalAllocationSimulator: React.FC<CapitalAllocationSimulatorProps> = ({
         <p className="text-slate-500 mt-2 font-medium max-w-3xl">
           Educational simulation to understand liquidity, coverage, and reserve risk under optimistic/base/stress assumptions.
         </p>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Advanced Trading Access</div>
+            <div className="text-2xl font-black tracking-tighter text-slate-900 mt-1">Optional, Gated, Educational-Only</div>
+            <p className="text-sm text-slate-500 font-medium mt-2 max-w-3xl">
+              Business Growth remains primary. Trading unlocks only after post-funding and capital-protection checks.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${tradingAccess.snapshot?.eligible ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+              {tradingAccess.snapshot?.eligible ? 'Eligible' : 'Locked'}
+            </span>
+            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${tradingAccess.snapshot?.access_ready ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+              {tradingAccess.snapshot?.access_ready ? 'Unlocked' : 'In Setup'}
+            </span>
+          </div>
+        </div>
+
+        {!funded ? (
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-700 flex items-start gap-3">
+            <Lock size={16} className="mt-0.5 text-slate-500" />
+            <div>Trading access appears only after a funded outcome is logged and reserve discipline is established.</div>
+          </div>
+        ) : null}
+
+        {funded && tradingAccess.loading && !tradingAccess.snapshot ? (
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-700 flex items-center gap-3">
+            <RefreshCw size={16} className="animate-spin text-slate-500" />
+            Checking access requirements...
+          </div>
+        ) : null}
+
+        {funded && tradingAccess.error ? (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+            {tradingAccess.error}
+          </div>
+        ) : null}
+
+        {funded && tradingAccess.snapshot ? (
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-8 rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-3">
+              {tradingAccess.snapshot.blockers.length > 0 ? (
+                <div className="space-y-2">
+                  {tradingAccess.snapshot.blockers.map((blocker) => (
+                    <div key={blocker} className="text-sm text-slate-700 font-medium flex items-start gap-2">
+                      <AlertTriangle size={15} className="text-amber-500 mt-0.5" />
+                      <span>{blocker}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-emerald-700 font-medium flex items-start gap-2">
+                  <CheckCircle2 size={16} className="mt-0.5" />
+                  <span>Eligibility checks passed. Complete opt-in steps to unlock optional modules.</span>
+                </div>
+              )}
+              <div className="text-xs text-slate-500 font-medium">
+                Access flow: Opt in → Watch overview video → Accept disclaimer → Start with paper trading.
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+              {!tradingAccess.snapshot.opted_in ? (
+                <button
+                  onClick={() => void tradingAccess.optIn()}
+                  disabled={!tradingAccess.snapshot.eligible || tradingAccess.busyAction !== null}
+                  className="w-full rounded-xl bg-slate-900 px-4 py-3 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50"
+                >
+                  {tradingAccess.busyAction === 'opt_in' ? 'Saving...' : 'Opt In'}
+                </button>
+              ) : null}
+
+              {tradingAccess.snapshot.opted_in && !tradingAccess.snapshot.video_complete ? (
+                <button
+                  onClick={() => void tradingAccess.completeVideo()}
+                  disabled={tradingAccess.busyAction !== null}
+                  className="w-full rounded-xl bg-blue-600 px-4 py-3 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50"
+                >
+                  {tradingAccess.busyAction === 'video' ? 'Saving...' : 'Mark Overview Complete'}
+                </button>
+              ) : null}
+
+              {tradingAccess.snapshot.opted_in && tradingAccess.snapshot.video_complete && !tradingAccess.snapshot.disclaimer_complete ? (
+                <button
+                  onClick={() => void tradingAccess.acceptDisclaimer()}
+                  disabled={tradingAccess.busyAction !== null}
+                  className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50"
+                >
+                  {tradingAccess.busyAction === 'disclaimer' ? 'Saving...' : 'Accept Disclaimer'}
+                </button>
+              ) : null}
+
+              {tradingAccess.snapshot.access_ready ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700 font-medium">
+                  Access unlocked. Start with paper trading before advanced strategy content.
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {allocSum !== 100 ? (
