@@ -12,6 +12,7 @@ import {
 import useTradingAccess from '../hooks/useTradingAccess';
 import useTradingEducation from '../hooks/useTradingEducation';
 import usePortalAI from '../hooks/usePortalAI';
+import useTradingSignals from '../hooks/useTradingSignals';
 
 interface InvestmentLabProps {
   contact: Contact;
@@ -26,10 +27,13 @@ function statusTone(status: 'locked' | 'ready' | 'active' | 'done'): string {
 
 const InvestmentLab: React.FC<InvestmentLabProps> = ({ contact }) => {
   const [coachPrompt, setCoachPrompt] = useState('Explain the safest next simulation step for me.');
+  const [signalSymbolFilter, setSignalSymbolFilter] = useState('');
+  const [signalTimeframeFilter, setSignalTimeframeFilter] = useState('');
 
   const tradingAccess = useTradingAccess(contact.id, { reconcileOnFetch: true });
   const coach = usePortalAI(contact.id, 'trading_coach');
   const education = useTradingEducation(tradingAccess.snapshot);
+  const liveSignals = useTradingSignals(Boolean(tradingAccess.snapshot?.access_ready), { limit: 20, offset: 0 });
 
   const funded = useMemo(
     () => contact.status === 'Closed' || (contact.fundedDeals?.length || 0) > 0,
@@ -283,6 +287,105 @@ const InvestmentLab: React.FC<InvestmentLabProps> = ({ contact }) => {
                   </div>
                 </article>
               ))}
+            </div>
+          </section>
+
+          <section className="rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Live Approved Signals</p>
+                <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Portal Consumption Contract</h3>
+                <p className="mt-2 text-sm text-slate-600">Reads from `/api/trading/signals` with client-safe fields only.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void liveSignals.refresh()}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
+              >
+                <RefreshCw size={14} className={liveSignals.loading ? 'animate-spin' : ''} /> Refresh
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+              <label className="text-xs font-bold text-slate-700">
+                Symbol
+                <input
+                  value={signalSymbolFilter}
+                  onChange={(event) => setSignalSymbolFilter(event.target.value.toUpperCase())}
+                  placeholder="EURUSD"
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="text-xs font-bold text-slate-700">
+                Timeframe
+                <select
+                  value={signalTimeframeFilter}
+                  onChange={(event) => setSignalTimeframeFilter(event.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                >
+                  <option value="">All</option>
+                  <option value="15m">15m</option>
+                  <option value="1h">1h</option>
+                  <option value="4h">4h</option>
+                  <option value="1d">1d</option>
+                </select>
+              </label>
+
+              <div className="md:col-span-2 flex items-end">
+                <button
+                  type="button"
+                  onClick={() =>
+                    liveSignals.setFilters((prev) => ({
+                      ...prev,
+                      symbol: signalSymbolFilter.trim() || undefined,
+                      timeframe: signalTimeframeFilter || undefined,
+                      market_type: 'forex',
+                      offset: 0,
+                    }))
+                  }
+                  className="w-full rounded-xl bg-slate-900 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white"
+                >
+                  Apply Signal Filters
+                </button>
+              </div>
+            </div>
+
+            {liveSignals.error ? (
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                {liveSignals.error}
+              </div>
+            ) : null}
+
+            <div className="mt-4 space-y-3">
+              {liveSignals.loading ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Loading approved signals...</div>
+              ) : liveSignals.signals.length === 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  No approved/published signals matched this filter.
+                </div>
+              ) : (
+                liveSignals.signals.slice(0, 12).map((signal) => (
+                  <article key={signal.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-black text-slate-900">
+                        {signal.symbol} · {signal.direction} · {signal.timeframe}
+                      </p>
+                      <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
+                        {signal.review_status}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{signal.headline || 'Signal setup'}</p>
+                    <p className="mt-1 text-xs text-slate-700">{signal.client_summary || signal.why_it_matters || 'No summary available.'}</p>
+                    <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 md:grid-cols-4">
+                      <p><span className="font-black">Confidence:</span> {signal.confidence_label || 'n/a'}</p>
+                      <p><span className="font-black">Risk:</span> {signal.risk_label || 'n/a'}</p>
+                      <p><span className="font-black">Score:</span> {signal.score_total ?? 'n/a'}</p>
+                      <p><span className="font-black">Expires:</span> {signal.expires_at ? new Date(signal.expires_at).toLocaleString() : 'n/a'}</p>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
           </section>
 
