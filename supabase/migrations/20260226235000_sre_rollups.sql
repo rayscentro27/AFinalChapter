@@ -11,13 +11,10 @@ create table if not exists public.sre_rollup_5m (
   updated_at timestamptz not null default now(),
   unique (tenant_id, bucket_start, metric)
 );
-
 create index if not exists sre_rollup_5m_tenant_bucket_idx
   on public.sre_rollup_5m (tenant_id, bucket_start desc);
-
 create index if not exists sre_rollup_5m_metric_bucket_idx
   on public.sre_rollup_5m (metric, bucket_start desc);
-
 create table if not exists public.sre_rollup_1h (
   id bigserial primary key,
   tenant_id uuid,
@@ -28,13 +25,10 @@ create table if not exists public.sre_rollup_1h (
   updated_at timestamptz not null default now(),
   unique (tenant_id, bucket_start, metric)
 );
-
 create index if not exists sre_rollup_1h_tenant_bucket_idx
   on public.sre_rollup_1h (tenant_id, bucket_start desc);
-
 create index if not exists sre_rollup_1h_metric_bucket_idx
   on public.sre_rollup_1h (metric, bucket_start desc);
-
 -- Capacity/performance indexes
 
 do $$
@@ -62,7 +56,6 @@ begin
       on public.messages (tenant_id, contact_id, received_at desc);
   end if;
 end $$;
-
 do $$
 begin
   if exists (
@@ -88,7 +81,6 @@ begin
       on public.webhook_events (tenant_id, provider, received_at desc);
   end if;
 end $$;
-
 do $$
 begin
   if exists (
@@ -114,7 +106,6 @@ begin
       on public.outbox_messages (tenant_id, status, next_attempt_at);
   end if;
 end $$;
-
 do $$
 begin
   if exists (

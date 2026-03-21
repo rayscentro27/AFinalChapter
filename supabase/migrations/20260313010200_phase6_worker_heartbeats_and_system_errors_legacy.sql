@@ -1,7 +1,6 @@
 -- Phase 6: worker heartbeats + legacy-compatible system errors
 
 begin;
-
 create table if not exists public.worker_heartbeats (
   worker_id text primary key,
   worker_type text not null,
@@ -26,16 +25,12 @@ create table if not exists public.worker_heartbeats (
   meta jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists worker_heartbeats_last_heartbeat_idx
   on public.worker_heartbeats (last_heartbeat_at desc);
-
 create index if not exists worker_heartbeats_mode_status_idx
   on public.worker_heartbeats (system_mode, status, last_heartbeat_at desc);
-
 create index if not exists worker_heartbeats_last_seen_idx
   on public.worker_heartbeats (last_seen_at desc);
-
 create table if not exists public.system_errors (
   id uuid primary key default gen_random_uuid(),
   source text not null,
@@ -47,14 +42,10 @@ create table if not exists public.system_errors (
   details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists system_errors_created_at_idx
   on public.system_errors (created_at desc);
-
 create index if not exists system_errors_source_severity_idx
   on public.system_errors (source, severity, created_at desc);
-
 create index if not exists system_errors_tenant_created_idx
   on public.system_errors (tenant_id, created_at desc);
-
 commit;

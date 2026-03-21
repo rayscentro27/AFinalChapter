@@ -2,7 +2,6 @@
 -- Adds Stripe-native plan table and compatibility columns while preserving existing plan_code/provider fields.
 
 create extension if not exists pgcrypto;
-
 create table if not exists public.subscription_plans (
   id uuid primary key default gen_random_uuid(),
   stripe_price_id text unique,
@@ -11,10 +10,8 @@ create table if not exists public.subscription_plans (
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
-
 create unique index if not exists subscription_plans_tier_uidx
   on public.subscription_plans (tier);
-
 insert into public.subscription_plans (tier, stripe_price_id, monthly_price_cents, is_active)
 values
   ('free', null, 0, true),
@@ -23,7 +20,6 @@ values
 on conflict (tier) do update
 set monthly_price_cents = excluded.monthly_price_cents,
     is_active = excluded.is_active;
-
 do $do$
 begin
   if exists (
@@ -44,13 +40,11 @@ begin
     alter type public.subscription_status add value 'incomplete';
   end if;
 end $do$;
-
 alter table public.subscriptions
   add column if not exists tier text,
   add column if not exists stripe_customer_id text,
   add column if not exists stripe_subscription_id text,
   add column if not exists cancel_at_period_end boolean not null default false;
-
 do $do$
 begin
   if not exists (
@@ -64,20 +58,16 @@ begin
       check (tier in ('free', 'growth', 'premium'));
   end if;
 end $do$;
-
 update public.subscriptions
 set
   tier = coalesce(tier, lower(plan_code)),
   stripe_customer_id = coalesce(stripe_customer_id, provider_customer_id),
   stripe_subscription_id = coalesce(stripe_subscription_id, provider_subscription_id);
-
 create unique index if not exists subscriptions_stripe_subscription_uidx
   on public.subscriptions (stripe_subscription_id)
   where stripe_subscription_id is not null;
-
 create index if not exists subscriptions_tenant_tier_status_idx
   on public.subscriptions (tenant_id, tier, status, updated_at desc);
-
 create or replace function public.nexus_sync_subscription_compat_columns()
 returns trigger
 language plpgsql
@@ -114,12 +104,10 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_subscriptions_sync_compat on public.subscriptions;
 create trigger trg_subscriptions_sync_compat
 before insert or update on public.subscriptions
 for each row execute procedure public.nexus_sync_subscription_compat_columns();
-
 create or replace function public.nexus_can_manage_subscription_scope(
   p_user_id uuid,
   p_tenant_id uuid
@@ -180,43 +168,35 @@ begin
   return false;
 end;
 $fn$;
-
 grant execute on function public.nexus_can_manage_subscription_scope(uuid, uuid) to authenticated;
-
 alter table public.subscription_plans enable row level security;
-
 drop policy if exists subscription_plans_select_all on public.subscription_plans;
 create policy subscription_plans_select_all
 on public.subscription_plans
 for select to authenticated
 using (true);
-
 drop policy if exists subscription_plans_admin_write on public.subscription_plans;
 create policy subscription_plans_admin_write
 on public.subscription_plans
 for all to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 drop policy if exists subscriptions_select_own_or_admin on public.subscriptions;
 create policy subscriptions_select_own_or_admin
 on public.subscriptions
 for select to authenticated
 using (public.nexus_can_manage_subscription_scope(user_id, tenant_id));
-
 drop policy if exists subscriptions_insert_own_or_admin on public.subscriptions;
 create policy subscriptions_insert_own_or_admin
 on public.subscriptions
 for insert to authenticated
 with check (public.nexus_can_manage_subscription_scope(user_id, tenant_id));
-
 drop policy if exists subscriptions_update_own_or_admin on public.subscriptions;
 create policy subscriptions_update_own_or_admin
 on public.subscriptions
 for update to authenticated
 using (public.nexus_can_manage_subscription_scope(user_id, tenant_id))
 with check (public.nexus_can_manage_subscription_scope(user_id, tenant_id));
-
 drop policy if exists subscription_events_select_own_or_admin on public.subscription_events;
 create policy subscription_events_select_own_or_admin
 on public.subscription_events
@@ -229,7 +209,6 @@ using (
       and public.nexus_can_manage_subscription_scope(s.user_id, s.tenant_id)
   )
 );
-
 drop policy if exists subscription_events_insert_own_or_admin on public.subscription_events;
 create policy subscription_events_insert_own_or_admin
 on public.subscription_events

@@ -72,5 +72,4 @@ begin
     coalesce(latest_out_metadata ->> 'method', 'settings') as last_method;
 end;
 $fn$;
-
 grant execute on function public.get_sms_consent_status(uuid) to authenticated;

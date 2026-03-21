@@ -1,0 +1,40 @@
+PROMPT 14 — NEXUS CAPITAL ALLOCATION ENGINE
+
+You are a Senior Staff Engineer implementing the Nexus Capital Allocation Engine.
+
+Purpose:
+Determine how much capital each strategy is allowed to trade based on performance, evidence, regime, and diversification.
+
+STRICT RULES
+- DO NOT modify execution gateway
+- DO NOT place trades
+- Add-only service: /opt/nexus-services/capital-allocator
+- No secrets committed
+
+INPUT TABLES:
+strategy_scores, promotion_evidence, market_regimes, strategy_performance, approved_signals
+
+OUTPUT TABLE:
+strategy_allocations
+
+SUPABASE SQL:
+/opt/nexus-services/ops/supabase/capital_allocator.sql
+
+PORTFOLIO LIMITS (defaults):
+TOTAL_ACCOUNT_RISK=0.05
+MAX_STRATEGY_RISK=0.01
+MAX_STRATEGIES_ACTIVE=5
+MIN_STRATEGY_SCORE=60
+
+WORKER:
+every 5 minutes:
+- compute allocation_score
+- allocate % weights
+- cap risk
+- write strategy_allocations
+
+FILES:
+worker.js, allocationEngine.js, scoreEngine.js, regimeMatcher.js, diversificationEngine.js, db.js, config.js, package.json, .env.example, README.md
+
+SYSTEMD:
+capital-allocator.service + capital-allocator.timer (every 5 minutes)

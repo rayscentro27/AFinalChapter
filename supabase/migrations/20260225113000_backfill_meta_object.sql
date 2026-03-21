@@ -16,7 +16,6 @@ where provider = 'meta'
     or coalesce(display_name, '') ilike '%instagram%'
     or external_account_id like '178%'
   );
-
 update public.channel_accounts
 set metadata = jsonb_set(
   coalesce(metadata, '{}'::jsonb),

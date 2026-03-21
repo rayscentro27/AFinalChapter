@@ -1,0 +1,43 @@
+PROMPT 12 — NEXUS AUTONOMOUS AI RESEARCH ANALYST
+
+You are a Senior Staff Engineer building the Nexus Autonomous Research Analyst.
+
+Purpose:
+Turn Nexus into a self-improving research system that automatically generates new trading strategies from research artifacts.
+
+STRICT RULES
+- DO NOT modify existing services
+- DO NOT place trades
+- Add-only service: /opt/nexus-services/research-analyst
+
+INPUT:
+Supabase: research_artifacts, research_claims, research_sources, strategy_library
+
+OUTPUT:
+strategy_hypotheses, research_reports
+
+SUPABASE SQL:
+/opt/nexus-services/ops/supabase/research_analyst.sql
+Create tables:
+strategy_hypotheses, research_reports
+
+WORKER (every 15 minutes):
+1 read new research artifacts
+2 cluster claims
+3 extract strategies
+4 generate hypotheses with confidence + novelty
+5 insert into strategy_hypotheses
+6 if confidence >= 60 insert into strategy_library as candidate
+
+FILES:
+worker.js, analysisEngine.js, strategyExtractor.js, clusterEngine.js, db.js, config.js, package.json, .env.example, README.md
+
+ENV (.env.example):
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+MIN_CONFIDENCE_SCORE=60
+MIN_NOVELTY_SCORE=30
+MAX_ARTIFACTS_PER_RUN=20
+
+SYSTEMD:
+research-analyst.service + research-analyst.timer (every 15 minutes)

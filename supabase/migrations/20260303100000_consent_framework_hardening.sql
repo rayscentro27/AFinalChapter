@@ -2,7 +2,6 @@
 -- Ensures super-admin compatibility, durable audit fields, and complete consent status visibility.
 
 create extension if not exists pgcrypto;
-
 create or replace function public.nexus_is_master_admin_compat()
 returns boolean
 language plpgsql
@@ -46,9 +45,7 @@ begin
   return lower(coalesce(auth.jwt() ->> 'role', '')) in ('super_admin', 'admin');
 end;
 $fn$;
-
 grant execute on function public.nexus_is_master_admin_compat() to authenticated;
-
 create table if not exists public.consents (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -61,34 +58,26 @@ create table if not exists public.consents (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create unique index if not exists consents_user_type_version_uidx
   on public.consents (user_id, consent_type, version);
-
 create index if not exists consents_tenant_user_idx
   on public.consents (tenant_id, user_id, accepted_at desc);
-
 create index if not exists consents_user_accepted_idx
   on public.consents (user_id, accepted_at desc);
-
 alter table public.consents enable row level security;
-
 drop policy if exists consents_select_own on public.consents;
 create policy consents_select_own on public.consents
 for select to authenticated
 using (auth.uid() = user_id);
-
 drop policy if exists consents_select_master_admin on public.consents;
 drop policy if exists consents_select_super_admin on public.consents;
 create policy consents_select_super_admin on public.consents
 for select to authenticated
 using (public.nexus_is_master_admin_compat());
-
 drop policy if exists consents_insert_own on public.consents;
 create policy consents_insert_own on public.consents
 for insert to authenticated
 with check (auth.uid() = user_id);
-
 create table if not exists public.audit_events (
   id bigserial primary key,
   tenant_id uuid null,
@@ -97,12 +86,10 @@ create table if not exists public.audit_events (
   metadata jsonb,
   created_at timestamptz default now()
 );
-
 alter table public.audit_events add column if not exists actor_user_id uuid;
 alter table public.audit_events add column if not exists event_type text;
 alter table public.audit_events add column if not exists metadata jsonb;
 alter table public.audit_events add column if not exists created_at timestamptz;
-
 do $do$
 begin
   if exists (
@@ -134,7 +121,6 @@ begin
   end if;
 end;
 $do$;
-
 do $do$
 begin
   if exists (
@@ -178,18 +164,14 @@ begin
   $sql$;
 end;
 $do$;
-
 alter table public.audit_events alter column event_type set default 'event';
 alter table public.audit_events alter column created_at set default now();
 alter table public.audit_events alter column metadata set default '{}'::jsonb;
-
 alter table public.audit_events alter column event_type set not null;
 alter table public.audit_events alter column created_at set not null;
 alter table public.audit_events alter column metadata set not null;
-
 create index if not exists audit_events_tenant_created_idx
   on public.audit_events (tenant_id, created_at desc);
-
 create table if not exists public.consent_requirements (
   consent_type public.consent_type primary key,
   current_version text not null,
@@ -198,7 +180,6 @@ create table if not exists public.consent_requirements (
   updated_by_user_id uuid references auth.users(id) on delete set null,
   updated_at timestamptz not null default now()
 );
-
 insert into public.consent_requirements (consent_type, current_version, is_required, description)
 values
   ('terms', 'v1', true, 'Terms of Service acceptance required for workspace access.'),
@@ -211,7 +192,6 @@ values
   ('sms_opt_in', 'v1', false, 'SMS opt-in consent.'),
   ('sms_opt_out', 'v1', false, 'SMS opt-out record.')
 on conflict (consent_type) do nothing;
-
 create or replace function public.nexus_all_known_user_ids()
 returns table(user_id uuid)
 language plpgsql
@@ -242,9 +222,7 @@ begin
   end if;
 end;
 $fn$;
-
 grant execute on function public.nexus_all_known_user_ids() to authenticated;
-
 create or replace view public.user_consent_status as
 with cfg as (
   select
@@ -312,7 +290,6 @@ group by
   cfg.ai_disclosure_version,
   cfg.disclaimers_version,
   cfg.comms_email_version;
-
 grant select on public.user_consent_status to authenticated;
 grant select, insert on public.consents to authenticated, service_role;
 grant select, insert on public.audit_events to authenticated, service_role;

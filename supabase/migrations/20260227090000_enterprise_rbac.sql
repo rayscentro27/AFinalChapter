@@ -2,7 +2,6 @@
 -- Enterprise RBAC: custom roles + permissions, with legacy role backfill.
 
 create extension if not exists pgcrypto;
-
 create table if not exists public.tenant_roles (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -12,7 +11,6 @@ create table if not exists public.tenant_roles (
   created_at timestamptz not null default now(),
   unique (tenant_id, key)
 );
-
 create table if not exists public.tenant_role_permissions (
   id bigserial primary key,
   tenant_id uuid not null,
@@ -20,10 +18,8 @@ create table if not exists public.tenant_role_permissions (
   permission text not null,
   unique (tenant_id, role_id, permission)
 );
-
 create index if not exists tenant_role_permissions_tenant_permission_idx
   on public.tenant_role_permissions (tenant_id, permission);
-
 -- Add role_id to tenant membership tables when present.
 do $$
 begin
@@ -53,7 +49,6 @@ begin
     end if;
   end if;
 end $$;
-
 do $$
 begin
   if exists (
@@ -82,7 +77,6 @@ begin
     end if;
   end if;
 end $$;
-
 -- Membership indexes.
 do $$
 begin
@@ -110,7 +104,6 @@ begin
       on public.tenant_members (tenant_id, role_id);
   end if;
 end $$;
-
 -- Backfill system roles for tenants with existing memberships.
 do $$
 begin
@@ -150,7 +143,6 @@ begin
     $sql$;
   end if;
 end $$;
-
 -- Backfill role permissions for system roles.
 insert into public.tenant_role_permissions (tenant_id, role_id, permission)
 select tr.tenant_id, tr.id, p.permission
@@ -212,7 +204,6 @@ join (
 ) as p(role_key, permission)
   on p.role_key = tr.key
 on conflict (tenant_id, role_id, permission) do nothing;
-
 -- Backfill role_id from existing role text (tenant_memberships).
 do $$
 begin
@@ -231,7 +222,6 @@ begin
     $sql$;
   end if;
 end $$;
-
 -- Backfill role_id from existing role text (tenant_members).
 do $$
 begin

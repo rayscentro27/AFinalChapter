@@ -1,7 +1,6 @@
 -- Prompt 6: finalized legal docs with versioning + admin publishing
 
 create extension if not exists pgcrypto;
-
 create table if not exists public.legal_documents (
   id uuid primary key default gen_random_uuid(),
   doc_key text not null,
@@ -18,11 +17,9 @@ create table if not exists public.legal_documents (
   updated_at timestamptz not null default now(),
   unique (doc_key, version)
 );
-
 create unique index if not exists legal_documents_active_doc_key_uidx
   on public.legal_documents (doc_key)
   where is_active = true;
-
 create table if not exists public.consent_requirements (
   consent_type public.consent_type primary key,
   current_version text not null,
@@ -31,7 +28,6 @@ create table if not exists public.consent_requirements (
   updated_by_user_id uuid references auth.users(id) on delete set null,
   updated_at timestamptz not null default now()
 );
-
 create or replace function public.nexus_set_updated_at()
 returns trigger
 language plpgsql
@@ -41,70 +37,58 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_legal_documents_set_updated_at on public.legal_documents;
 create trigger trg_legal_documents_set_updated_at
 before update on public.legal_documents
 for each row execute procedure public.nexus_set_updated_at();
-
 drop trigger if exists trg_consent_requirements_set_updated_at on public.consent_requirements;
 create trigger trg_consent_requirements_set_updated_at
 before update on public.consent_requirements
 for each row execute procedure public.nexus_set_updated_at();
-
 alter table public.legal_documents enable row level security;
 alter table public.consent_requirements enable row level security;
-
 DROP POLICY IF EXISTS legal_documents_select_published ON public.legal_documents;
 create policy legal_documents_select_published
 on public.legal_documents
 for select to anon, authenticated
 using (status = 'published' and is_active = true);
-
 DROP POLICY IF EXISTS legal_documents_select_admin_all ON public.legal_documents;
 create policy legal_documents_select_admin_all
 on public.legal_documents
 for select to authenticated
 using (public.nexus_is_master_admin_compat());
-
 DROP POLICY IF EXISTS legal_documents_admin_insert ON public.legal_documents;
 create policy legal_documents_admin_insert
 on public.legal_documents
 for insert to authenticated
 with check (public.nexus_is_master_admin_compat());
-
 DROP POLICY IF EXISTS legal_documents_admin_update ON public.legal_documents;
 create policy legal_documents_admin_update
 on public.legal_documents
 for update to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 DROP POLICY IF EXISTS legal_documents_admin_delete ON public.legal_documents;
 create policy legal_documents_admin_delete
 on public.legal_documents
 for delete to authenticated
 using (public.nexus_is_master_admin_compat());
-
 DROP POLICY IF EXISTS consent_requirements_select_all ON public.consent_requirements;
 create policy consent_requirements_select_all
 on public.consent_requirements
 for select to anon, authenticated
 using (true);
-
 DROP POLICY IF EXISTS consent_requirements_admin_write ON public.consent_requirements;
 create policy consent_requirements_admin_write
 on public.consent_requirements
 for all to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 grant usage on schema public to anon, authenticated, service_role;
 grant select on table public.legal_documents to anon, authenticated, service_role;
 grant insert, update, delete on table public.legal_documents to authenticated, service_role;
 grant select on table public.consent_requirements to anon, authenticated, service_role;
 grant insert, update, delete on table public.consent_requirements to authenticated, service_role;
-
 insert into public.consent_requirements (consent_type, current_version, is_required, description)
 values
   ('terms', 'v1', true, 'Terms of Service acceptance required for workspace access.'),
@@ -117,7 +101,6 @@ values
   ('sms_opt_in', 'v1', false, 'SMS opt-in consent.'),
   ('sms_opt_out', 'v1', false, 'SMS opt-out record.')
 on conflict (consent_type) do nothing;
-
 insert into public.legal_documents (doc_key, version, title, subtitle, markdown_body, status, is_active)
 values
   (
@@ -274,7 +257,6 @@ set
   markdown_body = excluded.markdown_body,
   status = excluded.status,
   updated_at = now();
-
 -- Set initial active versions only when none exist for a given doc_key.
 update public.legal_documents ld
 set
@@ -298,7 +280,6 @@ and not exists (
   where x.doc_key = ld.doc_key
     and x.is_active = true
 );
-
 create or replace function public.admin_publish_legal_document(
   p_doc_key text,
   p_version text
@@ -351,9 +332,7 @@ begin
   select doc_row.id, doc_row.doc_key, doc_row.version, doc_row.published_at;
 end;
 $fn$;
-
 grant execute on function public.admin_publish_legal_document(text, text) to authenticated;
-
 create or replace view public.user_consent_status as
 with cfg as (
   select
@@ -416,5 +395,4 @@ group by
   cfg.ai_disclosure_version,
   cfg.disclaimers_version,
   cfg.comms_email_version;
-
 grant select on public.user_consent_status to authenticated;

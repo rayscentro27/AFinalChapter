@@ -1,0 +1,57 @@
+PROMPT 18 — NEXUS KNOWLEDGE GRAPH LAYER (Nodes + Edges in Supabase)
+
+You are a Senior Staff Engineer implementing the Nexus Knowledge Graph Layer inside Supabase.
+
+Purpose:
+Store structured relationships between strategies, research, regimes, and concepts so Nexus can reason via SQL queries without LLM calls.
+
+STRICT RULES:
+- Add-only implementation
+- Do not modify existing services
+- No secrets committed
+
+SUPABASE SQL:
+/opt/nexus-services/ops/supabase/knowledge_graph.sql
+
+TABLE: graph_nodes
+- id uuid pk default gen_random_uuid()
+- created_at timestamptz default now()
+- node_type text (strategy|market_regime|indicator|risk_model|research_source|trading_concept)
+- name text
+- description text
+- meta jsonb default '{}'::jsonb
+
+TABLE: graph_edges
+- id uuid pk default gen_random_uuid()
+- created_at timestamptz default now()
+- source_node uuid references graph_nodes(id)
+- target_node uuid references graph_nodes(id)
+- relationship text
+- confidence numeric
+- meta jsonb default '{}'::jsonb
+
+RELATIONSHIPS:
+works_in_regime, derived_from, uses_indicator, requires_risk_model, supports_strategy, contradicts_strategy, improves_strategy
+
+SERVICE:
+/opt/nexus-services/knowledge-graph
+
+FILES:
+graphBuilder.js
+graphQueries.js
+db.js
+config.js
+package.json
+.env.example
+README.md
+
+WORKER (every 10 minutes):
+- read new research artifacts + strategy_library rows
+- extract relationships (rule-based deterministic v1)
+- upsert nodes (dedupe by node_type+name)
+- insert edges with confidence score
+- never delete nodes; mark obsolete via meta if needed
+
+VALIDATION:
+select * from graph_nodes limit 10;
+select * from graph_edges limit 10;

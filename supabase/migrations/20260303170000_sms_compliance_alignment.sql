@@ -44,9 +44,7 @@ begin
   return lower(coalesce(auth.jwt() ->> 'role', '')) = 'super_admin';
 end;
 $fn$;
-
 grant execute on function public.nexus_is_super_admin_only() to authenticated;
-
 -- Alias required by product surface: getSmsConsentStatus(user_id)
 create or replace function public.getsmsconsentstatus(p_user_id uuid default auth.uid())
 returns table (
@@ -66,9 +64,7 @@ as $fn$
   select *
   from public.get_sms_consent_status(p_user_id);
 $fn$;
-
 grant execute on function public.getsmsconsentstatus(uuid) to authenticated;
-
 -- Quoted camelCase alias for direct SQL integrations.
 create or replace function public."getSmsConsentStatus"(p_user_id uuid default auth.uid())
 returns table (
@@ -88,9 +84,7 @@ as $fn$
   select *
   from public.get_sms_consent_status(p_user_id);
 $fn$;
-
 grant execute on function public."getSmsConsentStatus"(uuid) to authenticated;
-
 -- SMS template writes restricted to super_admin.
 drop policy if exists sms_templates_admin_write on public.sms_templates;
 create policy sms_templates_admin_write
@@ -98,7 +92,6 @@ on public.sms_templates
 for all to authenticated
 using (public.nexus_is_super_admin_only())
 with check (public.nexus_is_super_admin_only());
-
 -- Explicit SMS consent read policy for super_admin visibility.
 drop policy if exists consents_select_sms_super_admin on public.consents;
 create policy consents_select_sms_super_admin

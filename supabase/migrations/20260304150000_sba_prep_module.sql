@@ -1,7 +1,6 @@
 -- SBA Prep module (educational only, no approval/amount guarantees)
 
 create extension if not exists pgcrypto;
-
 create or replace function public.nexus_sba_is_admin()
 returns boolean
 language plpgsql
@@ -22,7 +21,6 @@ begin
   return lower(coalesce(auth.jwt() ->> 'role', '')) in ('admin', 'super_admin');
 end;
 $fn$;
-
 create or replace function public.nexus_sba_can_access_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -81,7 +79,6 @@ begin
   return false;
 end;
 $fn$;
-
 create or replace function public.nexus_sba_can_manage_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -142,7 +139,6 @@ begin
   return false;
 end;
 $fn$;
-
 create or replace function public.nexus_sba_user_has_premium(p_user_id uuid, p_tenant_id uuid)
 returns boolean
 language sql
@@ -161,12 +157,10 @@ as $fn$
     limit 1
   );
 $fn$;
-
 grant execute on function public.nexus_sba_is_admin() to authenticated;
 grant execute on function public.nexus_sba_can_access_tenant(uuid) to authenticated;
 grant execute on function public.nexus_sba_can_manage_tenant(uuid) to authenticated;
 grant execute on function public.nexus_sba_user_has_premium(uuid, uuid) to authenticated;
-
 create table if not exists public.uploads (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -178,13 +172,10 @@ create table if not exists public.uploads (
   size_bytes bigint,
   created_at timestamptz not null default now()
 );
-
 create index if not exists uploads_tenant_user_created_idx
   on public.uploads (tenant_id, user_id, created_at desc);
-
 create unique index if not exists uploads_bucket_path_uidx
   on public.uploads (bucket, object_path);
-
 create table if not exists public.sba_prep_plans (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -198,7 +189,6 @@ create table if not exists public.sba_prep_plans (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.sba_documents_required (
   id uuid primary key default gen_random_uuid(),
   key text not null unique,
@@ -206,7 +196,6 @@ create table if not exists public.sba_documents_required (
   description_md text not null,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.sba_document_links (
   id uuid primary key default gen_random_uuid(),
   plan_id uuid not null references public.sba_prep_plans(id) on delete cascade,
@@ -218,16 +207,12 @@ create table if not exists public.sba_document_links (
   updated_at timestamptz not null default now(),
   unique(plan_id, required_doc_key)
 );
-
 create index if not exists sba_prep_plans_tenant_user_status_idx
   on public.sba_prep_plans (tenant_id, user_id, status, updated_at desc);
-
 create index if not exists sba_document_links_plan_status_idx
   on public.sba_document_links (plan_id, status, updated_at desc);
-
 create index if not exists sba_document_links_upload_idx
   on public.sba_document_links (upload_id);
-
 create or replace function public.nexus_sba_set_updated_at()
 returns trigger
 language plpgsql
@@ -237,17 +222,14 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_sba_prep_plans_set_updated_at on public.sba_prep_plans;
 create trigger trg_sba_prep_plans_set_updated_at
 before update on public.sba_prep_plans
 for each row execute procedure public.nexus_sba_set_updated_at();
-
 drop trigger if exists trg_sba_document_links_set_updated_at on public.sba_document_links;
 create trigger trg_sba_document_links_set_updated_at
 before update on public.sba_document_links
 for each row execute procedure public.nexus_sba_set_updated_at();
-
 create or replace function public.nexus_sba_recompute_plan_readiness(p_plan_id uuid)
 returns void
 language plpgsql
@@ -320,9 +302,7 @@ begin
   where id = p_plan_id;
 end;
 $fn$;
-
 grant execute on function public.nexus_sba_recompute_plan_readiness(uuid) to authenticated, service_role;
-
 create or replace function public.nexus_sba_recompute_from_link_trigger()
 returns trigger
 language plpgsql
@@ -334,17 +314,14 @@ begin
   return coalesce(new, old);
 end;
 $fn$;
-
 drop trigger if exists trg_sba_document_links_recompute on public.sba_document_links;
 create trigger trg_sba_document_links_recompute
 after insert or update or delete on public.sba_document_links
 for each row execute procedure public.nexus_sba_recompute_from_link_trigger();
-
 alter table public.uploads enable row level security;
 alter table public.sba_prep_plans enable row level security;
 alter table public.sba_documents_required enable row level security;
 alter table public.sba_document_links enable row level security;
-
 -- uploads
 
 drop policy if exists uploads_select_scope on public.uploads;
@@ -355,7 +332,6 @@ using (
   auth.uid() = user_id
   or public.nexus_sba_can_access_tenant(tenant_id)
 );
-
 drop policy if exists uploads_insert_scope on public.uploads;
 create policy uploads_insert_scope
 on public.uploads
@@ -368,7 +344,6 @@ with check (
   )
   or public.nexus_sba_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists uploads_update_scope on public.uploads;
 create policy uploads_update_scope
 on public.uploads
@@ -381,7 +356,6 @@ with check (
   auth.uid() = user_id
   or public.nexus_sba_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists uploads_delete_scope on public.uploads;
 create policy uploads_delete_scope
 on public.uploads
@@ -390,7 +364,6 @@ using (
   auth.uid() = user_id
   or public.nexus_sba_can_manage_tenant(tenant_id)
 );
-
 -- sba_documents_required
 
 drop policy if exists sba_documents_required_select_all on public.sba_documents_required;
@@ -398,14 +371,12 @@ create policy sba_documents_required_select_all
 on public.sba_documents_required
 for select to authenticated
 using (true);
-
 drop policy if exists sba_documents_required_admin_write on public.sba_documents_required;
 create policy sba_documents_required_admin_write
 on public.sba_documents_required
 for all to authenticated
 using (public.nexus_sba_is_admin())
 with check (public.nexus_sba_is_admin());
-
 -- sba_prep_plans
 
 drop policy if exists sba_prep_plans_select_scope on public.sba_prep_plans;
@@ -416,7 +387,6 @@ using (
   auth.uid() = user_id
   or public.nexus_sba_can_access_tenant(tenant_id)
 );
-
 drop policy if exists sba_prep_plans_insert_scope on public.sba_prep_plans;
 create policy sba_prep_plans_insert_scope
 on public.sba_prep_plans
@@ -429,7 +399,6 @@ with check (
   )
   or public.nexus_sba_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists sba_prep_plans_update_scope on public.sba_prep_plans;
 create policy sba_prep_plans_update_scope
 on public.sba_prep_plans
@@ -446,7 +415,6 @@ with check (
   )
   or public.nexus_sba_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists sba_prep_plans_delete_scope on public.sba_prep_plans;
 create policy sba_prep_plans_delete_scope
 on public.sba_prep_plans
@@ -455,7 +423,6 @@ using (
   auth.uid() = user_id
   or public.nexus_sba_can_manage_tenant(tenant_id)
 );
-
 -- sba_document_links
 
 drop policy if exists sba_document_links_select_scope on public.sba_document_links;
@@ -473,7 +440,6 @@ using (
       )
   )
 );
-
 drop policy if exists sba_document_links_insert_scope on public.sba_document_links;
 create policy sba_document_links_insert_scope
 on public.sba_document_links
@@ -489,7 +455,6 @@ with check (
       )
   )
 );
-
 drop policy if exists sba_document_links_update_client_scope on public.sba_document_links;
 create policy sba_document_links_update_client_scope
 on public.sba_document_links
@@ -514,7 +479,6 @@ with check (
       and public.nexus_sba_user_has_premium(p.user_id, p.tenant_id)
   )
 );
-
 drop policy if exists sba_document_links_update_admin_scope on public.sba_document_links;
 create policy sba_document_links_update_admin_scope
 on public.sba_document_links
@@ -535,7 +499,6 @@ with check (
       and public.nexus_sba_can_manage_tenant(p.tenant_id)
   )
 );
-
 drop policy if exists sba_document_links_delete_scope on public.sba_document_links;
 create policy sba_document_links_delete_scope
 on public.sba_document_links
@@ -548,12 +511,10 @@ using (
       and public.nexus_sba_can_manage_tenant(p.tenant_id)
   )
 );
-
 grant select, insert, update, delete on table public.uploads to authenticated, service_role;
 grant select, insert, update, delete on table public.sba_prep_plans to authenticated, service_role;
 grant select, insert, update, delete on table public.sba_documents_required to authenticated, service_role;
 grant select, insert, update, delete on table public.sba_document_links to authenticated, service_role;
-
 insert into public.sba_documents_required (key, title, description_md)
 values
   ('pnl', 'Profit and Loss Statements', 'Last 2-3 years and year-to-date P&L statements for educational lender prep review.'),

@@ -1,0 +1,88 @@
+PROMPT 8 — NEXUS CHANNEL CREDIBILITY ENGINE
+
+You are a Senior Staff Engineer implementing a YouTube channel credibility scoring system for Nexus Research Brain.
+
+STRICT RULES
+- DO NOT modify existing watcher or research worker services.
+- ADD a new service under /opt/nexus-services/channel-ranker.
+- No YouTube API keys required.
+- Use existing channel data from youtube_watchlist.
+
+GOAL
+Create a credibility scoring engine that evaluates YouTube trading channels before their videos enter the research pipeline.
+
+SERVICE
+/opt/nexus-services/channel-ranker
+
+FILES
+channel-ranker/
+  worker.js
+  scorer.js
+  transcriptAnalyzer.js
+  db.js
+  package.json
+  .env.example
+
+FUNCTIONS
+transcriptAnalyzer.js
+- scan transcripts
+- detect hype phrases
+- detect educational signals
+
+scorer.js
+calculate channel score based on:
+positive signals
+negative signals
+strategy specificity
+risk management mentions
+
+OUTPUT
+channel_scores table
+
+schema
+channel_id text
+score numeric
+risk_rating text
+educational_score numeric
+hype_penalty numeric
+last_updated timestamptz
+
+FILTERING RULES
+score >= 70 trusted
+score 50-69 review queue
+score < 50 blacklist
+
+SUPABASE TABLES
+youtube_channels
+id uuid pk
+channel_id text
+channel_name text
+subscriber_count numeric
+created_at timestamptz
+
+channel_scores
+channel_id text
+score numeric
+last_updated timestamptz
+
+channel_blacklist
+channel_id text
+reason text
+created_at timestamptz
+
+ENV
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+
+SYSTEMD
+channel-ranker.service
+channel-ranker.timer
+
+Timer interval
+every 24 hours
+
+RUNBOOK
+node worker.js --once
+
+validate
+select * from channel_scores order by score desc limit 10;

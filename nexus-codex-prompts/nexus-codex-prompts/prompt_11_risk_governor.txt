@@ -1,0 +1,54 @@
+PROMPT 11 — NEXUS AI RISK GOVERNOR
+
+You are a Senior Staff Engineer implementing the final safety layer of the Nexus trading system.
+
+CRITICAL REQUIREMENTS
+- This module must NEVER place trades itself.
+- It only validates and approves/blocks signals before execution.
+- It sits between strategy signals and the execution gateway.
+- ADD-ONLY service under /opt/nexus-services/risk-governor
+
+DO NOT MODIFY:
+- /opt/nexus-api/gateway
+- /opt/nexus-services/execution-gateway
+- /opt/nexus-services/trading-brain
+
+DATA FLOW:
+trade_signals → risk_governor → approved_signals → execution_gateway
+
+SUPABASE SQL:
+/opt/nexus-services/ops/supabase/risk_governor.sql
+
+Tables:
+risk_checks, approved_signals
+
+RULES (defaults):
+MAX_TRADES_PER_DAY=10
+MAX_RISK_PER_TRADE=1%
+MAX_ACCOUNT_RISK=5%
+MAX_DAILY_LOSS=3%
+MAX_OPEN_TRADES=5
+ALLOWED_INSTRUMENTS=EUR_USD,GBP_USD,USD_JPY,AUD_USD,USD_CAD
+
+Worker:
+every 30 seconds:
+- fetch pending signals
+- evaluate risk
+- insert risk_checks
+- if approved insert approved_signals
+
+FILES:
+worker.js, db.js, riskEngine.js, config.js, package.json, .env.example, README.md
+
+SYSTEMD:
+risk-governor.service (long-running) or timer every 30s (either is acceptable but prefer long-running loop)
+
+ENV (.env.example):
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+MAX_TRADES_PER_DAY=10
+MAX_RISK_PER_TRADE=0.01
+MAX_ACCOUNT_RISK=0.05
+MAX_DAILY_LOSS=0.03
+MAX_OPEN_TRADES=5
+ALLOWED_INSTRUMENTS=EUR_USD,GBP_USD,USD_JPY,AUD_USD,USD_CAD

@@ -2,7 +2,6 @@
 -- No guarantees of grant outcomes. No automatic submission.
 
 create extension if not exists pgcrypto;
-
 create or replace function public.nexus_grants_is_admin()
 returns boolean
 language plpgsql
@@ -30,7 +29,6 @@ begin
   return lower(coalesce(auth.jwt() ->> 'role', '')) in ('admin', 'super_admin');
 end;
 $fn$;
-
 create or replace function public.nexus_grants_can_access_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -96,7 +94,6 @@ begin
   return false;
 end;
 $fn$;
-
 create or replace function public.nexus_grants_can_manage_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -164,11 +161,9 @@ begin
   return false;
 end;
 $fn$;
-
 grant execute on function public.nexus_grants_is_admin() to authenticated;
 grant execute on function public.nexus_grants_can_access_tenant(uuid) to authenticated;
 grant execute on function public.nexus_grants_can_manage_tenant(uuid) to authenticated;
-
 create table if not exists public.grants_catalog (
   id uuid primary key default gen_random_uuid(),
   source text not null,
@@ -184,7 +179,6 @@ create table if not exists public.grants_catalog (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.grant_matches (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -198,7 +192,6 @@ create table if not exists public.grant_matches (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.grant_application_drafts (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -211,7 +204,6 @@ create table if not exists public.grant_application_drafts (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.grant_submissions (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -225,34 +217,24 @@ create table if not exists public.grant_submissions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists grants_catalog_active_deadline_idx
   on public.grants_catalog (is_active, deadline_date);
-
 create index if not exists grants_catalog_geo_idx
   on public.grants_catalog using gin (geography);
-
 create index if not exists grants_catalog_tags_idx
   on public.grants_catalog using gin (industry_tags);
-
 create index if not exists grant_matches_tenant_user_status_idx
   on public.grant_matches (tenant_id, user_id, status, created_at desc);
-
 create index if not exists grant_matches_grant_status_idx
   on public.grant_matches (grant_id, status, updated_at desc);
-
 create unique index if not exists grant_matches_unique_client_grant_idx
   on public.grant_matches (tenant_id, user_id, client_file_id, grant_id);
-
 create index if not exists grant_drafts_match_status_idx
   on public.grant_application_drafts (grant_match_id, status, updated_at desc);
-
 create index if not exists grant_submissions_match_status_idx
   on public.grant_submissions (grant_match_id, status, updated_at desc);
-
 create unique index if not exists grant_submissions_unique_match_method_idx
   on public.grant_submissions (grant_match_id, submission_method);
-
 create or replace function public.nexus_grants_set_updated_at()
 returns trigger
 language plpgsql
@@ -262,58 +244,48 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_grants_catalog_set_updated_at on public.grants_catalog;
 create trigger trg_grants_catalog_set_updated_at
 before update on public.grants_catalog
 for each row execute procedure public.nexus_grants_set_updated_at();
-
 drop trigger if exists trg_grant_matches_set_updated_at on public.grant_matches;
 create trigger trg_grant_matches_set_updated_at
 before update on public.grant_matches
 for each row execute procedure public.nexus_grants_set_updated_at();
-
 drop trigger if exists trg_grant_application_drafts_set_updated_at on public.grant_application_drafts;
 create trigger trg_grant_application_drafts_set_updated_at
 before update on public.grant_application_drafts
 for each row execute procedure public.nexus_grants_set_updated_at();
-
 drop trigger if exists trg_grant_submissions_set_updated_at on public.grant_submissions;
 create trigger trg_grant_submissions_set_updated_at
 before update on public.grant_submissions
 for each row execute procedure public.nexus_grants_set_updated_at();
-
 alter table public.grants_catalog enable row level security;
 alter table public.grant_matches enable row level security;
 alter table public.grant_application_drafts enable row level security;
 alter table public.grant_submissions enable row level security;
-
 -- grants_catalog: all authenticated users can read active rows; admin can manage.
 drop policy if exists grants_catalog_select_active on public.grants_catalog;
 create policy grants_catalog_select_active
 on public.grants_catalog
 for select to authenticated
 using (is_active = true or public.nexus_grants_is_admin());
-
 drop policy if exists grants_catalog_admin_insert on public.grants_catalog;
 create policy grants_catalog_admin_insert
 on public.grants_catalog
 for insert to authenticated
 with check (public.nexus_grants_is_admin());
-
 drop policy if exists grants_catalog_admin_update on public.grants_catalog;
 create policy grants_catalog_admin_update
 on public.grants_catalog
 for update to authenticated
 using (public.nexus_grants_is_admin())
 with check (public.nexus_grants_is_admin());
-
 drop policy if exists grants_catalog_admin_delete on public.grants_catalog;
 create policy grants_catalog_admin_delete
 on public.grants_catalog
 for delete to authenticated
 using (public.nexus_grants_is_admin());
-
 -- grant_matches
 drop policy if exists grant_matches_select_scope on public.grant_matches;
 create policy grant_matches_select_scope
@@ -323,7 +295,6 @@ using (
   auth.uid() = user_id
   or public.nexus_grants_can_access_tenant(tenant_id)
 );
-
 drop policy if exists grant_matches_insert_scope on public.grant_matches;
 create policy grant_matches_insert_scope
 on public.grant_matches
@@ -335,7 +306,6 @@ with check (
   )
   or public.nexus_grants_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists grant_matches_update_scope on public.grant_matches;
 create policy grant_matches_update_scope
 on public.grant_matches
@@ -351,7 +321,6 @@ with check (
   )
   or public.nexus_grants_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists grant_matches_delete_scope on public.grant_matches;
 create policy grant_matches_delete_scope
 on public.grant_matches
@@ -360,7 +329,6 @@ using (
   auth.uid() = user_id
   or public.nexus_grants_can_manage_tenant(tenant_id)
 );
-
 -- grant_application_drafts
 drop policy if exists grant_drafts_select_scope on public.grant_application_drafts;
 create policy grant_drafts_select_scope
@@ -370,7 +338,6 @@ using (
   auth.uid() = user_id
   or public.nexus_grants_can_access_tenant(tenant_id)
 );
-
 drop policy if exists grant_drafts_insert_scope on public.grant_application_drafts;
 create policy grant_drafts_insert_scope
 on public.grant_application_drafts
@@ -382,7 +349,6 @@ with check (
   )
   or public.nexus_grants_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists grant_drafts_update_scope on public.grant_application_drafts;
 create policy grant_drafts_update_scope
 on public.grant_application_drafts
@@ -398,7 +364,6 @@ with check (
   )
   or public.nexus_grants_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists grant_drafts_delete_scope on public.grant_application_drafts;
 create policy grant_drafts_delete_scope
 on public.grant_application_drafts
@@ -407,7 +372,6 @@ using (
   auth.uid() = user_id
   or public.nexus_grants_can_manage_tenant(tenant_id)
 );
-
 -- grant_submissions
 -- Only client owner or tenant admin can mark submitted/awarded/denied through updates.
 drop policy if exists grant_submissions_select_scope on public.grant_submissions;
@@ -418,7 +382,6 @@ using (
   auth.uid() = user_id
   or public.nexus_grants_can_access_tenant(tenant_id)
 );
-
 drop policy if exists grant_submissions_insert_scope on public.grant_submissions;
 create policy grant_submissions_insert_scope
 on public.grant_submissions
@@ -430,7 +393,6 @@ with check (
   )
   or public.nexus_grants_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists grant_submissions_update_scope on public.grant_submissions;
 create policy grant_submissions_update_scope
 on public.grant_submissions
@@ -446,7 +408,6 @@ with check (
   )
   or public.nexus_grants_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists grant_submissions_delete_scope on public.grant_submissions;
 create policy grant_submissions_delete_scope
 on public.grant_submissions
@@ -455,12 +416,10 @@ using (
   auth.uid() = user_id
   or public.nexus_grants_can_manage_tenant(tenant_id)
 );
-
 grant select, insert, update, delete on table public.grants_catalog to authenticated, service_role;
 grant select, insert, update, delete on table public.grant_matches to authenticated, service_role;
 grant select, insert, update, delete on table public.grant_application_drafts to authenticated, service_role;
 grant select, insert, update, delete on table public.grant_submissions to authenticated, service_role;
-
 -- Policy key used for authorize_submit approvals.
 insert into public.policy_documents (key, title, is_active, require_reaccept_on_publish)
 values ('grants_disclaimer', 'Grants Submission Disclaimer', true, false)
@@ -468,7 +427,6 @@ on conflict (key) do update
 set title = excluded.title,
     is_active = excluded.is_active,
     updated_at = now();
-
 insert into public.policy_versions (
   document_id,
   version,
@@ -506,7 +464,6 @@ where pd.key = 'grants_disclaimer'
     where pv.document_id = pd.id
       and pv.version = 'v1'
   );
-
 create or replace function public.nexus_grants_latest_policy_version_id(p_key text)
 returns uuid
 language sql
@@ -523,9 +480,7 @@ as $fn$
   order by pv.published_at desc nulls last, pv.created_at desc
   limit 1;
 $fn$;
-
 grant execute on function public.nexus_grants_latest_policy_version_id(text) to authenticated;
-
 insert into public.grants_catalog (
   source,
   name,

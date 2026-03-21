@@ -1,7 +1,6 @@
 -- Commission Ledger (educational, client-reported outcomes; no guarantee of funding outcomes).
 
 create extension if not exists pgcrypto;
-
 create or replace function public.nexus_commission_is_super_admin()
 returns boolean
 language plpgsql
@@ -29,7 +28,6 @@ begin
   return lower(coalesce(auth.jwt() ->> 'role', '')) in ('admin', 'super_admin');
 end;
 $fn$;
-
 create or replace function public.nexus_commission_can_access_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -95,7 +93,6 @@ begin
   return false;
 end;
 $fn$;
-
 create or replace function public.nexus_commission_can_manage_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -163,7 +160,6 @@ begin
   return false;
 end;
 $fn$;
-
 create or replace function public.nexus_commission_user_has_premium(p_user_id uuid, p_tenant_id uuid)
 returns boolean
 language sql
@@ -182,7 +178,6 @@ as $fn$
     limit 1
   );
 $fn$;
-
 create or replace function public.nexus_commission_has_disclosure_consent(p_user_id uuid, p_tenant_id uuid)
 returns boolean
 language sql
@@ -200,7 +195,6 @@ as $fn$
     limit 1
   );
 $fn$;
-
 create table if not exists public.commission_agreements (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -213,7 +207,6 @@ create table if not exists public.commission_agreements (
   consent_id uuid not null references public.consents(id) on delete restrict,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.funding_outcomes (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -229,7 +222,6 @@ create table if not exists public.funding_outcomes (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.commission_events (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -246,7 +238,6 @@ create table if not exists public.commission_events (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create or replace function public.nexus_commission_has_active_agreement(p_user_id uuid, p_tenant_id uuid)
 returns boolean
 language sql
@@ -269,38 +260,28 @@ as $fn$
     limit 1
   );
 $fn$;
-
 grant execute on function public.nexus_commission_is_super_admin() to authenticated;
 grant execute on function public.nexus_commission_can_access_tenant(uuid) to authenticated;
 grant execute on function public.nexus_commission_can_manage_tenant(uuid) to authenticated;
 grant execute on function public.nexus_commission_user_has_premium(uuid, uuid) to authenticated;
 grant execute on function public.nexus_commission_has_disclosure_consent(uuid, uuid) to authenticated;
 grant execute on function public.nexus_commission_has_active_agreement(uuid, uuid) to authenticated;
-
 create unique index if not exists commission_agreements_user_consent_uidx
   on public.commission_agreements (user_id, consent_id);
-
 create index if not exists commission_agreements_tenant_user_effective_idx
   on public.commission_agreements (tenant_id, user_id, effective_at desc, created_at desc);
-
 create index if not exists commission_agreements_policy_idx
   on public.commission_agreements (policy_version_id, created_at desc);
-
 create index if not exists funding_outcomes_tenant_user_status_idx
   on public.funding_outcomes (tenant_id, user_id, outcome_status, created_at desc);
-
 create index if not exists funding_outcomes_client_file_idx
   on public.funding_outcomes (client_file_id, created_at desc);
-
 create index if not exists commission_events_tenant_status_idx
   on public.commission_events (tenant_id, status, created_at desc);
-
 create index if not exists commission_events_user_status_idx
   on public.commission_events (user_id, status, created_at desc);
-
 create unique index if not exists commission_events_funding_outcome_uidx
   on public.commission_events (funding_outcome_id);
-
 create or replace function public.nexus_commission_set_updated_at()
 returns trigger
 language plpgsql
@@ -310,17 +291,14 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_funding_outcomes_set_updated_at on public.funding_outcomes;
 create trigger trg_funding_outcomes_set_updated_at
 before update on public.funding_outcomes
 for each row execute procedure public.nexus_commission_set_updated_at();
-
 drop trigger if exists trg_commission_events_set_updated_at on public.commission_events;
 create trigger trg_commission_events_set_updated_at
 before update on public.commission_events
 for each row execute procedure public.nexus_commission_set_updated_at();
-
 create or replace function public.nexus_commission_validate_agreement()
 returns trigger
 language plpgsql
@@ -367,12 +345,10 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_commission_agreements_validate on public.commission_agreements;
 create trigger trg_commission_agreements_validate
 before insert or update on public.commission_agreements
 for each row execute procedure public.nexus_commission_validate_agreement();
-
 create or replace function public.nexus_commission_validate_event()
 returns trigger
 language plpgsql
@@ -462,16 +438,13 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_commission_events_validate on public.commission_events;
 create trigger trg_commission_events_validate
 before insert or update on public.commission_events
 for each row execute procedure public.nexus_commission_validate_event();
-
 alter table public.commission_agreements enable row level security;
 alter table public.funding_outcomes enable row level security;
 alter table public.commission_events enable row level security;
-
 drop policy if exists commission_agreements_select_scope on public.commission_agreements;
 create policy commission_agreements_select_scope
 on public.commission_agreements
@@ -480,7 +453,6 @@ using (
   auth.uid() = user_id
   or public.nexus_commission_can_access_tenant(tenant_id)
 );
-
 drop policy if exists commission_agreements_insert_scope on public.commission_agreements;
 create policy commission_agreements_insert_scope
 on public.commission_agreements
@@ -492,20 +464,17 @@ with check (
   )
   or public.nexus_commission_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists commission_agreements_update_scope on public.commission_agreements;
 create policy commission_agreements_update_scope
 on public.commission_agreements
 for update to authenticated
 using (public.nexus_commission_can_manage_tenant(tenant_id))
 with check (public.nexus_commission_can_manage_tenant(tenant_id));
-
 drop policy if exists commission_agreements_delete_scope on public.commission_agreements;
 create policy commission_agreements_delete_scope
 on public.commission_agreements
 for delete to authenticated
 using (public.nexus_commission_can_manage_tenant(tenant_id));
-
 drop policy if exists funding_outcomes_select_scope on public.funding_outcomes;
 create policy funding_outcomes_select_scope
 on public.funding_outcomes
@@ -514,7 +483,6 @@ using (
   auth.uid() = user_id
   or public.nexus_commission_can_access_tenant(tenant_id)
 );
-
 drop policy if exists funding_outcomes_insert_scope on public.funding_outcomes;
 create policy funding_outcomes_insert_scope
 on public.funding_outcomes
@@ -526,7 +494,6 @@ with check (
   )
   or public.nexus_commission_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists funding_outcomes_update_scope on public.funding_outcomes;
 create policy funding_outcomes_update_scope
 on public.funding_outcomes
@@ -542,7 +509,6 @@ with check (
   )
   or public.nexus_commission_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists funding_outcomes_delete_scope on public.funding_outcomes;
 create policy funding_outcomes_delete_scope
 on public.funding_outcomes
@@ -551,7 +517,6 @@ using (
   auth.uid() = user_id
   or public.nexus_commission_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists commission_events_select_scope on public.commission_events;
 create policy commission_events_select_scope
 on public.commission_events
@@ -560,7 +525,6 @@ using (
   auth.uid() = user_id
   or public.nexus_commission_can_access_tenant(tenant_id)
 );
-
 drop policy if exists commission_events_insert_scope on public.commission_events;
 create policy commission_events_insert_scope
 on public.commission_events
@@ -581,20 +545,17 @@ with check (
   )
   or public.nexus_commission_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists commission_events_update_scope on public.commission_events;
 create policy commission_events_update_scope
 on public.commission_events
 for update to authenticated
 using (public.nexus_commission_can_manage_tenant(tenant_id))
 with check (public.nexus_commission_can_manage_tenant(tenant_id));
-
 drop policy if exists commission_events_delete_scope on public.commission_events;
 create policy commission_events_delete_scope
 on public.commission_events
 for delete to authenticated
 using (public.nexus_commission_can_manage_tenant(tenant_id));
-
 grant select, insert, update, delete on table public.commission_agreements to authenticated, service_role;
 grant select, insert, update, delete on table public.funding_outcomes to authenticated, service_role;
 grant select, insert, update, delete on table public.commission_events to authenticated, service_role;

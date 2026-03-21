@@ -1,0 +1,65 @@
+PROMPT 16 — NEXUS AI HEDGE FUND CONTROL PANEL (React + Supabase Views + Safe Admin Controls)
+
+You are a Senior Staff Engineer + Product Engineer. Implement the Nexus “AI Hedge Fund Control Panel” inside the existing Netlify React portal repo (app.goclearonline.cc).
+
+STRICT RULES:
+- Do NOT change existing Oracle VM services.
+- Do NOT expose Supabase service role key to the browser.
+- Use Supabase anon key only on the client.
+- All write actions must go through:
+  A) Supabase RLS-protected RPC functions, OR
+  B) existing Nexus API (if already has admin endpoints), OR
+  C) a new serverless Netlify function (only if needed, minimal).
+- Default UI is READ-ONLY unless user is admin.
+- Patch minimally; do not rewrite the app.
+
+GOAL:
+Add an admin dashboard page:
+  /admin/hedge-fund
+
+It shows:
+1) System Status: kill_switch, execution_enabled, mode, last heartbeat timestamps
+2) Strategy Leaderboard: top strategies + evidence + promoted status
+3) Market Regimes: latest regime per instrument
+4) Signal Pipeline: latest trade_signals + approvals + execution requests + orders
+5) Performance: daily PnL + win rate + profit factor + drawdown
+
+ADMIN ACTIONS (admin-only):
+- Toggle kill switch ON/OFF
+- Toggle execution_enabled ON/OFF (with confirmation)
+- Promote/Demote a strategy
+- Approve/Deny a pending approval request
+
+SUPABASE SQL IN REPO (/ops/supabase):
+Create control_panel_views.sql (read-only views):
+- v_system_state
+- v_strategy_leaderboard_30
+- v_market_regimes_latest
+- v_signal_pipeline
+- v_performance_daily
+
+Create control_panel_rpcs.sql (SECURITY DEFINER RPCs + role checks):
+- rpc_set_kill_switch(new_value boolean)
+- rpc_set_execution_enabled(new_value boolean)
+- rpc_set_strategy_promoted(strategy_uuid uuid, promoted boolean)
+- rpc_approve_signal(signal_id uuid)
+- rpc_deny_signal(signal_id uuid, reason text)
+
+FRONTEND:
+- Add route /admin/hedge-fund
+- Components: SystemStatusCard, StrategyLeaderboardTable, RegimePanel, SignalPipelineTable, PerformancePanel
+- Auto-refresh every 30s + manual refresh
+- Filters: instrument, promoted-only, confidence min
+
+ENV (Netlify):
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+VITE_API_BASE_URL (already)
+
+DELIVERABLES:
+- /src/pages/admin/HedgeFundControlPanel.tsx (or .jsx)
+- /src/components/hedgefund/*
+- /ops/supabase/control_panel_views.sql
+- /ops/supabase/control_panel_rpcs.sql
+- Router update
+- README/RUNBOOK updates

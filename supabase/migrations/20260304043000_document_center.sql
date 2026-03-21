@@ -1,7 +1,6 @@
 -- Document Center: durable generated-document index + approval proofs.
 
 create extension if not exists pgcrypto;
-
 create table if not exists public.documents (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -16,7 +15,6 @@ create table if not exists public.documents (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.document_approvals (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -29,28 +27,20 @@ create table if not exists public.document_approvals (
   user_agent text,
   notes text
 );
-
 create index if not exists documents_tenant_user_created_idx
   on public.documents (tenant_id, user_id, created_at desc);
-
 create index if not exists documents_user_status_idx
   on public.documents (user_id, status, created_at desc);
-
 create index if not exists documents_category_status_idx
   on public.documents (tenant_id, category, status, created_at desc);
-
 create unique index if not exists documents_source_unique_idx
   on public.documents (source_type, source_id);
-
 create index if not exists document_approvals_doc_approved_idx
   on public.document_approvals (document_id, approved_at desc);
-
 create unique index if not exists document_approvals_unique_per_type_idx
   on public.document_approvals (document_id, user_id, approval_type);
-
 create index if not exists document_approvals_tenant_user_idx
   on public.document_approvals (tenant_id, user_id, approved_at desc);
-
 create or replace function public.nexus_documents_is_super_admin()
 returns boolean
 language plpgsql
@@ -66,7 +56,6 @@ begin
   return lower(coalesce(auth.jwt() ->> 'role', '')) in ('super_admin', 'admin');
 end;
 $fn$;
-
 create or replace function public.nexus_documents_can_access_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -125,7 +114,6 @@ begin
   return false;
 end;
 $fn$;
-
 create or replace function public.nexus_documents_can_manage_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -186,11 +174,9 @@ begin
   return false;
 end;
 $fn$;
-
 grant execute on function public.nexus_documents_is_super_admin() to authenticated;
 grant execute on function public.nexus_documents_can_access_tenant(uuid) to authenticated;
 grant execute on function public.nexus_documents_can_manage_tenant(uuid) to authenticated;
-
 create or replace function public.nexus_documents_set_updated_at()
 returns trigger
 language plpgsql
@@ -200,12 +186,10 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_documents_set_updated_at on public.documents;
 create trigger trg_documents_set_updated_at
 before update on public.documents
 for each row execute procedure public.nexus_documents_set_updated_at();
-
 create or replace function public.nexus_create_document_from_artifact(
   p_tenant_id uuid,
   p_user_id uuid,
@@ -318,10 +302,8 @@ begin
   return doc_id;
 end;
 $fn$;
-
 grant execute on function public.nexus_create_document_from_artifact(uuid, uuid, text, text, text, text, uuid, text, text)
   to authenticated, service_role;
-
 create or replace function public.nexus_documents_from_finalized_letter()
 returns trigger
 language plpgsql
@@ -348,7 +330,6 @@ begin
   return new;
 end;
 $fn$;
-
 create or replace function public.nexus_documents_from_ai_letter_draft()
 returns trigger
 language plpgsql
@@ -375,7 +356,6 @@ begin
   return new;
 end;
 $fn$;
-
 create or replace function public.nexus_documents_from_ai_artifact()
 returns trigger
 language plpgsql
@@ -454,7 +434,6 @@ begin
   return new;
 end;
 $fn$;
-
 create or replace function public.nexus_documents_mark_mailed_from_event()
 returns trigger
 language plpgsql
@@ -479,7 +458,6 @@ begin
   return new;
 end;
 $fn$;
-
 create or replace function public.nexus_document_approvals_after_insert()
 returns trigger
 language plpgsql
@@ -548,27 +526,22 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_finalized_letters_documents on public.finalized_letters;
 create trigger trg_finalized_letters_documents
 after insert on public.finalized_letters
 for each row execute procedure public.nexus_documents_from_finalized_letter();
-
 drop trigger if exists trg_ai_letter_drafts_documents on public.ai_letter_drafts;
 create trigger trg_ai_letter_drafts_documents
 after insert on public.ai_letter_drafts
 for each row execute procedure public.nexus_documents_from_ai_letter_draft();
-
 drop trigger if exists trg_mailing_events_documents_status on public.mailing_events;
 create trigger trg_mailing_events_documents_status
 after insert or update of status on public.mailing_events
 for each row execute procedure public.nexus_documents_mark_mailed_from_event();
-
 drop trigger if exists trg_document_approvals_after_insert on public.document_approvals;
 create trigger trg_document_approvals_after_insert
 after insert on public.document_approvals
 for each row execute procedure public.nexus_document_approvals_after_insert();
-
 -- Optional integration for existing ai_artifacts table in environments where Prompt 10 created it.
 do $do$
 begin
@@ -578,10 +551,8 @@ begin
   end if;
 end;
 $do$;
-
 alter table public.documents enable row level security;
 alter table public.document_approvals enable row level security;
-
 drop policy if exists documents_select_access on public.documents;
 create policy documents_select_access
 on public.documents
@@ -590,7 +561,6 @@ using (
   auth.uid() = user_id
   or public.nexus_documents_can_access_tenant(tenant_id)
 );
-
 drop policy if exists documents_insert_access on public.documents;
 create policy documents_insert_access
 on public.documents
@@ -602,7 +572,6 @@ with check (
   )
   or public.nexus_documents_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists documents_update_access on public.documents;
 create policy documents_update_access
 on public.documents
@@ -615,7 +584,6 @@ with check (
   auth.uid() = user_id
   or public.nexus_documents_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists documents_delete_access on public.documents;
 create policy documents_delete_access
 on public.documents
@@ -624,7 +592,6 @@ using (
   auth.uid() = user_id
   or public.nexus_documents_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists document_approvals_select_access on public.document_approvals;
 create policy document_approvals_select_access
 on public.document_approvals
@@ -633,7 +600,6 @@ using (
   auth.uid() = user_id
   or public.nexus_documents_can_access_tenant(tenant_id)
 );
-
 drop policy if exists document_approvals_insert_access on public.document_approvals;
 create policy document_approvals_insert_access
 on public.document_approvals
@@ -651,23 +617,19 @@ with check (
   )
   or public.nexus_documents_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists document_approvals_update_manage on public.document_approvals;
 create policy document_approvals_update_manage
 on public.document_approvals
 for update to authenticated
 using (public.nexus_documents_can_manage_tenant(tenant_id))
 with check (public.nexus_documents_can_manage_tenant(tenant_id));
-
 drop policy if exists document_approvals_delete_manage on public.document_approvals;
 create policy document_approvals_delete_manage
 on public.document_approvals
 for delete to authenticated
 using (public.nexus_documents_can_manage_tenant(tenant_id));
-
 grant select, insert, update, delete on table public.documents to authenticated, service_role;
 grant select, insert, update, delete on table public.document_approvals to authenticated, service_role;
-
 -- Backfill finalized letters into Document Center.
 insert into public.documents (
   tenant_id,
@@ -705,7 +667,6 @@ do update
       storage_path = excluded.storage_path,
       content_hash = excluded.content_hash,
       updated_at = now();
-
 -- Backfill AI dispute drafts as review-required artifacts.
 insert into public.documents (
   tenant_id,
@@ -734,7 +695,6 @@ do update
   set title = excluded.title,
       status = excluded.status,
       updated_at = now();
-
 -- Backfill ai_artifacts (if table exists) without hard-coding column names.
 do $do$
 begin

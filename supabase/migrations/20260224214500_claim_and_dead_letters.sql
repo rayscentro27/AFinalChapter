@@ -54,10 +54,8 @@ begin
   end if;
 end;
 $$;
-
 revoke all on function public.claim_conversation(uuid, uuid) from public;
 grant execute on function public.claim_conversation(uuid, uuid) to authenticated;
-
 create table if not exists public.webhook_dead_letters (
   id bigserial primary key,
   tenant_id uuid null references public.tenants(id) on delete cascade,
@@ -72,20 +70,15 @@ create table if not exists public.webhook_dead_letters (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists webhook_dead_letters_unresolved_idx
   on public.webhook_dead_letters (resolved_at, next_retry_at);
-
 create index if not exists webhook_dead_letters_tenant_idx
   on public.webhook_dead_letters (tenant_id, created_at desc);
-
 drop trigger if exists trg_webhook_dead_letters_updated_at on public.webhook_dead_letters;
 create trigger trg_webhook_dead_letters_updated_at
 before update on public.webhook_dead_letters
 for each row execute function public.set_updated_at();
-
 alter table public.webhook_dead_letters enable row level security;
-
 drop policy if exists webhook_dead_letters_select on public.webhook_dead_letters;
 create policy webhook_dead_letters_select on public.webhook_dead_letters
 for select
@@ -96,7 +89,6 @@ using (
     and public.is_tenant_member(tenant_id)
   )
 );
-
 drop policy if exists webhook_dead_letters_insert on public.webhook_dead_letters;
 create policy webhook_dead_letters_insert on public.webhook_dead_letters
 for insert
@@ -107,7 +99,6 @@ with check (
     and public.nexus_can_manage_tenant_members(tenant_id)
   )
 );
-
 drop policy if exists webhook_dead_letters_update on public.webhook_dead_letters;
 create policy webhook_dead_letters_update on public.webhook_dead_letters
 for update
@@ -125,7 +116,6 @@ with check (
     and public.nexus_can_manage_tenant_members(tenant_id)
   )
 );
-
 drop policy if exists webhook_dead_letters_delete on public.webhook_dead_letters;
 create policy webhook_dead_letters_delete on public.webhook_dead_letters
 for delete

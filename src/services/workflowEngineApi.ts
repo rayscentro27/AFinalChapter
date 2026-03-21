@@ -8,7 +8,18 @@ export type WorkflowStartResponse = {
   error?: string;
 };
 
+// Helper to ensure authenticated session before invoking functions
+async function ensureAuth() {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (!session || error) {
+    throw new Error('User session required. Please sign in.');
+  }
+  return session;
+}
+
 export async function workflowStart(templateKey: string, context: Record<string, unknown> = {}) {
+  await ensureAuth(); // Verify session exists before invoking
+  
   const { data, error } = await supabase.functions.invoke('workflow-engine', {
     body: {
       action: 'start',
@@ -30,6 +41,8 @@ export async function workflowStart(templateKey: string, context: Record<string,
 }
 
 export async function workflowAdvance(instanceId: string, force = false) {
+  await ensureAuth(); // Verify session exists before invoking
+  
   const { data, error } = await supabase.functions.invoke('workflow-engine', {
     body: {
       action: 'advance',
@@ -51,6 +64,8 @@ export async function workflowAdvance(instanceId: string, force = false) {
 }
 
 export async function workflowTrigger(eventType: string, payload: Record<string, unknown>) {
+  await ensureAuth(); // Verify session exists before invoking
+  
   const { data, error } = await supabase.functions.invoke('workflow-engine', {
     body: {
       action: 'trigger',

@@ -1,0 +1,58 @@
+PROMPT 9 — NEXUS YOUTUBE CHANNEL DISCOVERY (WEEKLY) + AUTO-ADD TRUSTED CHANNELS
+
+You are a Senior Staff Engineer implementing “YouTube Channel Discovery” for Nexus Research Brain.
+
+STRICT RULES:
+- DO NOT modify existing services: youtube-watcher, research-worker, strategy-builder, trading-brain, execution-gateway, approval-queue.
+- ADD ONLY a new service under /opt/nexus-services/channel-discovery.
+- No secrets in repo. Provide .env.example only.
+- Prefer no YouTube API keys.
+- NO browser automation (no headless browsing).
+- This system discovers channels but MUST NOT blindly trust them.
+- Only auto-add channels if they pass a high trust threshold and are not blacklisted.
+
+GOAL:
+Every week:
+1) Discover candidate YouTube trading channels from:
+   - curated seed sources (Reddit lists, GitHub lists, your own seed URLs)
+   - YouTube search result pages (HTML fetch + parse, lightweight)
+   - OPTIONAL: RSS feed discovery from known channel IDs
+2) Extract channel_id + channel_name + channel_url
+3) De-dupe against existing youtube_watchlist + youtube_channels + channel_blacklist
+4) Score each candidate using the existing channel credibility rubric (deterministic first)
+5) Store candidates + scores
+6) Auto-add to youtube_watchlist ONLY if score >= AUTO_ADD_SCORE (default 85)
+7) Otherwise place into review queue
+
+NEW SERVICE:
+/opt/nexus-services/channel-discovery
+
+SUPABASE SQL:
+/opt/nexus-services/ops/supabase/channel_discovery.sql
+
+Tables:
+1) channel_discovery_seeds (seed_type=url|keyword, value, is_enabled)
+2) channel_candidates (channel_id unique, channel_name, channel_url, score, evidence, status)
+3) channel_review_queue (pending approval/reject)
+
+DISCOVERY METHODS (NO API KEYS):
+A) Keyword discovery via https://www.youtube.com/results?search_query=...
+Parse HTML for channelId occurrences.
+B) Seed URL discovery: parse for /channel/UC... or /@handle; resolve handle → channel_id by fetching channel page.
+
+ENV (.env.example):
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+AUTO_ADD_SCORE=85
+AUTO_ENABLE=false
+MAX_CANDIDATES_PER_RUN=50
+DISCOVERY_KEYWORDS="forex risk management,options covered calls,earnings expected move,IV crush strategy"
+HTTP_TIMEOUT_MS=12000
+
+SYSTEMD:
+channel-discovery.service
+channel-discovery.timer (weekly Sunday 3:15 AM)
+
+RUNBOOK:
+node worker.js --once
+validate tables and logs.

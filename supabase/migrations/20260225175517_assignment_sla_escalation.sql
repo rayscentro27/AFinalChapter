@@ -1,12 +1,10 @@
 create extension if not exists pgcrypto;
-
 alter table if exists public.conversations
   add column if not exists assigned_to uuid null,
   add column if not exists assigned_at timestamptz null,
   add column if not exists sla_minutes int not null default 60,
   add column if not exists sla_due_at timestamptz null,
   add column if not exists sla_breached_at timestamptz null;
-
 do $$
 declare
   priority_type text;
@@ -27,7 +25,6 @@ begin
       add column if not exists priority_label text not null default 'normal';
   end if;
 end $$;
-
 do $$
 begin
   if exists (
@@ -43,16 +40,12 @@ begin
       and assignee_user_id is not null;
   end if;
 end $$;
-
 create index if not exists conversations_tenant_assigned_to_idx
   on public.conversations (tenant_id, assigned_to);
-
 create index if not exists conversations_tenant_sla_due_idx
   on public.conversations (tenant_id, sla_due_at);
-
 create index if not exists conversations_tenant_sla_breached_idx
   on public.conversations (tenant_id, sla_breached_at);
-
 create table if not exists public.assignment_rules (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -62,10 +55,8 @@ create table if not exists public.assignment_rules (
   action jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists assignment_rules_tenant_active_created_idx
   on public.assignment_rules (tenant_id, is_active, created_at desc);
-
 create table if not exists public.agent_workload (
   tenant_id uuid not null,
   user_id uuid not null,

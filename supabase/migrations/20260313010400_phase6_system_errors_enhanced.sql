@@ -1,7 +1,6 @@
 -- Phase 6: enhance system_errors for structured observability
 
 begin;
-
 create table if not exists public.system_errors (
   id uuid primary key default gen_random_uuid(),
   service text not null,
@@ -12,7 +11,6 @@ create table if not exists public.system_errors (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 -- Compatibility for environments that already created a legacy shape.
 alter table public.system_errors add column if not exists service text;
 alter table public.system_errors add column if not exists component text;
@@ -20,7 +18,6 @@ alter table public.system_errors add column if not exists error_type text;
 alter table public.system_errors add column if not exists error_message text;
 alter table public.system_errors add column if not exists error_stack text;
 alter table public.system_errors add column if not exists metadata jsonb not null default '{}'::jsonb;
-
 -- Optional backfill from legacy columns when present.
 update public.system_errors
 set
@@ -35,17 +32,12 @@ where
   or error_type is null
   or error_message is null
   or metadata is null;
-
 create index if not exists system_errors_created_at_idx
   on public.system_errors (created_at desc);
-
 create index if not exists system_errors_service_component_created_idx
   on public.system_errors (service, component, created_at desc);
-
 create index if not exists system_errors_error_type_created_idx
   on public.system_errors (error_type, created_at desc);
-
 create index if not exists system_errors_job_type_created_idx
   on public.system_errors ((metadata->>'job_type'), created_at desc);
-
 commit;

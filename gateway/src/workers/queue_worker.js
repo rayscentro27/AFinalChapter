@@ -9,6 +9,75 @@ const handlers = {
   noop: async (_job, { logger: jobLogger }) => {
     jobLogger.info({ event: 'job_noop_processed' }, 'job_noop_processed');
   },
+
+  sentiment_triage: async (job, { logger: jobLogger }) => {
+    const { supabaseAdmin } = await import('../supabase.js');
+    const { enrichMessage } = await import('../lib/ai/enrichMessage.js');
+    
+    const tenantId = String(job.tenant_id || '');
+    const messageId = String(job.payload?.message_id || '');
+    
+    if (!tenantId || !messageId) {
+      throw new Error('missing_tenant_id_or_message_id');
+    }
+
+    jobLogger.info({ job_id: job.id, message_id: messageId, tenant_id: tenantId }, 'sentiment_triage_started');
+
+    try {
+      // Enrich message with AI sentiment analysis
+      const enrichment = await enrichMessage({
+        supabaseAdmin,
+        tenant_id: tenantId,
+        message_id: messageId,
+        includeSuggestedReply: true,
+      });
+
+      // Update message with enrichment results
+      const { error: updateErr } = await supabaseAdmin
+        .from('messages')
+        .update({
+          ai_sentiment: enrichment.sentiment,
+          ai_intent: enrichment.intent,
+          ai_enrich_status: 'complete',
+          ai_enriched_at: new Date().toISOString(),
+        })
+        .eq('id', messageId)
+        .eq('tenant_id', tenantId);
+
+      if (updateErr) {
+        jobLogger.error({ err: updateErr, message_id: messageId }, 'Failed to update message enrichment');
+        throw updateErr;
+      }
+
+      // If critical sentiment, create alert
+      if (enrichment.sentiment === 'Agitated' || enrichment.sentiment === 'Critical') {
+        const alertSeverity = enrichment.sentiment === 'Critical' ? 'critical' : 'warn';
+        const { error: alertErr } = await supabaseAdmin
+          .from('alert_events')
+          .insert({
+            tenant_id: tenantId,
+            alert_key: `sentiment_${messageId}`,
+            severity: alertSeverity,
+            message: `High friction sentiment detected: ${enrichment.summary || enrichment.sentiment}`,
+            details: { message_id: messageId, sentiment: enrichment.sentiment, intent: enrichment.intent },
+            status: 'open',
+          });
+
+        if (alertErr) {
+          jobLogger.warn({ err: alertErr }, 'Failed to create sentiment alert (non-fatal)');
+        } else {
+          jobLogger.info({ severity: alertSeverity, message_id: messageId }, 'Alert created for critical sentiment');
+        }
+      }
+
+      jobLogger.info({ job_id: job.id, message_id: messageId, sentiment: enrichment.sentiment }, 'sentiment_triage_completed');
+
+      return { ok: true, sentiment: enrichment.sentiment, intent: enrichment.intent };
+    } catch (error) {
+      jobLogger.error({ job_id: job.id, message_id: messageId, err: error.message || error }, 'sentiment_triage_failed');
+      throw error;
+    }
+  },
 };
 
 let runtime = null;

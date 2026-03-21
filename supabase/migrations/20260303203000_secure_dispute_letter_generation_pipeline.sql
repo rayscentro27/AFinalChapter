@@ -2,7 +2,6 @@
 -- Enforces PII separation, sanitized AI payload storage, and finalized letter records.
 
 create extension if not exists pgcrypto;
-
 create or replace function public.nexus_can_manage_tenant_compat(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -56,9 +55,7 @@ begin
   return false;
 end;
 $fn$;
-
 grant execute on function public.nexus_can_manage_tenant_compat(uuid) to authenticated;
-
 create table if not exists public.client_pii (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -68,10 +65,8 @@ create table if not exists public.client_pii (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists client_pii_tenant_user_created_idx
   on public.client_pii (tenant_id, user_id, created_at desc);
-
 create table if not exists public.sanitized_dispute_facts (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -82,10 +77,8 @@ create table if not exists public.sanitized_dispute_facts (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists sanitized_dispute_facts_tenant_user_created_idx
   on public.sanitized_dispute_facts (tenant_id, user_id, created_at desc);
-
 create table if not exists public.ai_letter_drafts (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -98,13 +91,10 @@ create table if not exists public.ai_letter_drafts (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists ai_letter_drafts_tenant_user_created_idx
   on public.ai_letter_drafts (tenant_id, user_id, created_at desc);
-
 create index if not exists ai_letter_drafts_sanitized_facts_idx
   on public.ai_letter_drafts (sanitized_facts_id);
-
 create table if not exists public.finalized_letters (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -118,13 +108,10 @@ create table if not exists public.finalized_letters (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists finalized_letters_tenant_user_created_idx
   on public.finalized_letters (tenant_id, user_id, created_at desc);
-
 create index if not exists finalized_letters_packet_idx
   on public.finalized_letters (dispute_packet_id);
-
 create or replace function public.nexus_secure_dispute_set_updated_at()
 returns trigger
 language plpgsql
@@ -134,32 +121,26 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_client_pii_set_updated_at on public.client_pii;
 create trigger trg_client_pii_set_updated_at
 before update on public.client_pii
 for each row execute procedure public.nexus_secure_dispute_set_updated_at();
-
 drop trigger if exists trg_sanitized_dispute_facts_set_updated_at on public.sanitized_dispute_facts;
 create trigger trg_sanitized_dispute_facts_set_updated_at
 before update on public.sanitized_dispute_facts
 for each row execute procedure public.nexus_secure_dispute_set_updated_at();
-
 drop trigger if exists trg_ai_letter_drafts_set_updated_at on public.ai_letter_drafts;
 create trigger trg_ai_letter_drafts_set_updated_at
 before update on public.ai_letter_drafts
 for each row execute procedure public.nexus_secure_dispute_set_updated_at();
-
 drop trigger if exists trg_finalized_letters_set_updated_at on public.finalized_letters;
 create trigger trg_finalized_letters_set_updated_at
 before update on public.finalized_letters
 for each row execute procedure public.nexus_secure_dispute_set_updated_at();
-
 alter table public.client_pii enable row level security;
 alter table public.sanitized_dispute_facts enable row level security;
 alter table public.ai_letter_drafts enable row level security;
 alter table public.finalized_letters enable row level security;
-
 drop policy if exists client_pii_select_access on public.client_pii;
 create policy client_pii_select_access
 on public.client_pii
@@ -169,13 +150,11 @@ using (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists client_pii_insert_owner on public.client_pii;
 create policy client_pii_insert_owner
 on public.client_pii
 for insert to authenticated
 with check (auth.uid() = user_id);
-
 drop policy if exists client_pii_update_access on public.client_pii;
 create policy client_pii_update_access
 on public.client_pii
@@ -190,7 +169,6 @@ with check (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists client_pii_delete_access on public.client_pii;
 create policy client_pii_delete_access
 on public.client_pii
@@ -200,7 +178,6 @@ using (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists sanitized_dispute_facts_select_access on public.sanitized_dispute_facts;
 create policy sanitized_dispute_facts_select_access
 on public.sanitized_dispute_facts
@@ -210,13 +187,11 @@ using (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists sanitized_dispute_facts_insert_owner on public.sanitized_dispute_facts;
 create policy sanitized_dispute_facts_insert_owner
 on public.sanitized_dispute_facts
 for insert to authenticated
 with check (auth.uid() = user_id);
-
 drop policy if exists sanitized_dispute_facts_update_access on public.sanitized_dispute_facts;
 create policy sanitized_dispute_facts_update_access
 on public.sanitized_dispute_facts
@@ -231,7 +206,6 @@ with check (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists sanitized_dispute_facts_delete_access on public.sanitized_dispute_facts;
 create policy sanitized_dispute_facts_delete_access
 on public.sanitized_dispute_facts
@@ -241,7 +215,6 @@ using (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists ai_letter_drafts_select_access on public.ai_letter_drafts;
 create policy ai_letter_drafts_select_access
 on public.ai_letter_drafts
@@ -251,13 +224,11 @@ using (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists ai_letter_drafts_insert_owner on public.ai_letter_drafts;
 create policy ai_letter_drafts_insert_owner
 on public.ai_letter_drafts
 for insert to authenticated
 with check (auth.uid() = user_id);
-
 drop policy if exists ai_letter_drafts_update_access on public.ai_letter_drafts;
 create policy ai_letter_drafts_update_access
 on public.ai_letter_drafts
@@ -272,7 +243,6 @@ with check (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists ai_letter_drafts_delete_access on public.ai_letter_drafts;
 create policy ai_letter_drafts_delete_access
 on public.ai_letter_drafts
@@ -282,7 +252,6 @@ using (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists finalized_letters_select_access on public.finalized_letters;
 create policy finalized_letters_select_access
 on public.finalized_letters
@@ -292,13 +261,11 @@ using (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists finalized_letters_insert_owner on public.finalized_letters;
 create policy finalized_letters_insert_owner
 on public.finalized_letters
 for insert to authenticated
 with check (auth.uid() = user_id);
-
 drop policy if exists finalized_letters_update_access on public.finalized_letters;
 create policy finalized_letters_update_access
 on public.finalized_letters
@@ -313,7 +280,6 @@ with check (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 drop policy if exists finalized_letters_delete_access on public.finalized_letters;
 create policy finalized_letters_delete_access
 on public.finalized_letters
@@ -323,7 +289,6 @@ using (
   or public.nexus_can_manage_tenant_compat(tenant_id)
   or public.nexus_is_master_admin_compat()
 );
-
 grant usage on schema public to authenticated, service_role;
 grant select, insert, update, delete on table public.client_pii to authenticated, service_role;
 grant select, insert, update, delete on table public.sanitized_dispute_facts to authenticated, service_role;

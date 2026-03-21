@@ -2,7 +2,6 @@
 -- Enables stable policy IDs/hashes, super-admin publishing, and policy-version consent proof.
 
 create extension if not exists pgcrypto;
-
 create or replace function public.nexus_set_updated_at()
 returns trigger
 language plpgsql
@@ -12,7 +11,6 @@ begin
   return new;
 end;
 $fn$;
-
 create table if not exists public.policy_documents (
   id uuid primary key default gen_random_uuid(),
   key text not null unique,
@@ -22,7 +20,6 @@ create table if not exists public.policy_documents (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.policy_versions (
   id uuid primary key default gen_random_uuid(),
   document_id uuid not null references public.policy_documents(id) on delete cascade,
@@ -35,18 +32,14 @@ create table if not exists public.policy_versions (
   created_at timestamptz not null default now(),
   unique (document_id, version)
 );
-
 create index if not exists policy_versions_document_idx
   on public.policy_versions (document_id, created_at desc);
-
 create index if not exists policy_versions_published_idx
   on public.policy_versions (document_id, published_at desc)
   where is_published = true;
-
 create unique index if not exists policy_versions_single_published_per_doc_uidx
   on public.policy_versions (document_id)
   where is_published = true;
-
 create or replace function public.nexus_set_policy_content_hash()
 returns trigger
 language plpgsql
@@ -56,51 +49,42 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_policy_documents_set_updated_at on public.policy_documents;
 create trigger trg_policy_documents_set_updated_at
 before update on public.policy_documents
 for each row execute procedure public.nexus_set_updated_at();
-
 drop trigger if exists trg_policy_versions_set_content_hash on public.policy_versions;
 create trigger trg_policy_versions_set_content_hash
 before insert or update of content_md on public.policy_versions
 for each row execute procedure public.nexus_set_policy_content_hash();
-
 alter table public.policy_documents enable row level security;
 alter table public.policy_versions enable row level security;
-
 drop policy if exists policy_documents_select_active on public.policy_documents;
 create policy policy_documents_select_active
 on public.policy_documents
 for select to authenticated
 using (is_active = true);
-
 drop policy if exists policy_documents_select_super_admin_all on public.policy_documents;
 create policy policy_documents_select_super_admin_all
 on public.policy_documents
 for select to authenticated
 using (public.nexus_is_master_admin_compat());
-
 drop policy if exists policy_documents_super_admin_insert on public.policy_documents;
 create policy policy_documents_super_admin_insert
 on public.policy_documents
 for insert to authenticated
 with check (public.nexus_is_master_admin_compat());
-
 drop policy if exists policy_documents_super_admin_update on public.policy_documents;
 create policy policy_documents_super_admin_update
 on public.policy_documents
 for update to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 drop policy if exists policy_documents_super_admin_delete on public.policy_documents;
 create policy policy_documents_super_admin_delete
 on public.policy_documents
 for delete to authenticated
 using (public.nexus_is_master_admin_compat());
-
 drop policy if exists policy_versions_select_published on public.policy_versions;
 create policy policy_versions_select_published
 on public.policy_versions
@@ -114,37 +98,31 @@ using (
       and pd.is_active = true
   )
 );
-
 drop policy if exists policy_versions_select_super_admin_all on public.policy_versions;
 create policy policy_versions_select_super_admin_all
 on public.policy_versions
 for select to authenticated
 using (public.nexus_is_master_admin_compat());
-
 drop policy if exists policy_versions_super_admin_insert on public.policy_versions;
 create policy policy_versions_super_admin_insert
 on public.policy_versions
 for insert to authenticated
 with check (public.nexus_is_master_admin_compat());
-
 drop policy if exists policy_versions_super_admin_update on public.policy_versions;
 create policy policy_versions_super_admin_update
 on public.policy_versions
 for update to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 drop policy if exists policy_versions_super_admin_delete on public.policy_versions;
 create policy policy_versions_super_admin_delete
 on public.policy_versions
 for delete to authenticated
 using (public.nexus_is_master_admin_compat());
-
 grant select on table public.policy_documents to authenticated, service_role;
 grant insert, update, delete on table public.policy_documents to authenticated, service_role;
 grant select on table public.policy_versions to authenticated, service_role;
 grant insert, update, delete on table public.policy_versions to authenticated, service_role;
-
 insert into public.policy_documents (key, title, require_reaccept_on_publish)
 values
   ('terms', 'Terms of Service', true),
@@ -160,7 +138,6 @@ on conflict (key) do update
 set
   title = excluded.title,
   updated_at = now();
-
 with seed_versions as (
   select *
   from (
@@ -315,13 +292,10 @@ where not exists (
   where pv.document_id = pd.id
     and pv.is_published = true
 );
-
 alter table public.consents
   add column if not exists policy_version_id uuid references public.policy_versions(id) on delete set null;
-
 create index if not exists consents_policy_version_idx
   on public.consents (policy_version_id);
-
 with mapped_versions as (
   select
     c.id as consent_id,
@@ -347,7 +321,6 @@ set
     )
 from mapped_versions mv
 where c.id = mv.consent_id;
-
 update public.consent_requirements cr
 set
   current_version = pv.version,
@@ -358,7 +331,6 @@ join public.policy_versions pv
  and pv.is_published = true
 where pd.key = cr.consent_type::text
   and cr.consent_type in ('terms', 'privacy', 'ai_disclosure', 'disclaimers');
-
 create or replace function public.admin_publish_policy_version(
   p_policy_key text,
   p_version text
@@ -440,9 +412,7 @@ begin
   select v_row.id, p_policy_key, v_row.version, v_row.content_hash, v_row.published_at;
 end;
 $fn$;
-
 grant execute on function public.admin_publish_policy_version(text, text) to authenticated;
-
 create or replace view public.user_consent_status as
 with cfg as (
   select
@@ -569,5 +539,4 @@ group by
   pc.privacy_policy_version_id,
   pc.ai_disclosure_policy_version_id,
   pc.disclaimers_policy_version_id;
-
 grant select on public.user_consent_status to authenticated;

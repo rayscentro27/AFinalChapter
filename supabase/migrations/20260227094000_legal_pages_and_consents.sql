@@ -2,7 +2,6 @@
 -- Phase 1 launch prerequisite
 
 create extension if not exists pgcrypto;
-
 -- Compatibility helper: supports projects that use either tenant_memberships,
 -- tenant_members, or JWT-only role claims.
 create or replace function public.nexus_is_master_admin_compat()
@@ -42,9 +41,7 @@ begin
   return coalesce((auth.jwt() ->> 'role') = 'admin', false);
 end;
 $fn$;
-
 grant execute on function public.nexus_is_master_admin_compat() to authenticated;
-
 -- 1) Versioned consent enum
 DO $do$
 BEGIN
@@ -67,7 +64,6 @@ BEGIN
     );
   END IF;
 END $do$;
-
 -- 2) Durable user consent records
 create table if not exists public.consents (
   id uuid primary key default gen_random_uuid(),
@@ -81,33 +77,25 @@ create table if not exists public.consents (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create unique index if not exists consents_user_type_version_uidx
   on public.consents (user_id, consent_type, version);
-
 create index if not exists consents_tenant_user_idx
   on public.consents (tenant_id, user_id, accepted_at desc);
-
 create index if not exists consents_user_accepted_idx
   on public.consents (user_id, accepted_at desc);
-
 alter table public.consents enable row level security;
-
 DROP POLICY IF EXISTS consents_select_own ON public.consents;
 CREATE POLICY consents_select_own ON public.consents
 FOR SELECT TO authenticated
 USING (auth.uid() = user_id);
-
 DROP POLICY IF EXISTS consents_select_master_admin ON public.consents;
 CREATE POLICY consents_select_master_admin ON public.consents
 FOR SELECT TO authenticated
 USING (public.nexus_is_master_admin_compat());
-
 DROP POLICY IF EXISTS consents_insert_own ON public.consents;
 CREATE POLICY consents_insert_own ON public.consents
 FOR INSERT TO authenticated
 WITH CHECK (auth.uid() = user_id);
-
 -- 3) Keep audit_events compatible with consent logging contract.
 create table if not exists public.audit_events (
   id bigserial primary key,
@@ -117,10 +105,8 @@ create table if not exists public.audit_events (
   metadata jsonb,
   created_at timestamptz default now()
 );
-
 alter table public.audit_events add column if not exists event_type text;
 alter table public.audit_events add column if not exists created_at timestamptz;
-
 DO $do$
 BEGIN
   IF EXISTS (
@@ -142,7 +128,6 @@ BEGIN
     $sql$;
   END IF;
 END $do$;
-
 DO $do$
 BEGIN
   IF EXISTS (
@@ -164,9 +149,7 @@ BEGIN
     $sql$;
   END IF;
 END $do$;
-
 alter table public.audit_events alter column created_at set default now();
-
 -- 4) Summarized status view for consent gate + admin oversight
 create or replace view public.user_consent_status as
 with latest as (
@@ -197,5 +180,4 @@ select
   coalesce(max(l.accepted_at), now()) as last_accepted_at
 from latest l
 group by l.user_id;
-
 grant select on public.user_consent_status to authenticated;

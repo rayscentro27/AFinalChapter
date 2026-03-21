@@ -1,0 +1,48 @@
+PROMPT 13 — NEXUS MARKET REGIME DETECTOR
+
+You are a Senior Staff Engineer implementing the Nexus Market Regime Detector.
+
+Purpose:
+Detect current market conditions and classify them into regimes that the trading system can use to enable/disable strategies.
+
+STRICT RULES
+- DO NOT modify existing trading services
+- DO NOT place trades
+- Add-only service: /opt/nexus-services/regime-detector
+- No secrets committed
+
+INSTRUMENTS:
+EUR_USD, GBP_USD, USD_JPY, AUD_USD, USD_CAD
+
+REGIMES:
+TRENDING, RANGING, HIGH_VOLATILITY, LOW_VOLATILITY, BREAKOUT
+
+INDICATORS:
+EMA50, EMA200, ATR(14)
+
+SUPABASE SQL:
+/opt/nexus-services/ops/supabase/regime_detector.sql
+Create table: market_regimes
+
+WORKER:
+Runs every 60 seconds:
+1 fetch candles (OANDA practice)
+2 compute indicators
+3 classify regime
+4 write to market_regimes
+
+FILES:
+worker.js, indicatorEngine.js, regimeEngine.js, oandaCandles.js, db.js, config.js, package.json, .env.example, README.md
+
+ENV (.env.example):
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+OANDA_API_KEY=
+OANDA_URL=https://api-fxpractice.oanda.com
+REGIME_TIMEFRAME=M15
+CANDLE_COUNT=500
+TREND_THRESHOLD=0.002
+VOLATILITY_MULTIPLIER=1.5
+
+SYSTEMD:
+regime-detector.service (+ optional timer)

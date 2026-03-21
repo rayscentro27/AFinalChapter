@@ -1,7 +1,6 @@
 -- P0-3 Stage B: Remaining tenant-sensitive RLS + explicit policies
 
 create extension if not exists pgcrypto;
-
 create or replace function public.nexus_is_master_admin()
 returns boolean
 language sql
@@ -16,7 +15,6 @@ as $$
       and lower(coalesce(tm.role, '')) = 'admin'
   );
 $$;
-
 create or replace function public.nexus_can_access_tenant(t uuid)
 returns boolean
 language sql
@@ -32,7 +30,6 @@ as $$
         and tm.tenant_id = t
     );
 $$;
-
 do $$
 declare
   t text;

@@ -1,7 +1,5 @@
 begin;
-
 create extension if not exists pgcrypto;
-
 create table if not exists public.strategy_library (
   id uuid primary key default gen_random_uuid(),
   strategy_id text unique,
@@ -14,7 +12,6 @@ create table if not exists public.strategy_library (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
-
 alter table public.strategy_library add column if not exists strategy_id text;
 alter table public.strategy_library add column if not exists strategy_name text;
 alter table public.strategy_library add column if not exists asset_type text;
@@ -24,16 +21,12 @@ alter table public.strategy_library add column if not exists status text;
 alter table public.strategy_library add column if not exists version text;
 alter table public.strategy_library add column if not exists created_at timestamptz default now();
 alter table public.strategy_library add column if not exists updated_at timestamptz default now();
-
 create index if not exists strategy_library_asset_type_status_idx
   on public.strategy_library(asset_type, status, updated_at desc);
-
 create index if not exists strategy_library_status_updated_idx
   on public.strategy_library(status, updated_at desc);
-
 create index if not exists strategy_library_created_by_idx
   on public.strategy_library(created_by, updated_at desc);
-
 do $$
 begin
   if not exists (
@@ -53,7 +46,6 @@ begin
     end;
   end if;
 end $$;
-
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -63,7 +55,6 @@ begin
   return new;
 end;
 $$;
-
 do $$
 begin
   if not exists (
@@ -74,5 +65,4 @@ begin
     for each row execute function public.set_updated_at();
   end if;
 end $$;
-
 commit;

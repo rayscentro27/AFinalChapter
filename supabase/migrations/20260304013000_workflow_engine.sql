@@ -1,7 +1,6 @@
 -- Workflow engine foundation: templates, instances, events, and task linkage.
 
 create extension if not exists pgcrypto;
-
 create table if not exists public.workflow_templates (
   id uuid primary key default gen_random_uuid(),
   key text not null unique,
@@ -9,7 +8,6 @@ create table if not exists public.workflow_templates (
   steps jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.workflow_instances (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -21,7 +19,6 @@ create table if not exists public.workflow_instances (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.workflow_events (
   id uuid primary key default gen_random_uuid(),
   instance_id uuid not null references public.workflow_instances(id) on delete cascade,
@@ -29,27 +26,20 @@ create table if not exists public.workflow_events (
   payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists workflow_instances_tenant_user_idx
   on public.workflow_instances (tenant_id, user_id, status, updated_at desc);
-
 create index if not exists workflow_instances_template_idx
   on public.workflow_instances (template_key, status, updated_at desc);
-
 create index if not exists workflow_events_instance_created_idx
   on public.workflow_events (instance_id, created_at desc);
-
 alter table public.client_tasks
   add column if not exists workflow_instance_id uuid references public.workflow_instances(id) on delete set null,
   add column if not exists workflow_step_number int,
   add column if not exists workflow_step_key text;
-
 create index if not exists client_tasks_workflow_instance_idx
   on public.client_tasks (workflow_instance_id, status, due_date);
-
 create index if not exists client_tasks_workflow_step_idx
   on public.client_tasks (workflow_instance_id, workflow_step_number);
-
 create or replace function public.nexus_workflow_set_updated_at()
 returns trigger
 language plpgsql
@@ -59,12 +49,10 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_workflow_instances_set_updated_at on public.workflow_instances;
 create trigger trg_workflow_instances_set_updated_at
 before update on public.workflow_instances
 for each row execute procedure public.nexus_workflow_set_updated_at();
-
 create or replace function public.nexus_workflow_can_access_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -121,7 +109,6 @@ begin
   return false;
 end;
 $fn$;
-
 create or replace function public.nexus_workflow_can_manage_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -180,27 +167,22 @@ begin
   return false;
 end;
 $fn$;
-
 grant execute on function public.nexus_workflow_can_access_tenant(uuid) to authenticated;
 grant execute on function public.nexus_workflow_can_manage_tenant(uuid) to authenticated;
-
 alter table public.workflow_templates enable row level security;
 alter table public.workflow_instances enable row level security;
 alter table public.workflow_events enable row level security;
-
 drop policy if exists workflow_templates_select_auth on public.workflow_templates;
 create policy workflow_templates_select_auth
 on public.workflow_templates
 for select to authenticated
 using (true);
-
 drop policy if exists workflow_templates_super_admin_write on public.workflow_templates;
 create policy workflow_templates_super_admin_write
 on public.workflow_templates
 for all to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 drop policy if exists workflow_instances_select_scope on public.workflow_instances;
 create policy workflow_instances_select_scope
 on public.workflow_instances
@@ -209,7 +191,6 @@ using (
   auth.uid() = user_id
   or public.nexus_workflow_can_access_tenant(tenant_id)
 );
-
 drop policy if exists workflow_instances_insert_scope on public.workflow_instances;
 create policy workflow_instances_insert_scope
 on public.workflow_instances
@@ -218,7 +199,6 @@ with check (
   auth.uid() = user_id
   and public.nexus_workflow_can_access_tenant(tenant_id)
 );
-
 drop policy if exists workflow_instances_update_scope on public.workflow_instances;
 create policy workflow_instances_update_scope
 on public.workflow_instances
@@ -231,7 +211,6 @@ with check (
   auth.uid() = user_id
   or public.nexus_workflow_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists workflow_events_select_scope on public.workflow_events;
 create policy workflow_events_select_scope
 on public.workflow_events
@@ -247,7 +226,6 @@ using (
       )
   )
 );
-
 drop policy if exists workflow_events_insert_scope on public.workflow_events;
 create policy workflow_events_insert_scope
 on public.workflow_events
@@ -263,7 +241,6 @@ with check (
       )
   )
 );
-
 insert into public.workflow_templates (key, description, steps)
 values
   (

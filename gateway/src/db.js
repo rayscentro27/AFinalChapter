@@ -1,6 +1,42 @@
 import { supabaseAdmin } from './supabase.js';
 import { buildWebhookEventKey, queueOutgoingWebhookEvent } from './lib/public-api/webhookDispatcher.js';
 
+export async function enqueueJob({
+  tenant_id,
+  job_type,
+  payload,
+  logger = console,
+}) {
+  if (!tenant_id || !job_type) {
+    logger.warn({ tenant_id, job_type }, 'enqueueJob: missing required fields');
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('job_queue')
+      .insert({
+        tenant_id,
+        job_type,
+        payload,
+        status: 'pending',
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      logger.error({ error: error.message, job_type, tenant_id }, 'enqueueJob: failed to insert job');
+      return null;
+    }
+
+    logger.info({ job_id: data?.id, job_type, tenant_id }, 'Job enqueued');
+    return data?.id || null;
+  } catch (err) {
+    logger.error({ error: String(err.message || err), job_type, tenant_id }, 'enqueueJob: exception');
+    return null;
+  }
+}
+
 export async function getChannelAccount({ provider, external_account_id }) {
   const { data, error } = await supabaseAdmin
     .from('channel_accounts')
@@ -261,6 +297,19 @@ export async function insertMessage({
       received_at: received_at || new Date().toISOString(),
     },
   }).catch(() => {});
+
+  // Enqueue sentiment triage job for inbound messages
+  if (direction === 'in') {
+    await enqueueJob({
+      tenant_id,
+      job_type: 'sentiment_triage',
+      payload: {
+        message_id: data.id,
+        conversation_id,
+        provider,
+      },
+    }).catch(() => {});
+  }
 
   return data.id;
 }

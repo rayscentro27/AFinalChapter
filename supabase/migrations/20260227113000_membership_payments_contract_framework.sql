@@ -2,7 +2,6 @@
 -- Adds plan, subscription, event, and commission disclosure records.
 
 create extension if not exists pgcrypto;
-
 -- Compatibility helper (safe re-definition across environments).
 create or replace function public.nexus_is_master_admin_compat()
 returns boolean
@@ -41,9 +40,7 @@ begin
   return coalesce((auth.jwt() ->> 'role') = 'admin', false);
 end;
 $fn$;
-
 grant execute on function public.nexus_is_master_admin_compat() to authenticated;
-
 create or replace function public.nexus_can_manage_subscription(p_user_id uuid)
 returns boolean
 language sql
@@ -53,9 +50,7 @@ set search_path = public
 as $fn$
   select auth.uid() = p_user_id or public.nexus_is_master_admin_compat();
 $fn$;
-
 grant execute on function public.nexus_can_manage_subscription(uuid) to authenticated;
-
 DO $do$
 BEGIN
   IF NOT EXISTS (
@@ -67,7 +62,6 @@ BEGIN
     CREATE TYPE public.subscription_status AS ENUM ('active', 'trialing', 'past_due', 'canceled');
   END IF;
 END $do$;
-
 create table if not exists public.membership_plans (
   id uuid primary key default gen_random_uuid(),
   code text not null unique check (code in ('FREE', 'GROWTH', 'PREMIUM')),
@@ -76,7 +70,6 @@ create table if not exists public.membership_plans (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -90,13 +83,10 @@ create table if not exists public.subscriptions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create unique index if not exists subscriptions_user_tenant_uidx
   on public.subscriptions (user_id, tenant_id);
-
 create index if not exists subscriptions_tenant_status_idx
   on public.subscriptions (tenant_id, status, plan_code);
-
 create table if not exists public.subscription_events (
   id uuid primary key default gen_random_uuid(),
   subscription_id uuid not null references public.subscriptions(id) on delete cascade,
@@ -104,10 +94,8 @@ create table if not exists public.subscription_events (
   payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists subscription_events_sub_created_idx
   on public.subscription_events (subscription_id, created_at desc);
-
 create table if not exists public.commission_disclosures (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -119,13 +107,10 @@ create table if not exists public.commission_disclosures (
   notes text,
   created_at timestamptz not null default now()
 );
-
 create index if not exists commission_disclosures_user_idx
   on public.commission_disclosures (user_id, accepted_at desc);
-
 create unique index if not exists commission_disclosures_user_version_uidx
   on public.commission_disclosures (user_id, version);
-
 create or replace function public.nexus_subscriptions_set_updated_at()
 returns trigger
 language plpgsql
@@ -135,12 +120,10 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_subscriptions_set_updated_at on public.subscriptions;
 create trigger trg_subscriptions_set_updated_at
 before update on public.subscriptions
 for each row execute procedure public.nexus_subscriptions_set_updated_at();
-
 insert into public.membership_plans (code, price_cents, is_active)
 values
   ('FREE', 0, true),
@@ -150,46 +133,39 @@ on conflict (code) do update
 set price_cents = excluded.price_cents,
     is_active = excluded.is_active,
     updated_at = now();
-
 alter table public.membership_plans enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.subscription_events enable row level security;
 alter table public.commission_disclosures enable row level security;
-
 -- membership_plans
 DROP POLICY IF EXISTS membership_plans_select_all ON public.membership_plans;
 create policy membership_plans_select_all
 on public.membership_plans
 for select to authenticated
 using (true);
-
 DROP POLICY IF EXISTS membership_plans_admin_write ON public.membership_plans;
 create policy membership_plans_admin_write
 on public.membership_plans
 for all to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 -- subscriptions
 DROP POLICY IF EXISTS subscriptions_select_own_or_admin ON public.subscriptions;
 create policy subscriptions_select_own_or_admin
 on public.subscriptions
 for select to authenticated
 using (public.nexus_can_manage_subscription(user_id));
-
 DROP POLICY IF EXISTS subscriptions_insert_own_or_admin ON public.subscriptions;
 create policy subscriptions_insert_own_or_admin
 on public.subscriptions
 for insert to authenticated
 with check (public.nexus_can_manage_subscription(user_id));
-
 DROP POLICY IF EXISTS subscriptions_update_own_or_admin ON public.subscriptions;
 create policy subscriptions_update_own_or_admin
 on public.subscriptions
 for update to authenticated
 using (public.nexus_can_manage_subscription(user_id))
 with check (public.nexus_can_manage_subscription(user_id));
-
 -- subscription_events
 DROP POLICY IF EXISTS subscription_events_select_own_or_admin ON public.subscription_events;
 create policy subscription_events_select_own_or_admin
@@ -203,7 +179,6 @@ using (
       and public.nexus_can_manage_subscription(s.user_id)
   )
 );
-
 DROP POLICY IF EXISTS subscription_events_insert_own_or_admin ON public.subscription_events;
 create policy subscription_events_insert_own_or_admin
 on public.subscription_events
@@ -216,14 +191,12 @@ with check (
       and public.nexus_can_manage_subscription(s.user_id)
   )
 );
-
 -- commission_disclosures
 DROP POLICY IF EXISTS commission_disclosures_select_own_or_admin ON public.commission_disclosures;
 create policy commission_disclosures_select_own_or_admin
 on public.commission_disclosures
 for select to authenticated
 using (public.nexus_can_manage_subscription(user_id));
-
 DROP POLICY IF EXISTS commission_disclosures_insert_own_or_admin ON public.commission_disclosures;
 create policy commission_disclosures_insert_own_or_admin
 on public.commission_disclosures

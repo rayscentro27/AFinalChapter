@@ -36,6 +36,16 @@ netlify/functions/manifest.json
 
 # Local backups
 .env.bad
+.env.corrupt*
+_local_backups/
+_local_backups2/
+.secrets/
+mac-mini-worker-bundle.tar.gz
+pencil-welcome.pen
+agent_test.json
+import.json
+import_test.json
+payload.json
 
 # dotenv
 .env

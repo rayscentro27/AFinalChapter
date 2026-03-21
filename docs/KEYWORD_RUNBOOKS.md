@@ -45,6 +45,43 @@ Command:
 scripts/oracle_gateway_smoke.sh
 ```
 
+## `oracle-messaging-smoke`
+Purpose: run a modern outbox smoke send using the permission-guarded `/messages/send` path.
+
+Command:
+```bash
+SMOKE_TENANT_ID=<tenant_uuid> \
+SMOKE_CONVERSATION_ID=<conversation_uuid> \
+SMOKE_PROVIDER=meta \
+SMOKE_BEARER_TOKEN=<user_jwt> \
+GATEWAY_BASE_URL=https://api.goclearonline.cc \
+GATEWAY_INTERNAL_API_KEY=<internal_api_key> \
+SUPABASE_URL=<supabase_url> \
+SUPABASE_SERVICE_ROLE_KEY=<service_role_key> \
+node scripts/smoke-inbox-send.mjs
+```
+
+## `oracle-smoke-user-provision`
+Purpose: create a deterministic smoke user and force tenant role (default: `admin`) to avoid `missing_permission` surprises.
+
+Command:
+```bash
+node scripts/provision_smoke_user_token.mjs --tenant-id=<tenant_uuid> --role=admin
+```
+
+Notes:
+- Writes token + metadata to `.secrets/real_user_bearer_token.txt` and `.secrets/real_user_bearer_token.meta.json` by default.
+- Use `--no-write=true` to print summary only.
+
+## `oracle-smoke-user-cleanup`
+Purpose: remove temporary `codex.smoke.admin.*` users and tenant membership rows.
+
+Commands:
+```bash
+node scripts/cleanup_smoke_users.mjs --dry-run=true
+node scripts/cleanup_smoke_users.mjs
+```
+
 ## `oracle-sync-env`
 Purpose: update Oracle API URL/key locally and in Netlify.
 

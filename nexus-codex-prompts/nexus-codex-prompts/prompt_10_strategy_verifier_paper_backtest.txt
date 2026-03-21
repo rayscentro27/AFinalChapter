@@ -1,0 +1,67 @@
+PROMPT 10 — NEXUS STRATEGY VERIFIER + PAPER BACKTEST HARNESS (EVIDENCE-BASED PROMOTION)
+
+You are a Senior Staff Engineer implementing “Strategy Verifier Mode” for Nexus.
+This adds evidence-based verification so Nexus does NOT promote strategies just because they sound good.
+
+STRICT RULES:
+- DO NOT modify existing Nexus API services: /opt/nexus-api/gateway, nexus-api.service.
+- DO NOT modify legacy gateway: /home/opc/afinal_gateway, nexus-gateway.service.
+- DO NOT rewrite Prompt 1–9 services. Only READ from their Supabase outputs.
+- ADD ONLY a new service under /opt/nexus-services/strategy-verifier.
+- Default safe: NO real trades. This is paper verification only.
+- No secrets in repo. Provide .env.example only.
+- No browser automation.
+
+GOAL:
+Verify strategies using paper backtests / replay simulations on historical price data (forex candles).
+Compute evidence metrics and use them to:
+- update evidence tables
+- drive promotions only when evidence thresholds are met
+
+SERVICE:
+/opt/nexus-services/strategy-verifier
+
+SUPABASE SQL:
+/opt/nexus-services/ops/supabase/strategy_verifier.sql
+
+Create tables:
+verifier_jobs, verifier_runs, verifier_trades, promotion_evidence
+
+PROMOTION POLICY (conservative):
+- trades_count >= 30
+- win_rate >= 0.50
+- profit_factor >= 1.20
+- max_drawdown_r <= 10
+If met: decision='promote' else hold/reject
+
+DATA SOURCE:
+OANDA candles endpoint:
+/v3/instruments/{instrument}/candles?granularity=M15&count=3000&price=M
+
+RISK MODEL:
+Fixed 1R.
+Defaults if missing:
+SL=15 pips, TP=30 pips, slippage=1 pip (configurable).
+
+FILES:
+worker.js, db.js, oandaCandles.js, ruleParser.js, simulator.js, metrics.js, promoter.js, package.json, .env.example, README.md
+
+SYSTEMD:
+strategy-verifier.service + strategy-verifier.timer (every 6 hours)
+
+ENV (.env.example):
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+OANDA_API_KEY=
+OANDA_URL=https://api-fxpractice.oanda.com
+OANDA_ENV=practice
+GRANULARITY=M15
+CANDLE_COUNT=3000
+MAX_ITEMS_PER_RUN=2
+DEFAULT_SL_PIPS=15
+DEFAULT_TP_PIPS=30
+SLIPPAGE_PIPS=1
+EVIDENCE_MIN_TRADES=30
+EVIDENCE_MIN_WIN_RATE=0.50
+EVIDENCE_MIN_PROFIT_FACTOR=1.20
+EVIDENCE_MAX_DRAWDOWN_R=10

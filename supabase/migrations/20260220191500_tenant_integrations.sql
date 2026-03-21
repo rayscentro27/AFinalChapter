@@ -1,5 +1,4 @@
 create extension if not exists pgcrypto;
-
 create table if not exists public.tenant_integrations (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -23,15 +22,11 @@ create table if not exists public.tenant_integrations (
 
   unique (tenant_id, provider)
 );
-
 create index if not exists tenant_integrations_tenant_provider_idx
 on public.tenant_integrations (tenant_id, provider);
-
 create index if not exists tenant_integrations_tenant_status_idx
 on public.tenant_integrations (tenant_id, status);
-
 alter table public.tenant_integrations enable row level security;
-
 drop policy if exists tenant_integrations_select on public.tenant_integrations;
 create policy tenant_integrations_select on public.tenant_integrations
 for select
@@ -45,7 +40,6 @@ using (
       and tm.role in ('admin', 'supervisor', 'sales')
   )
 );
-
 drop policy if exists tenant_integrations_insert on public.tenant_integrations;
 create policy tenant_integrations_insert on public.tenant_integrations
 for insert
@@ -62,7 +56,6 @@ with check (
     )
   )
 );
-
 drop policy if exists tenant_integrations_update on public.tenant_integrations;
 create policy tenant_integrations_update on public.tenant_integrations
 for update
@@ -92,7 +85,6 @@ with check (
     )
   )
 );
-
 drop policy if exists tenant_integrations_delete on public.tenant_integrations;
 create policy tenant_integrations_delete on public.tenant_integrations
 for delete
@@ -109,7 +101,6 @@ using (
     )
   )
 );
-
 create or replace function public.tenant_integrations_touch_updated_at()
 returns trigger
 language plpgsql
@@ -119,7 +110,6 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists trg_tenant_integrations_updated_at on public.tenant_integrations;
 create trigger trg_tenant_integrations_updated_at
 before update on public.tenant_integrations

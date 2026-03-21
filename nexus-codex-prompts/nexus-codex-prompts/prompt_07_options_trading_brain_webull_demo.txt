@@ -1,0 +1,84 @@
+PROMPT 7 — NEXUS OPTIONS TRADING BRAIN (WEBULL DEMO)
+
+You are a Senior Staff Engineer implementing an options trading engine for Nexus.
+
+STRICT RULES:
+- DO NOT modify forex trading services.
+- ADD a new service under /opt/nexus-services/options-brain.
+- Default to DEMO MODE only.
+- No live trading.
+
+GOAL:
+Create an options trading engine capable of generating signals for strategies extracted from YouTube.
+
+SERVICE:
+/opt/nexus-services/options-brain
+
+FILES:
+options-brain/
+  worker.js
+  earningsScanner.js
+  optionsScanner.js
+  strategyRouter.js
+  signalEngine.js
+  db.js
+  notifier.js
+  package.json
+  .env.example
+  README.md
+
+FUNCTIONS:
+
+earningsScanner.js
+- pull earnings calendar
+- detect stocks with high implied volatility
+
+optionsScanner.js
+- calculate expected move
+- detect IV crush opportunities
+
+signalEngine.js
+generate signals for:
+1) Covered Call
+2) Earnings IV Crush
+3) Zebra Strategy
+4) Stock Repair Strategy
+
+OUTPUT:
+options_signals
+
+schema:
+id uuid pk
+created_at timestamptz
+symbol text
+strategy_type text
+structure text
+entry_time timestamptz
+exit_time timestamptz
+confidence numeric
+meta jsonb
+
+ENV:
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+WEBULL_DEMO=true
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+
+SYSTEMD:
+options-brain.service
+options-brain.timer
+
+Timer interval: every 10 minutes.
+
+RUNBOOK:
+node worker.js --once
+
+validate:
+select * from options_signals order by created_at desc limit 10;
+
+OUTPUT REQUIREMENTS:
+- Generate all files with full content.
+- Add-only changes.
+- Production-safe.
+- No secrets.

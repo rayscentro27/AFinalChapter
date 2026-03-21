@@ -106,11 +106,18 @@ const SalesTrainer: React.FC = () => {
         setIsAnalyzingCoach(true);
         try {
             // Reusing analyzeCallStrategy for live roleplay coaching
-            const pivot = await geminiService.analyzeCallStrategy(transcript, { 
+            // Add timeout to prevent blocking if API is slow
+            const timeoutPromise = new Promise<string>((_, reject) => 
+              setTimeout(() => reject(new Error('Coach analysis timeout')), 5000)
+            );
+            const pivot = await Promise.race([
+              geminiService.analyzeCallStrategy(transcript, { 
                 name: 'Roleplay Lead', 
                 company: activeScenario.title,
                 notes: activeScenario.description
-            } as any);
+              } as any),
+              timeoutPromise
+            ]);
             setLiveCoaching(pivot);
             
             // Heuristic sentiment update based on transcript length and context
@@ -147,7 +154,14 @@ const SalesTrainer: React.FC = () => {
             notes: activeScenario.description 
         } as any;
         
-        const predicted = await geminiService.predictCommonObjections(mockContact);
+        // Add timeout to prevent blocking
+        const timeoutPromise = new Promise<string[]>((_, reject) => 
+          setTimeout(() => reject(new Error('Session prep timeout')), 8000)
+        );
+        const predicted = await Promise.race([
+          geminiService.predictCommonObjections(mockContact),
+          timeoutPromise
+        ]);
         setObjections(predicted.map(o => ({ objection: o, handled: false })));
     } catch (e) {
         console.error("Prep failed", e);
@@ -160,7 +174,14 @@ const SalesTrainer: React.FC = () => {
     setIsGettingRebuttal(index);
     try {
         const mockContact = { company: activeScenario.title } as any;
-        const rebuttal = await geminiService.generateObjectionResponse(mockContact, objections[index].objection);
+        // Add timeout to prevent blocking
+        const timeoutPromise = new Promise<string>((_, reject) => 
+          setTimeout(() => reject(new Error('Rebuttal fetch timeout')), 5000)
+        );
+        const rebuttal = await Promise.race([
+          geminiService.generateObjectionResponse(mockContact, objections[index].objection),
+          timeoutPromise
+        ]);
         const newObjections = [...objections];
         newObjections[index].rebuttal = rebuttal;
         setObjections(newObjections);

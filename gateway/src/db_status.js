@@ -151,9 +151,17 @@ async function patchMessagesByProviderRealId({
     .eq('provider', provider)
     .eq('provider_message_id_real', provider_message_id_real);
 
-  if (update.error && (missingColumn(update.error, 'delivery_status') || missingColumn(update.error, 'last_status_at'))) {
+  if (
+    update.error
+    && (
+      missingColumn(update.error, 'delivery_status')
+      || missingColumn(update.error, 'last_status_at')
+      || missingColumn(update.error, 'updated_at')
+    )
+  ) {
     delete patch.delivery_status;
     delete patch.last_status_at;
+    delete patch.updated_at;
 
     update = await supabaseAdmin
       .from('messages')

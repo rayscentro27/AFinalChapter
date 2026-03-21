@@ -2,7 +2,6 @@
 -- Adds paid-upgrade consent types and DB-level feature entitlement helper.
 
 create extension if not exists pgcrypto;
-
 -- Preserve super-admin compatibility across role labels.
 create or replace function public.nexus_is_master_admin_compat()
 returns boolean
@@ -47,9 +46,7 @@ begin
   return lower(coalesce(auth.jwt() ->> 'role', '')) in ('super_admin', 'admin');
 end;
 $fn$;
-
 grant execute on function public.nexus_is_master_admin_compat() to authenticated;
-
 DO $do$
 BEGIN
   IF EXISTS (
@@ -69,7 +66,6 @@ BEGIN
     ALTER TYPE public.consent_type ADD VALUE 'membership_agreement';
   END IF;
 END $do$;
-
 DO $do$
 BEGIN
   IF EXISTS (
@@ -89,8 +85,6 @@ BEGIN
     ALTER TYPE public.consent_type ADD VALUE 'refund_policy';
   END IF;
 END $do$;
-
-
 create or replace function public.can_access_feature(
   p_user_id uuid,
   p_feature_key text
@@ -174,5 +168,4 @@ begin
   return true;
 end;
 $fn$;
-
 grant execute on function public.can_access_feature(uuid, text) to authenticated;

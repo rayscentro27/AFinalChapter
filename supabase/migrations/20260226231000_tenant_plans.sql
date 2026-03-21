@@ -2,7 +2,6 @@
 -- Safe to run multiple times.
 
 create extension if not exists pgcrypto;
-
 create table if not exists public.tenant_plans (
   tenant_id uuid primary key,
   plan_key text not null default 'pro',
@@ -14,6 +13,5 @@ create table if not exists public.tenant_plans (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists tenant_plans_plan_key_idx
   on public.tenant_plans (plan_key);

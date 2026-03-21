@@ -89,6 +89,12 @@ function isMissingSchema(error) {
   );
 }
 
+function isMissingColumnProjection(error) {
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('column')
+    && (msg.includes('does not exist') || msg.includes('schema cache') || msg.includes("could not find the '"));
+}
+
 function computeBackoffMinutes(attempts) {
   const index = Math.max(0, Math.min(BACKOFF_MINUTES.length - 1, Number(attempts || 1) - 1));
   return BACKOFF_MINUTES[index];
@@ -219,18 +225,34 @@ async function loadAttachmentsByIds({ tenant_id, attachmentIds }) {
   const ids = Array.from(new Set((attachmentIds || []).filter((id) => isUuid(id))));
   if (!ids.length) return [];
 
-  const { data, error } = await supabaseAdmin
-    .from('attachments')
-    .select('id,tenant_id,storage_bucket,storage_path,content_type,size_bytes,sha256,created_at')
-    .eq('tenant_id', tenant_id)
-    .in('id', ids);
+  const selectCandidates = [
+    'id,tenant_id,storage_bucket,storage_path,content_type,size_bytes,sha256,created_at',
+    'id,tenant_id,storage_bucket,storage_path,mime_type,size_bytes,created_at',
+    'id,tenant_id,storage_bucket,storage_path,mime_type,size_bytes,provider_media_id,created_at',
+  ];
 
-  if (error) {
+  let lastError = null;
+
+  for (const select of selectCandidates) {
+    const { data, error } = await supabaseAdmin
+      .from('attachments')
+      .select(select)
+      .eq('tenant_id', tenant_id)
+      .in('id', ids);
+
+    if (!error) return data || [];
+
+    if (isMissingColumnProjection(error)) {
+      lastError = error;
+      continue;
+    }
+
     if (isMissingSchema(error)) return [];
     throw new Error(`attachments lookup failed: ${error.message}`);
   }
 
-  return data || [];
+  if (lastError && isMissingSchema(lastError)) return [];
+  throw new Error(`attachments lookup failed: ${lastError?.message || 'unknown_error'}`);
 }
 
 function normalizeAttachmentRecord(row) {
@@ -238,7 +260,7 @@ function normalizeAttachmentRecord(row) {
     attachment_id: asText(row?.id),
     storage_bucket: asText(row?.storage_bucket) || 'attachments',
     storage_path: asText(row?.storage_path),
-    content_type: asText(row?.content_type) || 'application/octet-stream',
+    content_type: asText(row?.content_type || row?.mime_type) || 'application/octet-stream',
     size_bytes: Number(row?.size_bytes || 0),
     sha256: asText(row?.sha256) || null,
     created_at: asText(row?.created_at) || null,

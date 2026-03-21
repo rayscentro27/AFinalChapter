@@ -3,7 +3,6 @@
 -- Educational-only positioning; no guaranteed outcomes.
 
 create extension if not exists pgcrypto;
-
 create or replace function public.nexus_funnel_is_super_admin()
 returns boolean
 language plpgsql
@@ -31,7 +30,6 @@ begin
   return lower(coalesce(auth.jwt() ->> 'role', '')) in ('admin', 'super_admin');
 end;
 $fn$;
-
 create or replace function public.nexus_funnel_can_access_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -97,7 +95,6 @@ begin
   return false;
 end;
 $fn$;
-
 create or replace function public.nexus_funnel_can_manage_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -165,11 +162,9 @@ begin
   return false;
 end;
 $fn$;
-
 grant execute on function public.nexus_funnel_is_super_admin() to authenticated;
 grant execute on function public.nexus_funnel_can_access_tenant(uuid) to authenticated;
 grant execute on function public.nexus_funnel_can_manage_tenant(uuid) to authenticated;
-
 create table if not exists public.leads (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid null references public.tenants(id) on delete set null,
@@ -184,7 +179,6 @@ create table if not exists public.leads (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.lead_events (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -193,7 +187,6 @@ create table if not exists public.lead_events (
   payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.funnel_sequences (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -204,7 +197,6 @@ create table if not exists public.funnel_sequences (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.funnel_steps (
   id uuid primary key default gen_random_uuid(),
   sequence_id uuid not null references public.funnel_sequences(id) on delete cascade,
@@ -214,7 +206,6 @@ create table if not exists public.funnel_steps (
   action_payload jsonb not null,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.funnel_enrollments (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -227,7 +218,6 @@ create table if not exists public.funnel_enrollments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.offers (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -238,7 +228,6 @@ create table if not exists public.offers (
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.funnel_metrics_daily (
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   day date not null,
@@ -251,7 +240,6 @@ create table if not exists public.funnel_metrics_daily (
   outcomes_approved int not null default 0,
   primary key (tenant_id, day)
 );
-
 create table if not exists public.lead_user_links (
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   lead_id uuid not null references public.leads(id) on delete cascade,
@@ -259,7 +247,6 @@ create table if not exists public.lead_user_links (
   linked_at timestamptz not null default now(),
   primary key (tenant_id, lead_id)
 );
-
 create table if not exists public.offers_inbox (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -269,7 +256,6 @@ create table if not exists public.offers_inbox (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.unsubscribe_tokens (
   token text primary key,
   lead_id uuid not null references public.leads(id) on delete cascade,
@@ -277,53 +263,38 @@ create table if not exists public.unsubscribe_tokens (
   consumed_at timestamptz null,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.lead_capture_rate_limits (
   id uuid primary key default gen_random_uuid(),
   scope text not null,
   key_hash text not null,
   created_at timestamptz not null default now()
 );
-
 create unique index if not exists leads_tenant_email_uidx
   on public.leads (coalesce(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid), email);
-
 create index if not exists leads_email_lower_idx
   on public.leads ((lower(email)));
-
 create index if not exists leads_status_idx
   on public.leads (tenant_id, status, created_at desc);
-
 create index if not exists lead_events_lead_created_idx
   on public.lead_events (lead_id, created_at desc);
-
 create index if not exists lead_events_tenant_event_idx
   on public.lead_events (tenant_id, event_type, created_at desc);
-
 create unique index if not exists funnel_steps_sequence_order_uidx
   on public.funnel_steps (sequence_id, step_order);
-
 create unique index if not exists funnel_enrollments_active_uidx
   on public.funnel_enrollments (lead_id, sequence_id);
-
 create index if not exists funnel_enrollments_tenant_next_run_idx
   on public.funnel_enrollments (tenant_id, next_run_at);
-
 create index if not exists lead_user_links_user_idx
   on public.lead_user_links (user_id, linked_at desc);
-
 create unique index if not exists lead_user_links_tenant_user_uidx
   on public.lead_user_links (tenant_id, user_id);
-
 create index if not exists offers_inbox_user_status_idx
   on public.offers_inbox (user_id, status, created_at desc);
-
 create index if not exists unsubscribe_tokens_lead_idx
   on public.unsubscribe_tokens (lead_id, expires_at desc);
-
 create index if not exists lead_capture_rate_limits_scope_key_idx
   on public.lead_capture_rate_limits (scope, key_hash, created_at desc);
-
 create or replace function public.nexus_funnel_touch_updated_at()
 returns trigger
 language plpgsql
@@ -333,27 +304,22 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_leads_touch_updated_at on public.leads;
 create trigger trg_leads_touch_updated_at
 before update on public.leads
 for each row execute procedure public.nexus_funnel_touch_updated_at();
-
 drop trigger if exists trg_funnel_sequences_touch_updated_at on public.funnel_sequences;
 create trigger trg_funnel_sequences_touch_updated_at
 before update on public.funnel_sequences
 for each row execute procedure public.nexus_funnel_touch_updated_at();
-
 drop trigger if exists trg_funnel_enrollments_touch_updated_at on public.funnel_enrollments;
 create trigger trg_funnel_enrollments_touch_updated_at
 before update on public.funnel_enrollments
 for each row execute procedure public.nexus_funnel_touch_updated_at();
-
 drop trigger if exists trg_offers_inbox_touch_updated_at on public.offers_inbox;
 create trigger trg_offers_inbox_touch_updated_at
 before update on public.offers_inbox
 for each row execute procedure public.nexus_funnel_touch_updated_at();
-
 alter table public.leads enable row level security;
 alter table public.lead_events enable row level security;
 alter table public.funnel_sequences enable row level security;
@@ -365,7 +331,6 @@ alter table public.lead_user_links enable row level security;
 alter table public.offers_inbox enable row level security;
 alter table public.unsubscribe_tokens enable row level security;
 alter table public.lead_capture_rate_limits enable row level security;
-
 -- leads
 
 drop policy if exists leads_select_linked_or_admin on public.leads;
@@ -381,9 +346,7 @@ using (
   )
   or (tenant_id is not null and public.nexus_funnel_can_access_tenant(tenant_id))
 );
-
 drop policy if exists leads_insert_admin_only on public.leads;
-
 drop policy if exists leads_update_linked_or_admin on public.leads;
 create policy leads_update_linked_or_admin
 on public.leads
@@ -406,13 +369,11 @@ with check (
   )
   or (tenant_id is not null and public.nexus_funnel_can_manage_tenant(tenant_id))
 );
-
 drop policy if exists leads_delete_admin_only on public.leads;
 create policy leads_delete_admin_only
 on public.leads
 for delete to authenticated
 using (tenant_id is not null and public.nexus_funnel_can_manage_tenant(tenant_id));
-
 -- lead_user_links
 
 drop policy if exists lead_user_links_select_own_or_admin on public.lead_user_links;
@@ -420,26 +381,22 @@ create policy lead_user_links_select_own_or_admin
 on public.lead_user_links
 for select to authenticated
 using (user_id = auth.uid() or public.nexus_funnel_can_access_tenant(tenant_id));
-
 drop policy if exists lead_user_links_insert_admin on public.lead_user_links;
 create policy lead_user_links_insert_admin
 on public.lead_user_links
 for insert to authenticated
 with check (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 drop policy if exists lead_user_links_update_admin on public.lead_user_links;
 create policy lead_user_links_update_admin
 on public.lead_user_links
 for update to authenticated
 using (public.nexus_funnel_can_manage_tenant(tenant_id))
 with check (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 drop policy if exists lead_user_links_delete_admin on public.lead_user_links;
 create policy lead_user_links_delete_admin
 on public.lead_user_links
 for delete to authenticated
 using (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 -- lead_events
 
 drop policy if exists lead_events_select_linked_or_admin on public.lead_events;
@@ -455,7 +412,6 @@ using (
       and lul.user_id = auth.uid()
   )
 );
-
 drop policy if exists lead_events_insert_linked_or_admin on public.lead_events;
 create policy lead_events_insert_linked_or_admin
 on public.lead_events
@@ -469,7 +425,6 @@ with check (
       and lul.user_id = auth.uid()
   )
 );
-
 -- funnel_sequences
 
 drop policy if exists funnel_sequences_select_active_or_admin on public.funnel_sequences;
@@ -477,26 +432,22 @@ create policy funnel_sequences_select_active_or_admin
 on public.funnel_sequences
 for select to authenticated
 using (is_active = true or public.nexus_funnel_can_access_tenant(tenant_id));
-
 drop policy if exists funnel_sequences_insert_admin on public.funnel_sequences;
 create policy funnel_sequences_insert_admin
 on public.funnel_sequences
 for insert to authenticated
 with check (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 drop policy if exists funnel_sequences_update_admin on public.funnel_sequences;
 create policy funnel_sequences_update_admin
 on public.funnel_sequences
 for update to authenticated
 using (public.nexus_funnel_can_manage_tenant(tenant_id))
 with check (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 drop policy if exists funnel_sequences_delete_admin on public.funnel_sequences;
 create policy funnel_sequences_delete_admin
 on public.funnel_sequences
 for delete to authenticated
 using (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 -- funnel_steps
 
 drop policy if exists funnel_steps_select_active_or_admin on public.funnel_steps;
@@ -511,7 +462,6 @@ using (
       and (fs.is_active = true or public.nexus_funnel_can_access_tenant(fs.tenant_id))
   )
 );
-
 drop policy if exists funnel_steps_insert_admin on public.funnel_steps;
 create policy funnel_steps_insert_admin
 on public.funnel_steps
@@ -524,7 +474,6 @@ with check (
       and public.nexus_funnel_can_manage_tenant(fs.tenant_id)
   )
 );
-
 drop policy if exists funnel_steps_update_admin on public.funnel_steps;
 create policy funnel_steps_update_admin
 on public.funnel_steps
@@ -545,7 +494,6 @@ with check (
       and public.nexus_funnel_can_manage_tenant(fs.tenant_id)
   )
 );
-
 drop policy if exists funnel_steps_delete_admin on public.funnel_steps;
 create policy funnel_steps_delete_admin
 on public.funnel_steps
@@ -558,7 +506,6 @@ using (
       and public.nexus_funnel_can_manage_tenant(fs.tenant_id)
   )
 );
-
 -- funnel_enrollments
 
 drop policy if exists funnel_enrollments_select_scope on public.funnel_enrollments;
@@ -574,26 +521,22 @@ using (
       and lul.user_id = auth.uid()
   )
 );
-
 drop policy if exists funnel_enrollments_insert_admin on public.funnel_enrollments;
 create policy funnel_enrollments_insert_admin
 on public.funnel_enrollments
 for insert to authenticated
 with check (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 drop policy if exists funnel_enrollments_update_admin on public.funnel_enrollments;
 create policy funnel_enrollments_update_admin
 on public.funnel_enrollments
 for update to authenticated
 using (public.nexus_funnel_can_manage_tenant(tenant_id))
 with check (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 drop policy if exists funnel_enrollments_delete_admin on public.funnel_enrollments;
 create policy funnel_enrollments_delete_admin
 on public.funnel_enrollments
 for delete to authenticated
 using (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 -- offers
 
 drop policy if exists offers_select_active_or_admin on public.offers;
@@ -601,26 +544,22 @@ create policy offers_select_active_or_admin
 on public.offers
 for select to authenticated
 using (is_active = true or public.nexus_funnel_can_access_tenant(tenant_id));
-
 drop policy if exists offers_insert_admin on public.offers;
 create policy offers_insert_admin
 on public.offers
 for insert to authenticated
 with check (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 drop policy if exists offers_update_admin on public.offers;
 create policy offers_update_admin
 on public.offers
 for update to authenticated
 using (public.nexus_funnel_can_manage_tenant(tenant_id))
 with check (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 drop policy if exists offers_delete_admin on public.offers;
 create policy offers_delete_admin
 on public.offers
 for delete to authenticated
 using (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 -- offers_inbox
 
 drop policy if exists offers_inbox_select_scope on public.offers_inbox;
@@ -628,26 +567,22 @@ create policy offers_inbox_select_scope
 on public.offers_inbox
 for select to authenticated
 using (user_id = auth.uid() or public.nexus_funnel_can_access_tenant(tenant_id));
-
 drop policy if exists offers_inbox_insert_admin on public.offers_inbox;
 create policy offers_inbox_insert_admin
 on public.offers_inbox
 for insert to authenticated
 with check (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 drop policy if exists offers_inbox_update_scope on public.offers_inbox;
 create policy offers_inbox_update_scope
 on public.offers_inbox
 for update to authenticated
 using (user_id = auth.uid() or public.nexus_funnel_can_manage_tenant(tenant_id))
 with check (user_id = auth.uid() or public.nexus_funnel_can_manage_tenant(tenant_id));
-
 drop policy if exists offers_inbox_delete_admin on public.offers_inbox;
 create policy offers_inbox_delete_admin
 on public.offers_inbox
 for delete to authenticated
 using (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 -- funnel_metrics_daily
 
 drop policy if exists funnel_metrics_daily_select_admin on public.funnel_metrics_daily;
@@ -655,14 +590,12 @@ create policy funnel_metrics_daily_select_admin
 on public.funnel_metrics_daily
 for select to authenticated
 using (public.nexus_funnel_can_access_tenant(tenant_id));
-
 drop policy if exists funnel_metrics_daily_write_admin on public.funnel_metrics_daily;
 create policy funnel_metrics_daily_write_admin
 on public.funnel_metrics_daily
 for all to authenticated
 using (public.nexus_funnel_can_manage_tenant(tenant_id))
 with check (public.nexus_funnel_can_manage_tenant(tenant_id));
-
 -- unsubscribe_tokens & rate_limit rows are function-managed only
 
 drop policy if exists unsubscribe_tokens_admin_all on public.unsubscribe_tokens;
@@ -687,14 +620,12 @@ with check (
       and public.nexus_funnel_can_manage_tenant(l.tenant_id)
   )
 );
-
 drop policy if exists lead_capture_rate_limits_admin_all on public.lead_capture_rate_limits;
 create policy lead_capture_rate_limits_admin_all
 on public.lead_capture_rate_limits
 for all to authenticated
 using (public.nexus_funnel_is_super_admin())
 with check (public.nexus_funnel_is_super_admin());
-
 grant select, insert, update, delete on table public.leads to authenticated, service_role;
 grant select, insert, update, delete on table public.lead_events to authenticated, service_role;
 grant select, insert, update, delete on table public.funnel_sequences to authenticated, service_role;
@@ -706,7 +637,6 @@ grant select, insert, update, delete on table public.lead_user_links to authenti
 grant select, insert, update, delete on table public.offers_inbox to authenticated, service_role;
 grant select, insert, update, delete on table public.unsubscribe_tokens to authenticated, service_role;
 grant select, insert, update, delete on table public.lead_capture_rate_limits to authenticated, service_role;
-
 with default_tenant as (
   select id as tenant_id
   from public.tenants
@@ -743,7 +673,6 @@ set
   body_md = excluded.body_md,
   target_tier = excluded.target_tier,
   is_active = excluded.is_active;
-
 with default_tenant as (
   select id as tenant_id
   from public.tenants
@@ -778,7 +707,6 @@ set
   description = excluded.description,
   is_active = excluded.is_active,
   updated_at = now();
-
 insert into public.funnel_steps (sequence_id, step_order, wait_minutes, action_type, action_payload)
 select fs.id, s.step_order, s.wait_minutes, s.action_type, s.action_payload
 from public.funnel_sequences fs

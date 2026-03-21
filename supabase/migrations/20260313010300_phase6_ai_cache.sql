@@ -1,7 +1,6 @@
 -- Phase 6: AI cache foundation
 
 begin;
-
 create table if not exists public.ai_cache (
   id uuid primary key default gen_random_uuid(),
   cache_key text not null,
@@ -20,20 +19,15 @@ create table if not exists public.ai_cache (
   expires_at timestamptz null,
   invalidated_at timestamptz null
 );
-
 create unique index if not exists ai_cache_cache_key_unique_idx
   on public.ai_cache (cache_key)
   where invalidated_at is null;
-
 create unique index if not exists ai_cache_fingerprint_unique_idx
   on public.ai_cache (provider, model, task_type, request_fingerprint)
   where invalidated_at is null;
-
 create index if not exists ai_cache_task_created_idx
   on public.ai_cache (task_type, created_at desc);
-
 create index if not exists ai_cache_expires_idx
   on public.ai_cache (expires_at)
   where invalidated_at is null;
-
 commit;

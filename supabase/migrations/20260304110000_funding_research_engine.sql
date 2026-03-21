@@ -2,7 +2,6 @@
 -- Educational use only. No guarantees of approvals or funding outcomes.
 
 create extension if not exists pgcrypto;
-
 create or replace function public.nexus_funding_is_super_admin()
 returns boolean
 language plpgsql
@@ -30,7 +29,6 @@ begin
   return lower(coalesce(auth.jwt() ->> 'role', '')) in ('admin', 'super_admin');
 end;
 $fn$;
-
 create or replace function public.nexus_funding_can_access_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -96,7 +94,6 @@ begin
   return false;
 end;
 $fn$;
-
 create or replace function public.nexus_funding_can_manage_tenant(p_tenant_id uuid)
 returns boolean
 language plpgsql
@@ -164,11 +161,9 @@ begin
   return false;
 end;
 $fn$;
-
 grant execute on function public.nexus_funding_is_super_admin() to authenticated;
 grant execute on function public.nexus_funding_can_access_tenant(uuid) to authenticated;
 grant execute on function public.nexus_funding_can_manage_tenant(uuid) to authenticated;
-
 create table if not exists public.bank_catalog (
   id uuid primary key default gen_random_uuid(),
   is_active boolean not null default true,
@@ -180,7 +175,6 @@ create table if not exists public.bank_catalog (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.funding_research_packets (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -192,7 +186,6 @@ create table if not exists public.funding_research_packets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.funding_applications_tracker (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -205,25 +198,18 @@ create table if not exists public.funding_applications_tracker (
   opened_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists bank_catalog_active_name_idx
   on public.bank_catalog (is_active, name);
-
 create index if not exists funding_research_packets_tenant_user_created_idx
   on public.funding_research_packets (tenant_id, user_id, created_at desc);
-
 create index if not exists funding_research_packets_status_idx
   on public.funding_research_packets (tenant_id, status, created_at desc);
-
 create unique index if not exists funding_tracker_packet_bank_product_uidx
   on public.funding_applications_tracker (packet_id, bank_id, product_key);
-
 create index if not exists funding_tracker_user_status_idx
   on public.funding_applications_tracker (user_id, client_status, updated_at desc);
-
 create index if not exists funding_tracker_tenant_status_idx
   on public.funding_applications_tracker (tenant_id, client_status, updated_at desc);
-
 create or replace function public.nexus_funding_set_updated_at()
 returns trigger
 language plpgsql
@@ -233,22 +219,18 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_bank_catalog_set_updated_at on public.bank_catalog;
 create trigger trg_bank_catalog_set_updated_at
 before update on public.bank_catalog
 for each row execute procedure public.nexus_funding_set_updated_at();
-
 drop trigger if exists trg_funding_research_packets_set_updated_at on public.funding_research_packets;
 create trigger trg_funding_research_packets_set_updated_at
 before update on public.funding_research_packets
 for each row execute procedure public.nexus_funding_set_updated_at();
-
 drop trigger if exists trg_funding_applications_tracker_set_updated_at on public.funding_applications_tracker;
 create trigger trg_funding_applications_tracker_set_updated_at
 before update on public.funding_applications_tracker
 for each row execute procedure public.nexus_funding_set_updated_at();
-
 create or replace function public.nexus_funding_tracker_audit_event()
 returns trigger
 language plpgsql
@@ -298,47 +280,39 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_funding_applications_tracker_audit on public.funding_applications_tracker;
 create trigger trg_funding_applications_tracker_audit
 after insert or update on public.funding_applications_tracker
 for each row execute procedure public.nexus_funding_tracker_audit_event();
-
 alter table public.bank_catalog enable row level security;
 alter table public.funding_research_packets enable row level security;
 alter table public.funding_applications_tracker enable row level security;
-
 drop policy if exists bank_catalog_select_active on public.bank_catalog;
 create policy bank_catalog_select_active
 on public.bank_catalog
 for select to authenticated
 using (is_active = true);
-
 drop policy if exists bank_catalog_select_admin_all on public.bank_catalog;
 create policy bank_catalog_select_admin_all
 on public.bank_catalog
 for select to authenticated
 using (public.nexus_funding_is_super_admin());
-
 drop policy if exists bank_catalog_admin_insert on public.bank_catalog;
 create policy bank_catalog_admin_insert
 on public.bank_catalog
 for insert to authenticated
 with check (public.nexus_funding_is_super_admin());
-
 drop policy if exists bank_catalog_admin_update on public.bank_catalog;
 create policy bank_catalog_admin_update
 on public.bank_catalog
 for update to authenticated
 using (public.nexus_funding_is_super_admin())
 with check (public.nexus_funding_is_super_admin());
-
 drop policy if exists bank_catalog_admin_delete on public.bank_catalog;
 create policy bank_catalog_admin_delete
 on public.bank_catalog
 for delete to authenticated
 using (public.nexus_funding_is_super_admin());
-
 drop policy if exists funding_packets_select_scope on public.funding_research_packets;
 create policy funding_packets_select_scope
 on public.funding_research_packets
@@ -347,7 +321,6 @@ using (
   auth.uid() = user_id
   or public.nexus_funding_can_access_tenant(tenant_id)
 );
-
 drop policy if exists funding_packets_insert_scope on public.funding_research_packets;
 create policy funding_packets_insert_scope
 on public.funding_research_packets
@@ -356,7 +329,6 @@ with check (
   auth.uid() = user_id
   and public.nexus_funding_can_access_tenant(tenant_id)
 );
-
 drop policy if exists funding_packets_update_scope on public.funding_research_packets;
 create policy funding_packets_update_scope
 on public.funding_research_packets
@@ -369,7 +341,6 @@ with check (
   (auth.uid() = user_id and public.nexus_funding_can_access_tenant(tenant_id))
   or public.nexus_funding_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists funding_packets_delete_scope on public.funding_research_packets;
 create policy funding_packets_delete_scope
 on public.funding_research_packets
@@ -378,7 +349,6 @@ using (
   auth.uid() = user_id
   or public.nexus_funding_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists funding_tracker_select_scope on public.funding_applications_tracker;
 create policy funding_tracker_select_scope
 on public.funding_applications_tracker
@@ -387,7 +357,6 @@ using (
   auth.uid() = user_id
   or public.nexus_funding_can_access_tenant(tenant_id)
 );
-
 drop policy if exists funding_tracker_insert_scope on public.funding_applications_tracker;
 create policy funding_tracker_insert_scope
 on public.funding_applications_tracker
@@ -405,7 +374,6 @@ with check (
   )
   or public.nexus_funding_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists funding_tracker_update_scope on public.funding_applications_tracker;
 create policy funding_tracker_update_scope
 on public.funding_applications_tracker
@@ -427,7 +395,6 @@ with check (
   )
   or public.nexus_funding_can_manage_tenant(tenant_id)
 );
-
 drop policy if exists funding_tracker_delete_scope on public.funding_applications_tracker;
 create policy funding_tracker_delete_scope
 on public.funding_applications_tracker
@@ -436,11 +403,9 @@ using (
   auth.uid() = user_id
   or public.nexus_funding_can_manage_tenant(tenant_id)
 );
-
 grant select, insert, update, delete on table public.bank_catalog to authenticated, service_role;
 grant select, insert, update, delete on table public.funding_research_packets to authenticated, service_role;
 grant select, insert, update, delete on table public.funding_applications_tracker to authenticated, service_role;
-
 insert into public.bank_catalog (name, regions, products, requirements, notes_md)
 select seed.name, seed.regions, seed.products, seed.requirements, seed.notes_md
 from (

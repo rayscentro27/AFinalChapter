@@ -61,12 +61,23 @@ export function requireTenantPermission({ supabaseAdmin, permission, mfaMode = n
       });
 
       if (!allowed) {
+        req.log.warn({
+          tenant_id: tenantId,
+          user_id: userId,
+          required_permission: normalizedPermission,
+          role: membership.role || membership.role_key || null,
+          role_id: membership.role_id || null,
+          membership_table: membership.membership_table || null,
+        }, 'Tenant permission denied');
+
         return reply.code(403).send({
           ok: false,
           error: 'missing_permission',
           details: {
             required_permission: normalizedPermission,
             role: membership.role || membership.role_key || null,
+            role_id: membership.role_id || null,
+            membership_table: membership.membership_table || null,
           },
         });
       }

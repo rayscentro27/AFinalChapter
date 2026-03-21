@@ -1,5 +1,4 @@
 create extension if not exists pgcrypto;
-
 -- -----------------------------
 -- Client profiles (minimum fields for credit-intel matching)
 -- -----------------------------
@@ -26,7 +25,6 @@ create table if not exists public.client_profiles (
   constraint client_profiles_phone_e164_ck
     check (phone_e164 is null or phone_e164 ~ '^\\+[1-9][0-9]{7,14}$')
 );
-
 alter table public.client_profiles
   add column if not exists status text not null default 'build',
   add column if not exists fico int,
@@ -38,36 +36,28 @@ alter table public.client_profiles
   add column if not exists recent_denials boolean not null default false,
   add column if not exists phone_e164 text,
   add column if not exists updated_at timestamptz not null default now();
-
 create index if not exists client_profiles_tenant_status_idx
 on public.client_profiles (tenant_id, status);
-
 create index if not exists client_profiles_tenant_complexity_idx
 on public.client_profiles (tenant_id, case_complexity);
-
 alter table public.client_profiles enable row level security;
-
 drop policy if exists client_profiles_select on public.client_profiles;
 create policy client_profiles_select on public.client_profiles
 for select
 using (public.nexus_is_master_admin() or public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists client_profiles_insert on public.client_profiles;
 create policy client_profiles_insert on public.client_profiles
 for insert
 with check (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists client_profiles_update on public.client_profiles;
 create policy client_profiles_update on public.client_profiles
 for update
 using (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id))
 with check (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists client_profiles_delete on public.client_profiles;
 create policy client_profiles_delete on public.client_profiles
 for delete
 using (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id));
-
 -- -----------------------------
 -- Client alert preferences (consent + thresholds)
 -- -----------------------------
@@ -98,28 +88,22 @@ create table if not exists public.client_alert_prefs (
   constraint client_alert_prefs_phone_e164_ck
     check (phone_e164 is null or phone_e164 ~ '^\\+[1-9][0-9]{7,14}$')
 );
-
 create index if not exists client_alert_prefs_tenant_optin_idx
 on public.client_alert_prefs (tenant_id, sms_opt_in);
-
 alter table public.client_alert_prefs enable row level security;
-
 drop policy if exists client_alert_prefs_select on public.client_alert_prefs;
 create policy client_alert_prefs_select on public.client_alert_prefs
 for select
 using (public.nexus_is_master_admin() or public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists client_alert_prefs_insert on public.client_alert_prefs;
 create policy client_alert_prefs_insert on public.client_alert_prefs
 for insert
 with check (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists client_alert_prefs_update on public.client_alert_prefs;
 create policy client_alert_prefs_update on public.client_alert_prefs
 for update
 using (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id))
 with check (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id));
-
 -- -----------------------------
 -- Verified manual datapoints (Option B)
 -- -----------------------------
@@ -152,31 +136,24 @@ create table if not exists public.credit_intel_datapoints (
   constraint credit_intel_datapoints_manual_only_ck
     check (manual_entry = true)
 );
-
 create index if not exists credit_intel_datapoints_tenant_created_idx
 on public.credit_intel_datapoints (tenant_id, created_at desc);
-
 create index if not exists credit_intel_datapoints_tenant_verified_idx
 on public.credit_intel_datapoints (tenant_id, screenshot_verified, redaction_confirmed);
-
 alter table public.credit_intel_datapoints enable row level security;
-
 drop policy if exists credit_intel_datapoints_select on public.credit_intel_datapoints;
 create policy credit_intel_datapoints_select on public.credit_intel_datapoints
 for select
 using (public.nexus_is_master_admin() or public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists credit_intel_datapoints_insert on public.credit_intel_datapoints;
 create policy credit_intel_datapoints_insert on public.credit_intel_datapoints
 for insert
 with check (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists credit_intel_datapoints_update on public.credit_intel_datapoints;
 create policy credit_intel_datapoints_update on public.credit_intel_datapoints
 for update
 using (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id))
 with check (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id));
-
 -- -----------------------------
 -- Matches + alert history
 -- -----------------------------
@@ -209,31 +186,24 @@ create table if not exists public.credit_intel_matches (
 
   constraint credit_intel_matches_unique unique (tenant_id, datapoint_id, user_id)
 );
-
 create index if not exists credit_intel_matches_tenant_status_idx
 on public.credit_intel_matches (tenant_id, status, created_at desc);
-
 create index if not exists credit_intel_matches_tenant_user_idx
 on public.credit_intel_matches (tenant_id, user_id, created_at desc);
-
 alter table public.credit_intel_matches enable row level security;
-
 drop policy if exists credit_intel_matches_select on public.credit_intel_matches;
 create policy credit_intel_matches_select on public.credit_intel_matches
 for select
 using (public.nexus_is_master_admin() or public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists credit_intel_matches_insert on public.credit_intel_matches;
 create policy credit_intel_matches_insert on public.credit_intel_matches
 for insert
 with check (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id));
-
 drop policy if exists credit_intel_matches_update on public.credit_intel_matches;
 create policy credit_intel_matches_update on public.credit_intel_matches
 for update
 using (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id))
 with check (auth.role() = 'authenticated' and public.nexus_can_access_tenant(tenant_id));
-
 -- -----------------------------
 -- updated_at trigger helper
 -- -----------------------------
@@ -246,22 +216,18 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists trg_client_profiles_updated_at on public.client_profiles;
 create trigger trg_client_profiles_updated_at
 before update on public.client_profiles
 for each row execute function public.credit_intel_touch_updated_at();
-
 drop trigger if exists trg_client_alert_prefs_updated_at on public.client_alert_prefs;
 create trigger trg_client_alert_prefs_updated_at
 before update on public.client_alert_prefs
 for each row execute function public.credit_intel_touch_updated_at();
-
 drop trigger if exists trg_credit_intel_datapoints_updated_at on public.credit_intel_datapoints;
 create trigger trg_credit_intel_datapoints_updated_at
 before update on public.credit_intel_datapoints
 for each row execute function public.credit_intel_touch_updated_at();
-
 drop trigger if exists trg_credit_intel_matches_updated_at on public.credit_intel_matches;
 create trigger trg_credit_intel_matches_updated_at
 before update on public.credit_intel_matches

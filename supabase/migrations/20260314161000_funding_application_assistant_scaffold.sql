@@ -1,7 +1,6 @@
 -- Phase 1 scaffold: funding profile/application assistant tables (additive)
 
 begin;
-
 create table if not exists public.bank_rules (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid null,
@@ -17,13 +16,10 @@ create table if not exists public.bank_rules (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists bank_rules_tenant_status_idx
   on public.bank_rules (tenant_id, status, updated_at desc);
-
 create index if not exists bank_rules_bank_product_idx
   on public.bank_rules (bank_name, product_type, status);
-
 create table if not exists public.application_guides (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -40,13 +36,10 @@ create table if not exists public.application_guides (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists application_guides_tenant_status_idx
   on public.application_guides (tenant_id, status, updated_at desc);
-
 create index if not exists application_guides_client_file_idx
   on public.application_guides (client_file_id, updated_at desc);
-
 create table if not exists public.funding_profile_patterns (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid null,
@@ -60,13 +53,10 @@ create table if not exists public.funding_profile_patterns (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists funding_profile_patterns_tenant_status_idx
   on public.funding_profile_patterns (tenant_id, status, updated_at desc);
-
 create index if not exists funding_profile_patterns_type_idx
   on public.funding_profile_patterns (pattern_type, status, confidence desc);
-
 create table if not exists public.funding_profile_assessments (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -81,13 +71,10 @@ create table if not exists public.funding_profile_assessments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists funding_profile_assessments_tenant_status_idx
   on public.funding_profile_assessments (tenant_id, status, updated_at desc);
-
 create index if not exists funding_profile_assessments_client_file_idx
   on public.funding_profile_assessments (client_file_id, updated_at desc);
-
 create table if not exists public.application_walkthrough_assets (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -101,13 +88,10 @@ create table if not exists public.application_walkthrough_assets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists application_walkthrough_assets_tenant_status_idx
   on public.application_walkthrough_assets (tenant_id, status, updated_at desc);
-
 create index if not exists application_walkthrough_assets_guide_idx
   on public.application_walkthrough_assets (guide_id, updated_at desc);
-
 create table if not exists public.funding_assistant_events (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid null,
@@ -118,44 +102,35 @@ create table if not exists public.funding_assistant_events (
   details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists funding_assistant_events_tenant_created_idx
   on public.funding_assistant_events (tenant_id, created_at desc);
-
 create index if not exists funding_assistant_events_type_created_idx
   on public.funding_assistant_events (event_type, created_at desc);
-
 -- updated_at trigger support
 drop trigger if exists trg_bank_rules_set_updated_at on public.bank_rules;
 create trigger trg_bank_rules_set_updated_at
 before update on public.bank_rules
 for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_application_guides_set_updated_at on public.application_guides;
 create trigger trg_application_guides_set_updated_at
 before update on public.application_guides
 for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_funding_profile_patterns_set_updated_at on public.funding_profile_patterns;
 create trigger trg_funding_profile_patterns_set_updated_at
 before update on public.funding_profile_patterns
 for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_funding_profile_assessments_set_updated_at on public.funding_profile_assessments;
 create trigger trg_funding_profile_assessments_set_updated_at
 before update on public.funding_profile_assessments
 for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_application_walkthrough_assets_set_updated_at on public.application_walkthrough_assets;
 create trigger trg_application_walkthrough_assets_set_updated_at
 before update on public.application_walkthrough_assets
 for each row execute function public.set_updated_at();
-
 alter table public.bank_rules enable row level security;
 alter table public.application_guides enable row level security;
 alter table public.funding_profile_patterns enable row level security;
 alter table public.funding_profile_assessments enable row level security;
 alter table public.application_walkthrough_assets enable row level security;
 alter table public.funding_assistant_events enable row level security;
-
 commit;

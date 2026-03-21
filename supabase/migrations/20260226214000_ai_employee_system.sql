@@ -2,7 +2,6 @@
 -- Safe for repeated execution across mixed legacy schemas
 
 create extension if not exists pgcrypto;
-
 create table if not exists public.ai_roles (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -12,7 +11,6 @@ create table if not exists public.ai_roles (
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
-
 alter table if exists public.ai_roles add column if not exists id uuid default gen_random_uuid();
 alter table if exists public.ai_roles add column if not exists tenant_id uuid;
 alter table if exists public.ai_roles add column if not exists key text;
@@ -20,13 +18,10 @@ alter table if exists public.ai_roles add column if not exists display_name text
 alter table if exists public.ai_roles add column if not exists tier_access text[] default '{}'::text[];
 alter table if exists public.ai_roles add column if not exists is_active boolean default true;
 alter table if exists public.ai_roles add column if not exists created_at timestamptz default now();
-
 create unique index if not exists ai_roles_tenant_key_uq
   on public.ai_roles (tenant_id, key);
-
 create index if not exists ai_roles_tenant_idx
   on public.ai_roles (tenant_id);
-
 create table if not exists public.ai_playbooks (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -38,7 +33,6 @@ create table if not exists public.ai_playbooks (
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
-
 alter table if exists public.ai_playbooks add column if not exists id uuid default gen_random_uuid();
 alter table if exists public.ai_playbooks add column if not exists tenant_id uuid;
 alter table if exists public.ai_playbooks add column if not exists role_key text;
@@ -48,16 +42,12 @@ alter table if exists public.ai_playbooks add column if not exists prompt_templa
 alter table if exists public.ai_playbooks add column if not exists compliance_flags jsonb default '{}'::jsonb;
 alter table if exists public.ai_playbooks add column if not exists is_active boolean default true;
 alter table if exists public.ai_playbooks add column if not exists created_at timestamptz default now();
-
 create unique index if not exists ai_playbooks_tenant_role_title_version_uq
   on public.ai_playbooks (tenant_id, role_key, title, version);
-
 create index if not exists ai_playbooks_tenant_idx
   on public.ai_playbooks (tenant_id);
-
 create index if not exists ai_playbooks_tenant_role_active_idx
   on public.ai_playbooks (tenant_id, role_key, is_active);
-
 create table if not exists public.client_profiles (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -72,7 +62,6 @@ create table if not exists public.client_profiles (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 alter table if exists public.client_profiles add column if not exists id uuid default gen_random_uuid();
 alter table if exists public.client_profiles add column if not exists tenant_id uuid;
 alter table if exists public.client_profiles add column if not exists contact_id uuid;
@@ -85,16 +74,12 @@ alter table if exists public.client_profiles add column if not exists business_e
 alter table if exists public.client_profiles add column if not exists intake_status text default 'in_progress';
 alter table if exists public.client_profiles add column if not exists created_at timestamptz default now();
 alter table if exists public.client_profiles add column if not exists updated_at timestamptz default now();
-
 create unique index if not exists client_profiles_tenant_contact_uq
   on public.client_profiles (tenant_id, contact_id);
-
 create index if not exists client_profiles_tenant_idx
   on public.client_profiles (tenant_id);
-
 create index if not exists client_profiles_tenant_contact_idx
   on public.client_profiles (tenant_id, contact_id);
-
 create table if not exists public.client_goals (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -105,7 +90,6 @@ create table if not exists public.client_goals (
   notes text null,
   created_at timestamptz not null default now()
 );
-
 alter table if exists public.client_goals add column if not exists id uuid default gen_random_uuid();
 alter table if exists public.client_goals add column if not exists tenant_id uuid;
 alter table if exists public.client_goals add column if not exists contact_id uuid;
@@ -114,13 +98,10 @@ alter table if exists public.client_goals add column if not exists target_timeli
 alter table if exists public.client_goals add column if not exists funding_purpose text;
 alter table if exists public.client_goals add column if not exists notes text;
 alter table if exists public.client_goals add column if not exists created_at timestamptz default now();
-
 create index if not exists client_goals_tenant_idx
   on public.client_goals (tenant_id);
-
 create index if not exists client_goals_tenant_contact_idx
   on public.client_goals (tenant_id, contact_id);
-
 create table if not exists public.client_documents (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -132,7 +113,6 @@ create table if not exists public.client_documents (
   pii_level text not null default 'sensitive',
   created_at timestamptz not null default now()
 );
-
 alter table if exists public.client_documents add column if not exists id uuid default gen_random_uuid();
 alter table if exists public.client_documents add column if not exists tenant_id uuid;
 alter table if exists public.client_documents add column if not exists contact_id uuid;
@@ -142,13 +122,10 @@ alter table if exists public.client_documents add column if not exists storage_p
 alter table if exists public.client_documents add column if not exists checksum_sha256 text;
 alter table if exists public.client_documents add column if not exists pii_level text default 'sensitive';
 alter table if exists public.client_documents add column if not exists created_at timestamptz default now();
-
 create index if not exists client_documents_tenant_idx
   on public.client_documents (tenant_id);
-
 create index if not exists client_documents_tenant_contact_idx
   on public.client_documents (tenant_id, contact_id);
-
 create table if not exists public.workflow_cases (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -160,7 +137,6 @@ create table if not exists public.workflow_cases (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 alter table if exists public.workflow_cases add column if not exists id uuid default gen_random_uuid();
 alter table if exists public.workflow_cases add column if not exists tenant_id uuid;
 alter table if exists public.workflow_cases add column if not exists contact_id uuid;
@@ -170,16 +146,12 @@ alter table if exists public.workflow_cases add column if not exists status text
 alter table if exists public.workflow_cases add column if not exists risk_level text default 'normal';
 alter table if exists public.workflow_cases add column if not exists created_at timestamptz default now();
 alter table if exists public.workflow_cases add column if not exists updated_at timestamptz default now();
-
 create index if not exists workflow_cases_tenant_idx
   on public.workflow_cases (tenant_id);
-
 create index if not exists workflow_cases_tenant_contact_idx
   on public.workflow_cases (tenant_id, contact_id);
-
 create index if not exists workflow_cases_tenant_status_idx
   on public.workflow_cases (tenant_id, status, updated_at desc);
-
 create table if not exists public.workflow_tasks (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -195,7 +167,6 @@ create table if not exists public.workflow_tasks (
   created_at timestamptz not null default now(),
   completed_at timestamptz null
 );
-
 alter table if exists public.workflow_tasks add column if not exists id uuid default gen_random_uuid();
 alter table if exists public.workflow_tasks add column if not exists tenant_id uuid;
 alter table if exists public.workflow_tasks add column if not exists case_id uuid;
@@ -209,16 +180,12 @@ alter table if exists public.workflow_tasks add column if not exists assigned_to
 alter table if exists public.workflow_tasks add column if not exists metadata jsonb default '{}'::jsonb;
 alter table if exists public.workflow_tasks add column if not exists created_at timestamptz default now();
 alter table if exists public.workflow_tasks add column if not exists completed_at timestamptz;
-
 create index if not exists workflow_tasks_tenant_idx
   on public.workflow_tasks (tenant_id);
-
 create index if not exists workflow_tasks_tenant_case_idx
   on public.workflow_tasks (tenant_id, case_id);
-
 create index if not exists workflow_tasks_tenant_status_idx
   on public.workflow_tasks (tenant_id, status, created_at desc);
-
 create table if not exists public.consent_logs (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -231,7 +198,6 @@ create table if not exists public.consent_logs (
   captured_at timestamptz not null default now(),
   evidence jsonb null
 );
-
 alter table if exists public.consent_logs add column if not exists id uuid default gen_random_uuid();
 alter table if exists public.consent_logs add column if not exists tenant_id uuid;
 alter table if exists public.consent_logs add column if not exists contact_id uuid;
@@ -242,16 +208,12 @@ alter table if exists public.consent_logs add column if not exists captured_via 
 alter table if exists public.consent_logs add column if not exists captured_by uuid;
 alter table if exists public.consent_logs add column if not exists captured_at timestamptz default now();
 alter table if exists public.consent_logs add column if not exists evidence jsonb;
-
 create index if not exists consent_logs_tenant_idx
   on public.consent_logs (tenant_id);
-
 create index if not exists consent_logs_tenant_contact_idx
   on public.consent_logs (tenant_id, contact_id);
-
 create index if not exists consent_logs_tenant_type_idx
   on public.consent_logs (tenant_id, consent_type, captured_at desc);
-
 create table if not exists public.funding_application_events (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -262,7 +224,6 @@ create table if not exists public.funding_application_events (
   notes text null,
   created_at timestamptz not null default now()
 );
-
 alter table if exists public.funding_application_events add column if not exists id uuid default gen_random_uuid();
 alter table if exists public.funding_application_events add column if not exists tenant_id uuid;
 alter table if exists public.funding_application_events add column if not exists contact_id uuid;
@@ -271,12 +232,9 @@ alter table if exists public.funding_application_events add column if not exists
 alter table if exists public.funding_application_events add column if not exists submitted_by text default 'client';
 alter table if exists public.funding_application_events add column if not exists notes text;
 alter table if exists public.funding_application_events add column if not exists created_at timestamptz default now();
-
 create index if not exists funding_application_events_tenant_idx
   on public.funding_application_events (tenant_id);
-
 create index if not exists funding_application_events_tenant_contact_idx
   on public.funding_application_events (tenant_id, contact_id);
-
 create index if not exists funding_application_events_tenant_action_idx
   on public.funding_application_events (tenant_id, action_type, created_at desc);

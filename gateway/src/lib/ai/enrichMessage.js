@@ -200,7 +200,7 @@ export async function enrichMessage({
 
   const messageRes = await supabaseAdmin
     .from('messages')
-    .select('id,tenant_id,conversation_id,contact_id,body,direction,provider,received_at,metadata,content')
+    .select('id,tenant_id,conversation_id,body,direction,provider,received_at,content')
     .eq('tenant_id', tenantId)
     .eq('id', messageId)
     .maybeSingle();

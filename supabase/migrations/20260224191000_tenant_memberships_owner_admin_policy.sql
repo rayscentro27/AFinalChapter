@@ -16,9 +16,7 @@ as $$
       and lower(coalesce(tm.role, '')) in ('owner', 'admin')
   );
 $$;
-
 grant execute on function public.nexus_can_manage_tenant_members(uuid) to authenticated;
-
 create or replace function public.nexus_assign_membership_role()
 returns trigger
 language plpgsql
@@ -45,7 +43,6 @@ begin
   return new;
 end;
 $$;
-
 drop policy if exists memberships_select on public.tenant_memberships;
 create policy memberships_select on public.tenant_memberships
 for select
@@ -58,7 +55,6 @@ using (
       and tm.user_id = auth.uid()
   )
 );
-
 drop policy if exists memberships_insert on public.tenant_memberships;
 create policy memberships_insert on public.tenant_memberships
 for insert
@@ -70,7 +66,6 @@ with check (
     or user_id = auth.uid()
   )
 );
-
 drop policy if exists memberships_update on public.tenant_memberships;
 create policy memberships_update on public.tenant_memberships
 for update
@@ -82,7 +77,6 @@ with check (
   public.nexus_is_master_admin()
   or public.nexus_can_manage_tenant_members(tenant_id)
 );
-
 drop policy if exists memberships_delete on public.tenant_memberships;
 create policy memberships_delete on public.tenant_memberships
 for delete

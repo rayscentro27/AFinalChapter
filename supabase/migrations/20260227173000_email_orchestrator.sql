@@ -1,7 +1,6 @@
 -- Prompt 7: Production Email Orchestrator (Sender + Brevo + MailerLite)
 
 create extension if not exists pgcrypto;
-
 -- Compatibility helpers may already exist from previous prompts.
 create or replace function public.nexus_is_master_admin_compat()
 returns boolean
@@ -40,9 +39,7 @@ begin
   return coalesce((auth.jwt() ->> 'role') = 'admin', false);
 end;
 $fn$;
-
 grant execute on function public.nexus_is_master_admin_compat() to authenticated;
-
 create or replace function public.nexus_can_access_tenant_compat(t uuid)
 returns boolean
 language plpgsql
@@ -94,9 +91,7 @@ begin
   return false;
 end;
 $fn$;
-
 grant execute on function public.nexus_can_access_tenant_compat(uuid) to authenticated;
-
 create or replace function public.nexus_email_set_updated_at()
 returns trigger
 language plpgsql
@@ -106,7 +101,6 @@ begin
   return new;
 end;
 $fn$;
-
 create table if not exists public.esp_providers (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -119,10 +113,8 @@ create table if not exists public.esp_providers (
   updated_at timestamptz not null default now(),
   unique (tenant_id, provider)
 );
-
 create index if not exists esp_providers_tenant_priority_idx
   on public.esp_providers (tenant_id, is_enabled, priority);
-
 create table if not exists public.esp_routing_rules (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -134,10 +126,8 @@ create table if not exists public.esp_routing_rules (
   updated_at timestamptz not null default now(),
   unique (tenant_id, message_type)
 );
-
 create index if not exists esp_routing_rules_tenant_type_idx
   on public.esp_routing_rules (tenant_id, message_type);
-
 create table if not exists public.esp_contacts (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -153,13 +143,10 @@ create table if not exists public.esp_contacts (
   updated_at timestamptz not null default now(),
   unique (tenant_id, email)
 );
-
 create index if not exists esp_contacts_tenant_user_idx
   on public.esp_contacts (tenant_id, user_id);
-
 create index if not exists esp_contacts_tenant_email_idx
   on public.esp_contacts (tenant_id, email);
-
 create table if not exists public.esp_messages (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -175,16 +162,12 @@ create table if not exists public.esp_messages (
   meta jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists esp_messages_tenant_created_idx
   on public.esp_messages (tenant_id, created_at desc);
-
 create index if not exists esp_messages_tenant_status_idx
   on public.esp_messages (tenant_id, status, created_at desc);
-
 create index if not exists esp_messages_provider_message_idx
   on public.esp_messages (provider, provider_message_id);
-
 create table if not exists public.esp_webhook_events (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid null,
@@ -194,13 +177,10 @@ create table if not exists public.esp_webhook_events (
   payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists esp_webhook_events_tenant_created_idx
   on public.esp_webhook_events (tenant_id, created_at desc);
-
 create index if not exists esp_webhook_events_provider_message_idx
   on public.esp_webhook_events (provider, provider_message_id, created_at desc);
-
 create table if not exists public.esp_send_counters (
   id bigserial primary key,
   tenant_id uuid not null,
@@ -211,65 +191,54 @@ create table if not exists public.esp_send_counters (
   updated_at timestamptz not null default now(),
   unique (tenant_id, provider, window_start)
 );
-
 create index if not exists esp_send_counters_lookup_idx
   on public.esp_send_counters (tenant_id, provider, window_start desc);
-
 drop trigger if exists trg_esp_providers_set_updated_at on public.esp_providers;
 create trigger trg_esp_providers_set_updated_at
 before update on public.esp_providers
 for each row execute procedure public.nexus_email_set_updated_at();
-
 drop trigger if exists trg_esp_routing_rules_set_updated_at on public.esp_routing_rules;
 create trigger trg_esp_routing_rules_set_updated_at
 before update on public.esp_routing_rules
 for each row execute procedure public.nexus_email_set_updated_at();
-
 drop trigger if exists trg_esp_contacts_set_updated_at on public.esp_contacts;
 create trigger trg_esp_contacts_set_updated_at
 before update on public.esp_contacts
 for each row execute procedure public.nexus_email_set_updated_at();
-
 drop trigger if exists trg_esp_send_counters_set_updated_at on public.esp_send_counters;
 create trigger trg_esp_send_counters_set_updated_at
 before update on public.esp_send_counters
 for each row execute procedure public.nexus_email_set_updated_at();
-
 alter table public.esp_providers enable row level security;
 alter table public.esp_routing_rules enable row level security;
 alter table public.esp_contacts enable row level security;
 alter table public.esp_messages enable row level security;
 alter table public.esp_webhook_events enable row level security;
 alter table public.esp_send_counters enable row level security;
-
 -- Providers: admin/super admin only.
 DROP POLICY IF EXISTS esp_providers_select_admin ON public.esp_providers;
 create policy esp_providers_select_admin
 on public.esp_providers
 for select to authenticated
 using (public.nexus_is_master_admin_compat() or public.nexus_can_access_tenant_compat(tenant_id));
-
 DROP POLICY IF EXISTS esp_providers_write_admin ON public.esp_providers;
 create policy esp_providers_write_admin
 on public.esp_providers
 for all to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 -- Routing: admin/super admin only.
 DROP POLICY IF EXISTS esp_routing_rules_select_admin ON public.esp_routing_rules;
 create policy esp_routing_rules_select_admin
 on public.esp_routing_rules
 for select to authenticated
 using (public.nexus_is_master_admin_compat() or public.nexus_can_access_tenant_compat(tenant_id));
-
 DROP POLICY IF EXISTS esp_routing_rules_write_admin ON public.esp_routing_rules;
 create policy esp_routing_rules_write_admin
 on public.esp_routing_rules
 for all to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 -- Contacts: user reads own, admins read tenant, writes for own or admin.
 DROP POLICY IF EXISTS esp_contacts_select_own_or_admin ON public.esp_contacts;
 create policy esp_contacts_select_own_or_admin
@@ -280,7 +249,6 @@ using (
   or public.nexus_is_master_admin_compat()
   or public.nexus_can_access_tenant_compat(tenant_id)
 );
-
 DROP POLICY IF EXISTS esp_contacts_insert_own_or_admin ON public.esp_contacts;
 create policy esp_contacts_insert_own_or_admin
 on public.esp_contacts
@@ -290,7 +258,6 @@ with check (
   or public.nexus_is_master_admin_compat()
   or public.nexus_can_access_tenant_compat(tenant_id)
 );
-
 DROP POLICY IF EXISTS esp_contacts_update_own_or_admin ON public.esp_contacts;
 create policy esp_contacts_update_own_or_admin
 on public.esp_contacts
@@ -305,7 +272,6 @@ with check (
   or public.nexus_is_master_admin_compat()
   or public.nexus_can_access_tenant_compat(tenant_id)
 );
-
 -- Messages: user reads own, admins read tenant, writes for own or admin.
 DROP POLICY IF EXISTS esp_messages_select_own_or_admin ON public.esp_messages;
 create policy esp_messages_select_own_or_admin
@@ -316,7 +282,6 @@ using (
   or public.nexus_is_master_admin_compat()
   or public.nexus_can_access_tenant_compat(tenant_id)
 );
-
 DROP POLICY IF EXISTS esp_messages_insert_own_or_admin ON public.esp_messages;
 create policy esp_messages_insert_own_or_admin
 on public.esp_messages
@@ -326,14 +291,12 @@ with check (
   or public.nexus_is_master_admin_compat()
   or public.nexus_can_access_tenant_compat(tenant_id)
 );
-
 DROP POLICY IF EXISTS esp_messages_update_admin ON public.esp_messages;
 create policy esp_messages_update_admin
 on public.esp_messages
 for update to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 -- Webhook events: admin visibility, service/admin writes.
 DROP POLICY IF EXISTS esp_webhook_events_select_admin ON public.esp_webhook_events;
 create policy esp_webhook_events_select_admin
@@ -343,7 +306,6 @@ using (
   public.nexus_is_master_admin_compat()
   or (tenant_id is not null and public.nexus_can_access_tenant_compat(tenant_id))
 );
-
 DROP POLICY IF EXISTS esp_webhook_events_insert_admin ON public.esp_webhook_events;
 create policy esp_webhook_events_insert_admin
 on public.esp_webhook_events
@@ -352,28 +314,24 @@ with check (
   public.nexus_is_master_admin_compat()
   or (tenant_id is not null and public.nexus_can_access_tenant_compat(tenant_id))
 );
-
 -- Counters: admin only.
 DROP POLICY IF EXISTS esp_send_counters_select_admin ON public.esp_send_counters;
 create policy esp_send_counters_select_admin
 on public.esp_send_counters
 for select to authenticated
 using (public.nexus_is_master_admin_compat());
-
 DROP POLICY IF EXISTS esp_send_counters_write_admin ON public.esp_send_counters;
 create policy esp_send_counters_write_admin
 on public.esp_send_counters
 for all to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 grant select, insert, update on public.esp_providers to authenticated, service_role;
 grant select, insert, update on public.esp_routing_rules to authenticated, service_role;
 grant select, insert, update on public.esp_contacts to authenticated, service_role;
 grant select, insert, update on public.esp_messages to authenticated, service_role;
 grant select, insert on public.esp_webhook_events to authenticated, service_role;
 grant select, insert, update on public.esp_send_counters to authenticated, service_role;
-
 -- Seed defaults for known tenants.
 do $seed$
 begin

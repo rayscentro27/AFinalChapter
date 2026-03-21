@@ -1,7 +1,6 @@
 -- Prompt 5: dispute letter pipeline (redact -> generate -> merge -> store)
 
 create extension if not exists pgcrypto;
-
 create or replace function public.nexus_can_access_tenant_compat(t uuid)
 returns boolean
 language plpgsql
@@ -53,9 +52,7 @@ begin
   return false;
 end;
 $fn$;
-
 grant execute on function public.nexus_can_access_tenant_compat(uuid) to authenticated;
-
 create table if not exists public.dispute_letter_runs (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -73,13 +70,10 @@ create table if not exists public.dispute_letter_runs (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists dispute_letter_runs_tenant_created_idx
   on public.dispute_letter_runs (tenant_id, created_at desc);
-
 create index if not exists dispute_letter_runs_requester_created_idx
   on public.dispute_letter_runs (requested_by_user_id, created_at desc);
-
 create table if not exists public.dispute_letters (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references public.dispute_letter_runs(id) on delete cascade,
@@ -94,13 +88,10 @@ create table if not exists public.dispute_letters (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists dispute_letters_tenant_created_idx
   on public.dispute_letters (tenant_id, created_at desc);
-
 create index if not exists dispute_letters_run_idx
   on public.dispute_letters (run_id);
-
 create or replace function public.dispute_letters_set_updated_at()
 returns trigger
 language plpgsql
@@ -110,20 +101,16 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_dispute_letter_runs_set_updated_at on public.dispute_letter_runs;
 create trigger trg_dispute_letter_runs_set_updated_at
 before update on public.dispute_letter_runs
 for each row execute procedure public.dispute_letters_set_updated_at();
-
 drop trigger if exists trg_dispute_letters_set_updated_at on public.dispute_letters;
 create trigger trg_dispute_letters_set_updated_at
 before update on public.dispute_letters
 for each row execute procedure public.dispute_letters_set_updated_at();
-
 alter table public.dispute_letter_runs enable row level security;
 alter table public.dispute_letters enable row level security;
-
 -- dispute_letter_runs policies
 DROP POLICY IF EXISTS dispute_letter_runs_select_access ON public.dispute_letter_runs;
 create policy dispute_letter_runs_select_access
@@ -134,7 +121,6 @@ using (
   or requested_by_user_id = auth.uid()
   or public.nexus_can_access_tenant_compat(tenant_id)
 );
-
 DROP POLICY IF EXISTS dispute_letter_runs_insert_access ON public.dispute_letter_runs;
 create policy dispute_letter_runs_insert_access
 on public.dispute_letter_runs
@@ -143,7 +129,6 @@ with check (
   requested_by_user_id = auth.uid()
   and public.nexus_can_access_tenant_compat(tenant_id)
 );
-
 DROP POLICY IF EXISTS dispute_letter_runs_update_access ON public.dispute_letter_runs;
 create policy dispute_letter_runs_update_access
 on public.dispute_letter_runs
@@ -156,7 +141,6 @@ with check (
   public.nexus_is_master_admin_compat()
   or requested_by_user_id = auth.uid()
 );
-
 -- dispute_letters policies
 DROP POLICY IF EXISTS dispute_letters_select_access ON public.dispute_letters;
 create policy dispute_letters_select_access
@@ -167,7 +151,6 @@ using (
   or created_by_user_id = auth.uid()
   or public.nexus_can_access_tenant_compat(tenant_id)
 );
-
 DROP POLICY IF EXISTS dispute_letters_insert_access ON public.dispute_letters;
 create policy dispute_letters_insert_access
 on public.dispute_letters
@@ -176,7 +159,6 @@ with check (
   created_by_user_id = auth.uid()
   and public.nexus_can_access_tenant_compat(tenant_id)
 );
-
 DROP POLICY IF EXISTS dispute_letters_update_access ON public.dispute_letters;
 create policy dispute_letters_update_access
 on public.dispute_letters
@@ -189,7 +171,6 @@ with check (
   public.nexus_is_master_admin_compat()
   or created_by_user_id = auth.uid()
 );
-
 grant usage on schema public to anon, authenticated, service_role;
 grant select, insert, update, delete on table public.dispute_letter_runs to anon, authenticated, service_role;
 grant select, insert, update, delete on table public.dispute_letters to anon, authenticated, service_role;

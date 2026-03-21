@@ -1,7 +1,6 @@
 -- Phase 6: queue foundation (job queue)
 
 begin;
-
 create table if not exists public.job_queue (
   id uuid primary key default gen_random_uuid(),
   job_type text not null,
@@ -22,18 +21,13 @@ create table if not exists public.job_queue (
   updated_at timestamptz not null default now(),
   completed_at timestamptz null
 );
-
 create index if not exists job_queue_status_available_priority_idx
   on public.job_queue (status, available_at, priority desc, created_at asc);
-
 create index if not exists job_queue_worker_status_idx
   on public.job_queue (worker_id, status, leased_at desc);
-
 create index if not exists job_queue_tenant_status_created_idx
   on public.job_queue (tenant_id, status, created_at desc);
-
 create unique index if not exists job_queue_dedupe_key_uniq
   on public.job_queue (dedupe_key)
   where dedupe_key is not null and status in ('pending', 'leased', 'running', 'retry_wait');
-
 commit;

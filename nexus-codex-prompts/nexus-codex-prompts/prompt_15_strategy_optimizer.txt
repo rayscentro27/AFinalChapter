@@ -1,0 +1,41 @@
+PROMPT 15 — NEXUS REINFORCEMENT LEARNING STRATEGY OPTIMIZER
+
+You are a Senior Staff Engineer implementing the Nexus Strategy Optimizer.
+
+Purpose:
+Generate improved strategy variants based on performance feedback (creates candidates only; never executes trades).
+
+STRICT RULES
+- DO NOT modify execution gateway
+- DO NOT modify risk governor
+- DO NOT execute trades
+- Add-only service: /opt/nexus-services/strategy-optimizer
+- No secrets committed
+
+INPUT:
+strategy_library, strategy_runs, verifier_runs, strategy_performance, strategy_allocations, market_regimes
+
+OUTPUT:
+optimized_strategy_candidates
+
+SUPABASE SQL:
+/opt/nexus-services/ops/supabase/strategy_optimizer.sql
+
+OPTIMIZATION METHODS:
+- parameter tuning
+- rule variation
+- regime specialization
+- position sizing variants
+
+WORKER:
+every 1 hour:
+- select candidate parent strategies
+- generate variants
+- compute improvement_score
+- insert optimized_strategy_candidates (status=candidate)
+
+FILES:
+worker.js, optimizerEngine.js, variationGenerator.js, rewardEngine.js, simulationEngine.js, db.js, config.js, package.json, .env.example, README.md
+
+SYSTEMD:
+strategy-optimizer.service + strategy-optimizer.timer (hourly)

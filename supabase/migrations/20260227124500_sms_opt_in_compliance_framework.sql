@@ -2,7 +2,6 @@
 -- Consent + policy + templates only. No provider sending integration.
 
 create extension if not exists pgcrypto;
-
 -- Compatibility helpers
 create or replace function public.nexus_is_master_admin_compat()
 returns boolean
@@ -41,9 +40,7 @@ begin
   return coalesce((auth.jwt() ->> 'role') = 'admin', false);
 end;
 $fn$;
-
 grant execute on function public.nexus_is_master_admin_compat() to authenticated;
-
 create or replace function public.nexus_can_access_user_compat(p_user_id uuid)
 returns boolean
 language sql
@@ -53,9 +50,7 @@ set search_path = public
 as $fn$
   select auth.uid() = p_user_id or public.nexus_is_master_admin_compat();
 $fn$;
-
 grant execute on function public.nexus_can_access_user_compat(uuid) to authenticated;
-
 -- Communication preferences (email marketing toggle; transactional email remains always on)
 create table if not exists public.communication_preferences (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -64,28 +59,23 @@ create table if not exists public.communication_preferences (
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
-
 alter table public.communication_preferences enable row level security;
-
 DROP POLICY IF EXISTS communication_preferences_select_own_or_admin ON public.communication_preferences;
 create policy communication_preferences_select_own_or_admin
 on public.communication_preferences
 for select to authenticated
 using (public.nexus_can_access_user_compat(user_id));
-
 DROP POLICY IF EXISTS communication_preferences_insert_own_or_admin ON public.communication_preferences;
 create policy communication_preferences_insert_own_or_admin
 on public.communication_preferences
 for insert to authenticated
 with check (public.nexus_can_access_user_compat(user_id));
-
 DROP POLICY IF EXISTS communication_preferences_update_own_or_admin ON public.communication_preferences;
 create policy communication_preferences_update_own_or_admin
 on public.communication_preferences
 for update to authenticated
 using (public.nexus_can_access_user_compat(user_id))
 with check (public.nexus_can_access_user_compat(user_id));
-
 -- SMS templates table for compliance-ready drafts (no sending in this phase)
 create table if not exists public.sms_templates (
   id uuid primary key default gen_random_uuid(),
@@ -95,24 +85,19 @@ create table if not exists public.sms_templates (
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
-
 create index if not exists sms_templates_marketing_idx on public.sms_templates (is_marketing);
-
 alter table public.sms_templates enable row level security;
-
 DROP POLICY IF EXISTS sms_templates_select_all ON public.sms_templates;
 create policy sms_templates_select_all
 on public.sms_templates
 for select to authenticated
 using (true);
-
 DROP POLICY IF EXISTS sms_templates_admin_write ON public.sms_templates;
 create policy sms_templates_admin_write
 on public.sms_templates
 for all to authenticated
 using (public.nexus_is_master_admin_compat())
 with check (public.nexus_is_master_admin_compat());
-
 insert into public.sms_templates (key, body, is_marketing)
 values
   (
@@ -139,7 +124,6 @@ on conflict (key) do update
 set body = excluded.body,
     is_marketing = excluded.is_marketing,
     updated_at = now();
-
 -- Server-side helper for current SMS consent state.
 create or replace function public.get_sms_consent_status(p_user_id uuid default auth.uid())
 returns table (
@@ -213,5 +197,4 @@ begin
     coalesce(latest_out.metadata ->> 'method', 'settings') as last_method;
 end;
 $fn$;
-
 grant execute on function public.get_sms_consent_status(uuid) to authenticated;

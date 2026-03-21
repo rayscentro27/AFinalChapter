@@ -1,0 +1,43 @@
+PROMPT 16.1 — NEXUS BOT OWNERSHIP + EMERGENCY CONTROL LAYER
+
+[DEPRECATION NOTE]
+The prior Oracle-VM OpenClaw hosting assumption is deprecated.
+OpenClaw is now expected on a dedicated AI operations machine (Mac Mini), while Oracle VM remains backend/API only.
+
+You are a Senior Staff Engineer implementing the Nexus Operator Control Layer.
+This ensures the OpenClaw bot is recognized as the system operator while keeping manual override controls.
+
+STRICT RULES:
+- DO NOT expose Supabase service role to the browser
+- DO NOT modify execution gateway
+- DO NOT expose OpenClaw gateway publicly
+- Add-only implementation
+- Use Supabase RPC for state changes
+- Maintain full audit logs
+
+SUPABASE SQL:
+Create operator_control.sql
+Tables:
+- system_state (execution_enabled, kill_switch, operator_lock, mode, last_updated_by)
+- bot_heartbeat (bot_name, service_name, status, last_run_at)
+- operator_events (actor_type, actor_id, event_type, event_description, raw)
+
+RPCs:
+- rpc_emergency_stop() -> kill_switch=true, execution_enabled=false, insert operator_event
+- rpc_set_operator_lock(lock_state boolean)
+- (optional) rpc_write_bot_heartbeat(bot_name, service_name, status, meta)
+
+BOT HEARTBEAT:
+OpenClaw bot updates heartbeat every 60s.
+
+CONTROL PANEL UPDATES:
+Add panels:
+- OperatorStatusPanel (shows bot status; warn if heartbeat >120s)
+- EmergencyControlPanel (big red emergency stop)
+- AutomationLock toggle (admin-only)
+- BotActivityFeed (operator_events stream)
+
+REQUIREMENTS:
+- Add-only
+- No secrets in frontend
+- Graceful “bot offline” handling

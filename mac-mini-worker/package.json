@@ -1,0 +1,21 @@
+{
+  "name": "nexus-mac-mini-worker",
+  "version": "1.0.0",
+  "description": "Autonomous worker pool for Nexus CRM - runs on Mac Mini backend",
+  "type": "module",
+  "main": "src/mac-mini-worker.js",
+  "scripts": {
+    "start": "node src/mac-mini-worker.js",
+    "dev": "NODE_ENV=development node src/mac-mini-worker.js",
+    "test": "node --test src/**/*.test.js",
+    "test:queue": "node src/test/test-worker-flow.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

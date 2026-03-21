@@ -3,7 +3,6 @@
 -- without changing base subscription billing history.
 
 create extension if not exists pgcrypto;
-
 create table if not exists public.membership_overrides (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null,
@@ -29,20 +28,15 @@ create table if not exists public.membership_overrides (
   check (promo_expires_at is null or promo_applied_at is null or promo_expires_at >= promo_applied_at),
   check ((override_type = 'promo' and promo_expires_at is not null) or override_type <> 'promo')
 );
-
 create index if not exists membership_overrides_tenant_active_idx
   on public.membership_overrides (tenant_id, active, override_end, created_at desc);
-
 create index if not exists membership_overrides_tenant_user_active_idx
   on public.membership_overrides (tenant_id, user_id, active, created_at desc);
-
 create index if not exists membership_overrides_tenant_type_idx
   on public.membership_overrides (tenant_id, override_type, active, created_at desc);
-
 create index if not exists membership_overrides_tenant_promo_code_idx
   on public.membership_overrides (tenant_id, promo_code)
   where promo_code is not null;
-
 create table if not exists public.membership_override_audit (
   id uuid primary key default gen_random_uuid(),
   membership_override_id uuid null references public.membership_overrides(id) on delete set null,
@@ -56,16 +50,12 @@ create table if not exists public.membership_override_audit (
   payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists membership_override_audit_tenant_created_idx
   on public.membership_override_audit (tenant_id, created_at desc);
-
 create index if not exists membership_override_audit_tenant_action_created_idx
   on public.membership_override_audit (tenant_id, action, created_at desc);
-
 create index if not exists membership_override_audit_override_idx
   on public.membership_override_audit (membership_override_id, created_at desc);
-
 create or replace function public.nexus_membership_overrides_set_updated_at()
 returns trigger
 language plpgsql
@@ -75,7 +65,6 @@ begin
   return new;
 end;
 $fn$;
-
 drop trigger if exists trg_membership_overrides_set_updated_at on public.membership_overrides;
 create trigger trg_membership_overrides_set_updated_at
 before update on public.membership_overrides

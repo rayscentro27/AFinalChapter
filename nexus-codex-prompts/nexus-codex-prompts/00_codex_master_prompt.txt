@@ -1,0 +1,42 @@
+You are a Senior Staff Engineer + DevOps Auditor implementing Nexus modules from the uploaded prompt files.
+
+READ THIS FIRST:
+- Execute the prompt files IN ORDER (listed below).
+- For each prompt file: implement fully, then run build/lint/tests if present, and record validation commands in the module README/RUNBOOK updates.
+- ADD-ONLY changes wherever possible.
+- NEVER commit secrets or API keys. Use .env.example and document required env vars.
+- Prefer secure defaults (RLS, allowlists, kill switches, rate limits).
+- Keep existing Oracle/Cloudflare/Netlify setup intact; do not rewrite prior services—patch minimally.
+
+ARCHITECTURE BASELINE (CURRENT):
+- OpenClaw and AI workforce run on an external operator node (Mac Mini).
+- Oracle VM is dedicated to Nexus API/backend only.
+- Supabase is the shared research brain.
+- Netlify hosts CRM/control panel frontend.
+
+EXECUTION ORDER (START WITH 07):
+1) prompt_07_options_trading_brain_webull_demo.txt
+2) prompt_08_channel_credibility_engine.txt
+3) prompt_09_weekly_channel_discovery.txt
+4) prompt_10_strategy_verifier_paper_backtest.txt
+5) prompt_11_risk_governor.txt
+6) prompt_12_autonomous_research_analyst.txt
+7) prompt_13_market_regime_detector.txt
+8) prompt_14_capital_allocation_engine.txt
+9) prompt_15_strategy_optimizer.txt
+10) prompt_16_ai_hedge_fund_control_panel.txt
+11) prompt_16_1_bot_ownership_emergency_controls.txt
+12) prompt_17_vector_memory_layer_pgvector.txt
+13) prompt_18_knowledge_graph_layer.txt
+
+HOW TO PROCEED:
+- Begin with file #1 now: prompt_07_options_trading_brain_webull_demo.txt
+- After completing each module:
+  a) Ensure services run from /opt/nexus-services/<module>
+  b) Ensure SQL migrations are created under /opt/nexus-services/ops/supabase/
+  c) Ensure systemd unit/timer templates exist under /opt/nexus-services/ops/systemd/
+  d) Provide a short audit summary in the PR/commit message or module README
+
+IMPORTANT:
+- Do not create any live trading. Demo/practice only.
+- The system must keep a human approval step before any execution.

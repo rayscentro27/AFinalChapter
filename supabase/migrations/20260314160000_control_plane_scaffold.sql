@@ -1,7 +1,6 @@
 -- Phase 1 scaffold: control plane tables (additive, no runtime activation)
 
 begin;
-
 create table if not exists public.system_config (
   id uuid primary key default gen_random_uuid(),
   scope text not null default 'global' check (scope in ('global', 'tenant', 'worker_group')),
@@ -17,10 +16,8 @@ create table if not exists public.system_config (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create unique index if not exists system_config_scope_scope_id_uniq
   on public.system_config (scope, coalesce(scope_id, ''));
-
 create table if not exists public.feature_flags (
   id uuid primary key default gen_random_uuid(),
   flag_key text not null,
@@ -34,13 +31,10 @@ create table if not exists public.feature_flags (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create unique index if not exists feature_flags_key_scope_scope_id_uniq
   on public.feature_flags (flag_key, scope, coalesce(scope_id, ''));
-
 create index if not exists feature_flags_scope_enabled_idx
   on public.feature_flags (scope, enabled, updated_at desc);
-
 create table if not exists public.worker_controls (
   id uuid primary key default gen_random_uuid(),
   worker_type text not null,
@@ -55,13 +49,10 @@ create table if not exists public.worker_controls (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create unique index if not exists worker_controls_worker_type_worker_id_uniq
   on public.worker_controls (worker_type, coalesce(worker_id, ''));
-
 create index if not exists worker_controls_paused_quarantine_idx
   on public.worker_controls (paused, quarantine_until, updated_at desc);
-
 create table if not exists public.queue_controls (
   id uuid primary key default gen_random_uuid(),
   job_type text not null,
@@ -75,10 +66,8 @@ create table if not exists public.queue_controls (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create unique index if not exists queue_controls_job_type_uniq
   on public.queue_controls (job_type);
-
 create table if not exists public.ai_usage_limits (
   id uuid primary key default gen_random_uuid(),
   scope text not null default 'global' check (scope in ('global', 'tenant', 'worker_group')),
@@ -94,10 +83,8 @@ create table if not exists public.ai_usage_limits (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create unique index if not exists ai_usage_limits_scope_scope_id_provider_task_uniq
   on public.ai_usage_limits (scope, coalesce(scope_id, ''), provider, task_type);
-
 create table if not exists public.incident_events (
   id uuid primary key default gen_random_uuid(),
   severity text not null default 'medium' check (severity in ('low', 'medium', 'high', 'critical')),
@@ -110,10 +97,8 @@ create table if not exists public.incident_events (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists incident_events_status_started_idx
   on public.incident_events (status, started_at desc);
-
 create table if not exists public.control_plane_audit_log (
   id uuid primary key default gen_random_uuid(),
   actor_user_id text null,
@@ -127,44 +112,35 @@ create table if not exists public.control_plane_audit_log (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create index if not exists control_plane_audit_log_created_idx
   on public.control_plane_audit_log (created_at desc);
-
 create index if not exists control_plane_audit_log_action_target_idx
   on public.control_plane_audit_log (action, target_type, created_at desc);
-
 -- updated_at trigger support
 drop trigger if exists trg_system_config_set_updated_at on public.system_config;
 create trigger trg_system_config_set_updated_at
 before update on public.system_config
 for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_feature_flags_set_updated_at on public.feature_flags;
 create trigger trg_feature_flags_set_updated_at
 before update on public.feature_flags
 for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_worker_controls_set_updated_at on public.worker_controls;
 create trigger trg_worker_controls_set_updated_at
 before update on public.worker_controls
 for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_queue_controls_set_updated_at on public.queue_controls;
 create trigger trg_queue_controls_set_updated_at
 before update on public.queue_controls
 for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_ai_usage_limits_set_updated_at on public.ai_usage_limits;
 create trigger trg_ai_usage_limits_set_updated_at
 before update on public.ai_usage_limits
 for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_incident_events_set_updated_at on public.incident_events;
 create trigger trg_incident_events_set_updated_at
 before update on public.incident_events
 for each row execute function public.set_updated_at();
-
 alter table public.system_config enable row level security;
 alter table public.feature_flags enable row level security;
 alter table public.worker_controls enable row level security;
@@ -172,5 +148,4 @@ alter table public.queue_controls enable row level security;
 alter table public.ai_usage_limits enable row level security;
 alter table public.incident_events enable row level security;
 alter table public.control_plane_audit_log enable row level security;
-
 commit;
