@@ -1,253 +1,348 @@
-import React, { useState } from 'react';
-import { Contact, InvestmentIdea } from '../types';
+import React, { useMemo, useState } from 'react';
+import { Contact } from '../types';
 import {
-  TrendingUp,
-  Sparkles,
-  Youtube,
-  ArrowRight,
-  RefreshCw,
-  ListChecks,
-  Layers,
-  PieChart,
   AlertTriangle,
   CheckCircle2,
+  Circle,
   Lock,
+  RefreshCw,
+  ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
-import * as geminiService from '../services/geminiService';
 import useTradingAccess from '../hooks/useTradingAccess';
+import useTradingEducation from '../hooks/useTradingEducation';
+import usePortalAI from '../hooks/usePortalAI';
 
 interface InvestmentLabProps {
   contact: Contact;
-  onUpdateContact: (contact: Contact) => void;
 }
 
-const InvestmentLab: React.FC<InvestmentLabProps> = ({ contact, onUpdateContact }) => {
-  const [videoUrl, setVideoUrl] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [activeStrategy, setActiveStrategy] = useState<InvestmentIdea | null>(null);
+function statusTone(status: 'locked' | 'ready' | 'active' | 'done'): string {
+  if (status === 'done') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+  if (status === 'active') return 'border-blue-200 bg-blue-50 text-blue-800';
+  if (status === 'ready') return 'border-slate-200 bg-white text-slate-800';
+  return 'border-slate-200 bg-slate-50 text-slate-500';
+}
+
+const InvestmentLab: React.FC<InvestmentLabProps> = ({ contact }) => {
+  const [coachPrompt, setCoachPrompt] = useState('Explain the safest next simulation step for me.');
+
   const tradingAccess = useTradingAccess(contact.id, { reconcileOnFetch: true });
+  const coach = usePortalAI(contact.id, 'trading_coach');
+  const education = useTradingEducation(tradingAccess.snapshot);
 
-  const strategies = contact.investmentStrategies || [];
-  const unlocked = Boolean(tradingAccess.snapshot?.access_ready);
+  const funded = useMemo(
+    () => contact.status === 'Closed' || (contact.fundedDeals?.length || 0) > 0,
+    [contact.fundedDeals?.length, contact.status]
+  );
 
-  const handleAnalyzeVideo = async () => {
-    if (!videoUrl) return;
-    setIsAnalyzing(true);
-    try {
-      const idea = await geminiService.generateInvestmentIdea(videoUrl, contact);
-      if (idea) {
-        onUpdateContact({
-          ...contact,
-          investmentStrategies: [idea, ...(contact.investmentStrategies || [])],
-        });
-        setActiveStrategy(idea);
-        setVideoUrl('');
-      }
-    } catch {
-      alert('Failed to deconstruct investment strategy.');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+  const lockReason =
+    !funded
+      ? 'This module is available only after funding is logged and post-funding stage is active.'
+      : !tradingAccess.snapshot?.eligible
+      ? 'Complete post-funding and capital-protection prerequisites to unlock this optional module.'
+      : !tradingAccess.snapshot?.access_ready
+      ? 'Finish opt-in, overview video, and disclaimer to unlock educational content.'
+      : null;
 
   return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="bg-indigo-950 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden border border-white/5">
-        <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12"><PieChart size={280} /></div>
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-300 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-10 border border-indigo-500/20">
-            Wealth Alpha Core
+    <div className="space-y-8 animate-fade-in pb-20">
+      <section className="rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Optional Post-Funding Module</div>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-900">Trading Education</h2>
+            <p className="mt-2 max-w-3xl text-sm font-medium text-slate-600">
+              Educational-only environment. No live execution. No guarantees. Practice-first progression with gated access.
+            </p>
           </div>
-          <h1 className="text-6xl font-black mb-8 tracking-tighter uppercase leading-[0.9]">
-            The <span className="text-indigo-400">Wealth</span> Accelerator.
-          </h1>
-          <p className="text-slate-300 text-xl leading-relaxed mb-0 font-medium">
-            Advanced trading content is optional and educational-only. Complete the access checklist first, then start with paper trading.
-          </p>
-        </div>
-      </div>
 
-      {tradingAccess.loading && !tradingAccess.snapshot ? (
-        <div className="rounded-[2.5rem] border border-slate-200 bg-white p-8 text-sm font-medium text-slate-700 flex items-center gap-3">
-          <RefreshCw className="animate-spin text-slate-500" size={18} /> Checking trading access...
-        </div>
-      ) : null}
-
-      {tradingAccess.error ? (
-        <div className="rounded-[2.5rem] border border-red-200 bg-red-50 p-6 text-sm font-medium text-red-700">
-          {tradingAccess.error}
-        </div>
-      ) : null}
-
-      {tradingAccess.snapshot && !unlocked ? (
-        <div className="rounded-[2.5rem] border border-slate-200 bg-white p-8 space-y-6">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="text-xl font-black text-slate-900 tracking-tight">Advanced Trading Access Setup</div>
-            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border bg-amber-50 text-amber-700 border-amber-200">
-              Locked
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
+                tradingAccess.snapshot?.eligible
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-amber-200 bg-amber-50 text-amber-700'
+              }`}
+            >
+              {tradingAccess.snapshot?.eligible ? 'Eligible' : 'Locked'}
+            </span>
+            <span
+              className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
+                tradingAccess.snapshot?.access_ready
+                  ? 'border-blue-200 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 bg-slate-100 text-slate-600'
+              }`}
+            >
+              {tradingAccess.snapshot?.access_ready ? 'Unlocked' : 'Setup Required'}
             </span>
           </div>
+        </div>
 
-          {tradingAccess.snapshot.blockers.length > 0 ? (
-            <div className="space-y-2">
-              {tradingAccess.snapshot.blockers.map((blocker) => (
-                <div key={blocker} className="text-sm text-slate-700 font-medium flex items-start gap-2">
-                  <AlertTriangle size={15} className="text-amber-500 mt-0.5" />
-                  <span>{blocker}</span>
+        {tradingAccess.loading && !tradingAccess.snapshot ? (
+          <div className="mt-6 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-700">
+            <RefreshCw size={16} className="animate-spin text-slate-500" /> Loading trading education access...
+          </div>
+        ) : null}
+
+        {tradingAccess.error ? (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+            {tradingAccess.error}
+          </div>
+        ) : null}
+
+        {lockReason ? (
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-700 flex items-start gap-2">
+            <Lock size={15} className="mt-0.5 text-slate-500" />
+            <span>{lockReason}</span>
+          </div>
+        ) : null}
+
+        {tradingAccess.snapshot ? (
+          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <button
+              type="button"
+              disabled={!tradingAccess.snapshot.eligible || tradingAccess.snapshot.opted_in || tradingAccess.busyAction !== null}
+              onClick={() => void tradingAccess.optIn()}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 disabled:opacity-50"
+            >
+              {tradingAccess.snapshot.opted_in ? '1) Opt-In Complete' : tradingAccess.busyAction === 'opt_in' ? 'Saving...' : '1) Opt In'}
+            </button>
+
+            <button
+              type="button"
+              disabled={!tradingAccess.snapshot.opted_in || tradingAccess.snapshot.video_complete || tradingAccess.busyAction !== null}
+              onClick={() => void tradingAccess.completeVideo()}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 disabled:opacity-50"
+            >
+              {tradingAccess.snapshot.video_complete
+                ? '2) Video Complete'
+                : tradingAccess.busyAction === 'video'
+                ? 'Saving...'
+                : '2) Mark Overview Complete'}
+            </button>
+
+            <button
+              type="button"
+              disabled={!tradingAccess.snapshot.video_complete || tradingAccess.snapshot.disclaimer_complete || tradingAccess.busyAction !== null}
+              onClick={() => void tradingAccess.acceptDisclaimer()}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 disabled:opacity-50"
+            >
+              {tradingAccess.snapshot.disclaimer_complete
+                ? '3) Disclaimer Accepted'
+                : tradingAccess.busyAction === 'disclaimer'
+                ? 'Saving...'
+                : '3) Accept Disclaimer'}
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      {tradingAccess.snapshot?.access_ready ? (
+        <>
+          <section className="rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Start Here</p>
+            <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Practice Before Real Capital</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Use this checklist to complete the first simulation cycle before exploring deeper strategy education.
+            </p>
+
+            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+              {education.checklist.map((item) => (
+                <div key={item.key} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{item.title}</p>
+                    <p className="text-xs text-slate-500">{item.required ? 'Required' : 'Optional'}</p>
+                  </div>
+                  {item.done ? <CheckCircle2 size={18} className="text-emerald-600" /> : <Circle size={18} className="text-slate-400" />}
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-sm text-emerald-700 font-medium flex items-start gap-2">
-              <CheckCircle2 size={16} className="mt-0.5" />
-              <span>Eligibility checks passed. Complete the setup actions below.</span>
-            </div>
-          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <button
-              onClick={() => void tradingAccess.optIn()}
-              disabled={!tradingAccess.snapshot.eligible || tradingAccess.snapshot.opted_in || tradingAccess.busyAction !== null}
-              className="rounded-xl bg-slate-900 text-white px-4 py-3 text-xs font-black uppercase tracking-widest disabled:opacity-40"
-            >
-              {tradingAccess.busyAction === 'opt_in' ? 'Saving...' : tradingAccess.snapshot.opted_in ? 'Opt-In Complete' : 'Opt In'}
-            </button>
-            <button
-              onClick={() => void tradingAccess.completeVideo()}
-              disabled={!tradingAccess.snapshot.opted_in || tradingAccess.snapshot.video_complete || tradingAccess.busyAction !== null}
-              className="rounded-xl bg-blue-600 text-white px-4 py-3 text-xs font-black uppercase tracking-widest disabled:opacity-40"
-            >
-              {tradingAccess.busyAction === 'video' ? 'Saving...' : tradingAccess.snapshot.video_complete ? 'Video Complete' : 'Mark Video Complete'}
-            </button>
-            <button
-              onClick={() => void tradingAccess.acceptDisclaimer()}
-              disabled={!tradingAccess.snapshot.video_complete || tradingAccess.snapshot.disclaimer_complete || tradingAccess.busyAction !== null}
-              className="rounded-xl bg-emerald-600 text-white px-4 py-3 text-xs font-black uppercase tracking-widest disabled:opacity-40"
-            >
-              {tradingAccess.busyAction === 'disclaimer' ? 'Saving...' : tradingAccess.snapshot.disclaimer_complete ? 'Disclaimer Accepted' : 'Accept Disclaimer'}
-            </button>
-          </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              {!education.selectedTool
+                ? education.tools.map((tool) => (
+                    <button
+                      key={tool.key}
+                      type="button"
+                      onClick={() =>
+                        void tradingAccess.updateLearningProgress({
+                          selected_tool: tool.key,
+                        })
+                      }
+                      disabled={tradingAccess.busyAction !== null}
+                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
+                    >
+                      {tradingAccess.busyAction === 'learning' ? 'Saving...' : `Select ${tool.name}`}
+                    </button>
+                  ))
+                : null}
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600 font-medium">
-            Educational use only. No financial advice, no guarantees, and paper trading is recommended first.
-          </div>
-        </div>
-      ) : null}
+              {!education.startedPaperTrading ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void tradingAccess.updateLearningProgress({
+                      started_paper_trading: true,
+                    })
+                  }
+                  disabled={tradingAccess.busyAction !== null}
+                  className="rounded-xl bg-slate-900 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-50"
+                >
+                  {tradingAccess.busyAction === 'learning' ? 'Saving...' : 'Mark Paper Trading Started'}
+                </button>
+              ) : null}
 
-      {unlocked ? (
-        <>
-          <div className="rounded-[2.5rem] border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-700 font-medium flex items-start gap-3">
-            <CheckCircle2 size={18} className="mt-0.5" />
-            <div>
-              Access unlocked. Keep simulation-first discipline before applying live capital.
-              {activeStrategy ? ` Latest strategy added: ${activeStrategy.title}.` : ''}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            <div className="lg:col-span-4 space-y-8">
-              <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-slate-200">
-                <h3 className="font-black text-xs uppercase tracking-[0.3em] text-slate-400 mb-8 flex items-center gap-2">
-                  <Youtube size={18} className="text-red-600" /> Neural Video Scout
-                </h3>
-                <p className="text-sm text-slate-500 mb-8 leading-relaxed font-medium">
-                  Paste one strategy video and convert it into a paper-trading-first execution checklist.
-                </p>
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="Paste YouTube Link..."
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                  <button
-                    onClick={handleAnalyzeVideo}
-                    disabled={isAnalyzing || !videoUrl}
-                    className="w-full bg-slate-950 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-indigo-600 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-                  >
-                    {isAnalyzing ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} />}
-                    Deconstruct Strategy
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><Layers size={100} /></div>
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] opacity-60 mb-2">Capital Pool</h3>
-                <div className="text-5xl font-black tracking-tighter mb-4">${(contact.revenue || 0).toLocaleString()}</div>
-                <p className="text-[10px] font-black uppercase tracking-widest mt-4 opacity-70">Simulation First: Recommended</p>
-              </div>
+              {education.startedPaperTrading && !education.firstSimulationCompleted ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void tradingAccess.updateLearningProgress({
+                      first_simulation_completed: true,
+                    })
+                  }
+                  disabled={tradingAccess.busyAction !== null}
+                  className="rounded-xl bg-emerald-600 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-50"
+                >
+                  {tradingAccess.busyAction === 'learning' ? 'Saving...' : 'Mark First Simulation Complete'}
+                </button>
+              ) : null}
             </div>
 
-            <div className="lg:col-span-8 space-y-8">
-              <h3 className="font-black text-xs uppercase tracking-[0.3em] text-slate-400 px-4">Tactical Blueprint Library</h3>
+            <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              Simulation-first guidance: document setup, entry, risk, and exit rationale before moving to another strategy.
+            </div>
+          </section>
 
-              {strategies.length === 0 ? (
-                <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[3rem] p-20 text-center flex flex-col items-center justify-center">
-                  <TrendingUp size={64} className="opacity-10 mb-4" />
-                  <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No strategies analyzed yet.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-6">
-                  {strategies.map((strat) => (
-                    <div key={strat.id} className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
-                      <div className="absolute top-0 right-0 p-8 opacity-5"><Layers size={120} /></div>
-                      <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-6 relative z-10">
-                        <div>
-                          <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-indigo-200 mb-4 inline-block">
-                            {strat.category}
-                          </span>
-                          <h4 className="text-3xl font-black text-slate-900 uppercase tracking-tight leading-none mb-2">{strat.title}</h4>
-                          <p className="text-sm text-slate-500 font-medium italic">" {strat.description} "</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ROI Potential</p>
-                          <p className="text-3xl font-black text-emerald-600 tracking-tighter">{strat.roiPotential}</p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 border-t border-slate-100 pt-8 relative z-10">
-                        <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><ListChecks size={14} /> Execution Steps</p>
-                          <div className="space-y-3">
-                            {strat.steps.map((step, i) => (
-                              <div key={i} className="flex gap-4 items-start">
-                                <div className="w-5 h-5 bg-slate-100 rounded flex items-center justify-center text-[10px] font-black shrink-0">{i + 1}</div>
-                                <p className="text-xs text-slate-600 font-medium leading-relaxed">{step}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex flex-col justify-end">
-                          <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 mb-6">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-[10px] font-black text-slate-400 uppercase">Risk Rating</span>
-                              <span className={`text-[10px] font-black uppercase ${strat.riskLevel === 'Low' ? 'text-emerald-500' : strat.riskLevel === 'High' ? 'text-red-500' : 'text-amber-500'}`}>{strat.riskLevel}</span>
-                            </div>
-                            <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                              <div className={`h-full ${strat.riskLevel === 'Low' ? 'bg-emerald-500 w-1/3' : strat.riskLevel === 'High' ? 'bg-red-500 w-full' : 'bg-amber-500 w-2/3'}`} />
-                            </div>
-                          </div>
-                          <button className="w-full bg-slate-950 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-indigo-600 transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2">
-                            Consult with Advisor <ArrowRight size={14} />
-                          </button>
-                        </div>
-                      </div>
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Tools Layer</p>
+              <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Simulation Platforms</h3>
+              <div className="mt-4 space-y-3">
+                {education.tools.map((tool) => (
+                  <div key={tool.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-black text-slate-900">{tool.name}</p>
+                      {education.selectedTool === tool.key ? (
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                          Selected
+                        </span>
+                      ) : null}
                     </div>
-                  ))}
-                </div>
-              )}
+                    <p className="mt-2 text-xs text-slate-600">{tool.description}</p>
+                    <p className="mt-2 text-xs text-slate-700 font-medium">Why useful: {tool.usefulness}</p>
+                    <p className="mt-1 text-xs text-slate-700 font-medium">Learning fit: {tool.fit}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </>
-      ) : null}
 
-      {tradingAccess.snapshot && !unlocked ? (
-        <div className="rounded-[2.5rem] border border-slate-200 bg-slate-50 p-5 text-xs text-slate-600 font-medium flex items-start gap-3">
-          <Lock size={16} className="mt-0.5 text-slate-500" />
-          Advanced trading remains secondary to business growth. Complete setup steps to unlock this optional learning module.
-        </div>
+            <div className="rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Trading Journey</p>
+              <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Guided Progression</h3>
+              <div className="mt-4 space-y-3">
+                {education.journey.map((step) => (
+                  <div key={step.key} className={`rounded-2xl border p-4 ${statusTone(step.status)}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-black">{step.title}</p>
+                      <span className="rounded-full border border-current/20 bg-white/60 px-2 py-1 text-[10px] font-black uppercase tracking-widest">
+                        {step.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs opacity-80">{step.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Approved Strategy Library</p>
+            <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Educational Strategy Cards</h3>
+            <p className="mt-2 text-sm text-slate-600">Only approved strategy summaries are shown here. Raw research remains outside the portal UI.</p>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              {education.strategies.map((strategy) => (
+                <article key={strategy.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
+                      {strategy.category}
+                    </span>
+                    <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
+                      {strategy.difficulty}
+                    </span>
+                  </div>
+                  <h4 className="mt-3 text-lg font-black tracking-tight text-slate-900">{strategy.title}</h4>
+                  <p className="mt-2 text-xs text-slate-600">{strategy.summary}</p>
+
+                  <div className="mt-3 space-y-2 text-xs">
+                    <p className="text-slate-700"><span className="font-black">When it works:</span> {strategy.when_it_works}</p>
+                    <p className="text-slate-700"><span className="font-black">When it fails:</span> {strategy.when_it_fails}</p>
+                    <p className="text-amber-800"><span className="font-black">Risk note:</span> {strategy.risk_note}</p>
+                    <p className="text-slate-700"><span className="font-black">Confidence:</span> {strategy.confidence_score}%</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Trading Coach</p>
+            <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">AI-Guided Explanation Layer</h3>
+            <p className="mt-2 text-sm text-slate-600">Ask for concept explanations and practical simulation steps. Educational guidance only.</p>
+
+            <div className="mt-4 space-y-3">
+              <textarea
+                value={coachPrompt}
+                onChange={(event) => setCoachPrompt(event.target.value)}
+                className="min-h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"
+                placeholder="Ask the Trading Coach to explain risk and your next simulation step."
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  void coach.ask({
+                    coaching_goal: 'Explain my next simulation-first action and the key risk controls.',
+                    user_message: coachPrompt,
+                  })
+                }
+                disabled={coach.loading}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
+              >
+                <Sparkles size={14} /> {coach.loading ? 'Loading Guidance...' : 'Ask Trading Coach'}
+              </button>
+
+              {coach.error ? <p className="text-sm font-medium text-red-600">{coach.error}</p> : null}
+
+              {coach.data?.answer ? (
+                <pre className="whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  {coach.data.answer}
+                </pre>
+              ) : null}
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800 font-medium flex items-start gap-2">
+              <ShieldAlert size={15} className="mt-0.5" />
+              Educational content only. No financial advice. No buy/sell directives. No performance guarantees.
+            </div>
+          </section>
+        </>
+      ) : tradingAccess.snapshot ? (
+        <section className="rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm">
+          <h3 className="text-2xl font-black tracking-tight text-slate-900">Trading Education Not Yet Unlocked</h3>
+          {(tradingAccess.snapshot.blockers || []).length ? (
+            <div className="mt-4 space-y-2">
+              {tradingAccess.snapshot.blockers.map((blocker) => (
+                <p key={blocker} className="flex items-start gap-2 text-sm font-medium text-amber-700">
+                  <AlertTriangle size={15} className="mt-0.5" /> {blocker}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-slate-600">Complete the setup sequence above to continue.</p>
+          )}
+        </section>
       ) : null}
     </div>
   );

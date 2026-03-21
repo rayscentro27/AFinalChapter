@@ -5,7 +5,7 @@ const BASE = '/.netlify/functions';
 type RequestInitExt = RequestInit & { timeoutMs?: number };
 
 export type FundingDecisionStatus = 'submitted' | 'approved' | 'denied' | 'pending' | 'cancelled';
-export type PortalAiRole = 'funding_guide' | 'credit_advisor' | 'business_setup_advisor';
+export type PortalAiRole = 'funding_guide' | 'credit_advisor' | 'business_setup_advisor' | 'trading_coach';
 
 export type FundingRoadmapResponse = {
   ok: boolean;

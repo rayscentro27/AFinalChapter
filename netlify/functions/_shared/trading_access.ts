@@ -21,6 +21,10 @@ export type TradingAccessSnapshot = {
   disclaimer_accepted_at: string | null;
   selected_allocation_path: 'business_growth' | 'trading_education' | 'grant_funding' | null;
   paper_trading_recommended: boolean;
+  started_paper_trading: boolean;
+  selected_tool: string | null;
+  first_simulation_completed: boolean;
+  learning_journey_state: 'locked' | 'ready_to_start' | 'in_progress' | 'completed';
   reserve_confirmed: boolean;
   business_growth_positioned: boolean;
   updated_at: string | null;
@@ -42,6 +46,12 @@ type AccessRow = {
   access_status: 'locked' | 'eligible_pending' | 'in_progress' | 'ready' | 'unlocked';
   metadata: Record<string, unknown>;
   updated_at: string | null;
+};
+
+type TradingLearningMeta = {
+  started_paper_trading: boolean;
+  selected_tool: string | null;
+  first_simulation_completed: boolean;
 };
 
 type CapitalProfileRow = {
@@ -71,6 +81,37 @@ function toIsoDatePlusDays(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function normalizeMeta(input: unknown): Record<string, unknown> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  return input as Record<string, unknown>;
+}
+
+function readLearningMeta(row: AccessRow | null): TradingLearningMeta {
+  const meta = normalizeMeta(row?.metadata);
+  const selectedToolRaw = meta.selected_tool;
+  const selectedTool = typeof selectedToolRaw === 'string' && selectedToolRaw.trim().length > 0 ? selectedToolRaw.trim() : null;
+  const started = Boolean(meta.started_paper_trading) || Boolean(row?.paper_trading_acknowledged);
+  const firstSimulationCompleted = Boolean(meta.first_simulation_completed);
+
+  return {
+    started_paper_trading: started,
+    selected_tool: selectedTool,
+    first_simulation_completed: firstSimulationCompleted,
+  };
+}
+
+function deriveLearningJourneyState(params: {
+  eligible: boolean;
+  accessReady: boolean;
+  startedPaperTrading: boolean;
+  firstSimulationCompleted: boolean;
+}): 'locked' | 'ready_to_start' | 'in_progress' | 'completed' {
+  if (!params.eligible || !params.accessReady) return 'locked';
+  if (params.firstSimulationCompleted) return 'completed';
+  if (params.startedPaperTrading) return 'in_progress';
+  return 'ready_to_start';
 }
 
 export async function resolveAuthedUserId(supabase: SupabaseClient): Promise<string> {
@@ -221,6 +262,8 @@ async function reconcileTradingTasks(
     videoComplete: boolean;
     disclaimerComplete: boolean;
     accessReady: boolean;
+    startedPaperTrading: boolean;
+    firstSimulationCompleted: boolean;
   }
 ): Promise<void> {
   if (!params.eligible) return;
@@ -278,8 +321,12 @@ async function reconcileTradingTasks(
       tenant_id: params.tenantId,
       task_id: 'adv_trading_paper_first',
       title: 'Start With Paper Trading',
-      description: 'Practice in simulation mode before engaging deeper strategy content.',
-      status: params.accessReady ? 'pending' : 'completed',
+      description: params.firstSimulationCompleted
+        ? 'First simulation completed. Continue practicing before deeper modules.'
+        : params.startedPaperTrading
+        ? 'Paper trading is in progress. Complete your first full simulation cycle.'
+        : 'Practice in simulation mode before engaging deeper strategy content.',
+      status: params.accessReady && !params.firstSimulationCompleted ? 'pending' : 'completed',
       due_date: toIsoDatePlusDays(7),
       type: 'education',
       link: '#portal',
@@ -338,6 +385,13 @@ export async function buildTradingAccessSnapshot(
   const disclaimerComplete = Boolean(existingAccess?.disclaimer_accepted_at) && disclaimerVersion.length > 0;
   const accessReady = eligible && optedIn && videoComplete && disclaimerComplete;
   const accessStatus = computeAccessStatus({ eligible, optedIn, videoComplete, disclaimerComplete, accessReady });
+  const learningMeta = readLearningMeta(existingAccess);
+  const learningJourneyState = deriveLearningJourneyState({
+    eligible,
+    accessReady,
+    startedPaperTrading: learningMeta.started_paper_trading,
+    firstSimulationCompleted: learningMeta.first_simulation_completed,
+  });
 
   const saved = await upsertAccessRow(supabase, {
     tenantId: params.tenantId,
@@ -357,6 +411,8 @@ export async function buildTradingAccessSnapshot(
       videoComplete,
       disclaimerComplete,
       accessReady,
+      startedPaperTrading: learningMeta.started_paper_trading,
+      firstSimulationCompleted: learningMeta.first_simulation_completed,
     });
   }
 
@@ -378,6 +434,10 @@ export async function buildTradingAccessSnapshot(
     disclaimer_accepted_at: saved.disclaimer_accepted_at,
     selected_allocation_path: selectedPath,
     paper_trading_recommended: true,
+    started_paper_trading: learningMeta.started_paper_trading,
+    selected_tool: learningMeta.selected_tool,
+    first_simulation_completed: learningMeta.first_simulation_completed,
+    learning_journey_state: learningJourneyState,
     reserve_confirmed: reserveConfirmed,
     business_growth_positioned: businessGrowthPositioned,
     updated_at: saved.updated_at || null,
@@ -477,6 +537,73 @@ export async function setTradingDisclaimerAccepted(
 
   if (error) {
     throw new Error(error.message || 'Unable to save disclaimer acceptance status.');
+  }
+
+  return buildTradingAccessSnapshot(supabase, {
+    tenantId: params.tenantId,
+    userId: params.userId,
+    reconcileTasks: params.reconcileTasks,
+  });
+}
+
+export async function setTradingLearningProgress(
+  supabase: SupabaseClient,
+  params: {
+    tenantId: string;
+    userId: string;
+    startedPaperTrading?: boolean;
+    selectedTool?: string | null;
+    firstSimulationCompleted?: boolean;
+    reconcileTasks?: boolean;
+  }
+): Promise<TradingAccessSnapshot> {
+  const nowIso = new Date().toISOString();
+  const existing = await readAccessRow(supabase, params.tenantId, params.userId);
+  const currentMeta = normalizeMeta(existing?.metadata);
+  const nextMeta: Record<string, unknown> = { ...currentMeta };
+
+  if (params.startedPaperTrading !== undefined) {
+    const started = Boolean(params.startedPaperTrading);
+    nextMeta.started_paper_trading = started;
+    if (started && !currentMeta.started_paper_trading_at) {
+      nextMeta.started_paper_trading_at = nowIso;
+    }
+  }
+
+  if (params.selectedTool !== undefined) {
+    const normalizedTool = String(params.selectedTool || '').trim();
+    nextMeta.selected_tool = normalizedTool || null;
+  }
+
+  if (params.firstSimulationCompleted !== undefined) {
+    const completed = Boolean(params.firstSimulationCompleted);
+    nextMeta.first_simulation_completed = completed;
+    if (completed) {
+      if (!currentMeta.first_simulation_completed_at) {
+        nextMeta.first_simulation_completed_at = nowIso;
+      }
+      nextMeta.started_paper_trading = true;
+      if (!currentMeta.started_paper_trading_at) {
+        nextMeta.started_paper_trading_at = nowIso;
+      }
+    }
+  }
+
+  const paperTradingAcknowledged = Boolean(nextMeta.started_paper_trading) || Boolean(existing?.paper_trading_acknowledged);
+  const patch = {
+    tenant_id: params.tenantId,
+    user_id: params.userId,
+    feature_key: ADVANCED_TRADING_FEATURE,
+    paper_trading_acknowledged: paperTradingAcknowledged,
+    metadata: nextMeta,
+  };
+
+  const { error } = await supabase
+    .from('user_advanced_access')
+    .upsert(patch, { onConflict: 'tenant_id,user_id,feature_key' });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to save paper trading progress.');
   }
 
   return buildTradingAccessSnapshot(supabase, {

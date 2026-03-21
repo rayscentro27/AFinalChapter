@@ -5,9 +5,10 @@ import {
   getTradingAccess,
   markTradingOverviewComplete,
   optInAdvancedTrading,
+  setTradingLearningProgress,
 } from '../services/tradingAccessService';
 
-type BusyAction = 'refresh' | 'opt_in' | 'video' | 'disclaimer' | null;
+type BusyAction = 'refresh' | 'opt_in' | 'video' | 'disclaimer' | 'learning' | null;
 
 export default function useTradingAccess(tenantId?: string, options?: { reconcileOnFetch?: boolean }) {
   const [snapshot, setSnapshot] = useState<TradingAccessSnapshot | null>(null);
@@ -95,6 +96,35 @@ export default function useTradingAccess(tenantId?: string, options?: { reconcil
     }
   }, [tenantId, snapshot?.disclaimer_version]);
 
+  const updateLearningProgress = useCallback(
+    async (input: {
+      started_paper_trading?: boolean;
+      selected_tool?: string | null;
+      first_simulation_completed?: boolean;
+    }) => {
+      if (!tenantId) return null;
+      setError('');
+      setBusyAction('learning');
+      try {
+        const next = await setTradingLearningProgress({
+          tenant_id: tenantId,
+          started_paper_trading: input.started_paper_trading,
+          selected_tool: input.selected_tool,
+          first_simulation_completed: input.first_simulation_completed,
+          reconcile: true,
+        });
+        setSnapshot(next);
+        return next;
+      } catch (err: any) {
+        setError(String(err?.message || 'Unable to save paper trading progress.'));
+        return null;
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [tenantId]
+  );
+
   return {
     snapshot,
     loading,
@@ -104,5 +134,6 @@ export default function useTradingAccess(tenantId?: string, options?: { reconcil
     optIn,
     completeVideo,
     acceptDisclaimer,
+    updateLearningProgress,
   };
 }

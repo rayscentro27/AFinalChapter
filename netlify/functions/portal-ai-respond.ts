@@ -12,12 +12,12 @@ import {
 
 const BodySchema = z.object({
   tenant_id: z.string().uuid().optional(),
-  role: z.enum(['funding_guide', 'credit_advisor', 'business_setup_advisor']).default('funding_guide'),
+  role: z.enum(['funding_guide', 'credit_advisor', 'business_setup_advisor', 'trading_coach']).default('funding_guide'),
   coaching_goal: z.string().min(3).max(300).optional(),
   user_message: z.string().max(1200).optional(),
 });
 
-function roleInstruction(role: 'funding_guide' | 'credit_advisor' | 'business_setup_advisor'): string {
+function roleInstruction(role: 'funding_guide' | 'credit_advisor' | 'business_setup_advisor' | 'trading_coach'): string {
   if (role === 'credit_advisor') {
     return [
       'You are Credit Advisor for a funding-first portal.',
@@ -36,6 +36,15 @@ function roleInstruction(role: 'funding_guide' | 'credit_advisor' | 'business_se
     ].join(' ');
   }
 
+  if (role === 'trading_coach') {
+    return [
+      'You are Trading Coach for an optional post-funding education module.',
+      'Explain strategy concepts, risk controls, and simulation-first workflow in plain language.',
+      'Educational only: do not give buy/sell recommendations, financial advice, or guarantees.',
+      'Always recommend paper-trading-first before any advanced content.',
+    ].join(' ');
+  }
+
   return [
     'You are Funding Guide for a funding-first portal.',
     'Prioritize current stage, blockers, and the next deterministic action.',
@@ -50,6 +59,29 @@ function compactContext(context: unknown): string {
 
 function fallbackAnswer(context: any): string {
   const stage = String(context?.user_stage || 'unknown').replace(/_/g, ' ');
+  const role = String(context?.role || 'funding_guide');
+
+  if (role === 'trading_coach') {
+    const trading = context?.trading_summary;
+    const blockers = Array.isArray(trading?.blockers) ? trading.blockers.slice(0, 3) : [];
+    const nextAction = trading?.first_simulation_completed
+      ? 'Continue paper trading and keep reviewing risk notes before advancing.'
+      : trading?.started_paper_trading
+      ? 'Finish your first full paper-trade simulation and log what you learned.'
+      : 'Start paper trading before any advanced strategy review.';
+
+    const parts = [
+      `Current stage: ${stage}.`,
+      trading?.access_ready
+        ? 'Trading education is unlocked in educational mode.'
+        : 'Trading education is still gated until prerequisites are complete.',
+      blockers.length ? `Blockers: ${blockers.join(' | ')}.` : '',
+      `Next action: ${nextAction}`,
+    ].filter(Boolean);
+
+    return parts.join(' ');
+  }
+
   const blockers = Array.isArray(context?.blockers) ? context.blockers.slice(0, 3) : [];
   const recommendation = context?.roadmap_summary?.recommendation?.top_recommendation?.title;
   const steps: string[] = [];

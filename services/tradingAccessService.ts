@@ -20,6 +20,10 @@ export type TradingAccessSnapshot = {
   disclaimer_accepted_at: string | null;
   selected_allocation_path: 'business_growth' | 'trading_education' | 'grant_funding' | null;
   paper_trading_recommended: boolean;
+  started_paper_trading: boolean;
+  selected_tool: string | null;
+  first_simulation_completed: boolean;
+  learning_journey_state: 'locked' | 'ready_to_start' | 'in_progress' | 'completed';
   reserve_confirmed: boolean;
   business_growth_positioned: boolean;
   updated_at: string | null;
@@ -143,6 +147,32 @@ export async function acceptTradingDisclaimer(input: {
       tenant_id: input.tenant_id,
       accepted: input.accepted ?? true,
       disclaimer_version: input.disclaimer_version || 'trading-v1',
+      reconcile: input.reconcile ?? true,
+    }),
+  });
+
+  return ensureAccess(payload);
+}
+
+export async function setTradingLearningProgress(input: {
+  tenant_id?: string;
+  started_paper_trading?: boolean;
+  selected_tool?: string | null;
+  first_simulation_completed?: boolean;
+  reconcile?: boolean;
+} = {}): Promise<TradingAccessSnapshot> {
+  const headers = await authHeaders();
+  const payload = await requestJson<TradingAccessResponse>(`${BASE}/trading-learning-progress`, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      tenant_id: input.tenant_id,
+      started_paper_trading: input.started_paper_trading,
+      selected_tool: input.selected_tool,
+      first_simulation_completed: input.first_simulation_completed,
       reconcile: input.reconcile ?? true,
     }),
   });

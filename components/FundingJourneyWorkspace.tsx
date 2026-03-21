@@ -790,77 +790,7 @@ export default function FundingJourneyWorkspace(props: {
           />
         ) : null}
 
-        {activeTab === 'tradingAccess' ? (
-          <>
-            <PrimaryCard title="Trading Access" subtitle="Optional Advanced Path (Gated)">
-              {trading.loading ? (
-                <div className="inline-flex items-center gap-2 text-sm text-slate-500">
-                  <Loader2 className="animate-spin" size={14} /> Loading trading access...
-                </div>
-              ) : trading.error ? (
-                <p className="text-sm font-medium text-red-600">{trading.error}</p>
-              ) : (
-                <>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Eligibility</p>
-                    <p className="mt-1 text-sm font-black text-slate-900">
-                      {trading.snapshot?.eligible ? 'Eligible' : 'Locked'}
-                    </p>
-                    {(trading.snapshot?.blockers || []).length ? (
-                      <ul className="mt-2 space-y-1 text-xs text-amber-700">
-                        {(trading.snapshot?.blockers || []).map((blocker) => (
-                          <li key={blocker} className="flex items-start gap-1">
-                            <Lock size={12} className="mt-0.5" />
-                            <span>{blocker}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <button
-                      type="button"
-                      disabled={!trading.snapshot?.eligible || !!trading.snapshot?.opted_in}
-                      onClick={() => void trading.optIn()}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 disabled:opacity-50"
-                    >
-                      {trading.snapshot?.opted_in ? 'Opted In' : '1) Opt In'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!trading.snapshot?.opted_in || !!trading.snapshot?.video_complete}
-                      onClick={() => void trading.completeVideo()}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 disabled:opacity-50"
-                    >
-                      {trading.snapshot?.video_complete ? 'Video Complete' : '2) Mark Video Complete'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!trading.snapshot?.video_complete || !!trading.snapshot?.disclaimer_complete}
-                      onClick={() => void trading.acceptDisclaimer()}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 disabled:opacity-50"
-                    >
-                      {trading.snapshot?.disclaimer_complete ? 'Disclaimer Accepted' : '3) Accept Disclaimer'}
-                    </button>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-                    Paper-trading-first posture: practice in simulation before any advanced live strategy.
-                  </div>
-
-                  {trading.snapshot?.access_ready ? (
-                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                      <p className="text-sm font-bold text-emerald-700">Access ready. Advanced education content is unlocked.</p>
-                    </div>
-                  ) : null}
-                </>
-              )}
-            </PrimaryCard>
-
-            <InvestmentLab contact={contact} onUpdateContact={onUpdateContact} />
-          </>
-        ) : null}
+        {activeTab === 'tradingAccess' ? <InvestmentLab contact={contact} /> : null}
 
         {activeTab === 'messages' ? (
           <div className="h-[72vh] overflow-hidden rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { buildTradingAccessSnapshot } from './trading_access';
 
 export type FundingDecisionStatus = 'submitted' | 'approved' | 'denied' | 'pending' | 'cancelled';
 export type PortalTaskStatus = 'pending' | 'completed';
@@ -1232,11 +1233,13 @@ export async function buildPortalAIContext(
   params: {
     tenantId: string;
     userId: string;
-    role: 'funding_guide' | 'credit_advisor' | 'business_setup_advisor';
+    role: 'funding_guide' | 'credit_advisor' | 'business_setup_advisor' | 'trading_coach';
     coachingGoal: string;
   }
 ) {
-  const [roadmap, tasks, latestHistory] = await Promise.all([
+  const includeTradingContext = params.role === 'trading_coach';
+
+  const [roadmap, tasks, latestHistory, tradingAccess] = await Promise.all([
     getFundingRoadmapData(supabase, {
       tenantId: params.tenantId,
       userId: params.userId,
@@ -1251,6 +1254,13 @@ export async function buildPortalAIContext(
       tenantId: params.tenantId,
       userId: params.userId,
     }),
+    includeTradingContext
+      ? buildTradingAccessSnapshot(supabase, {
+          tenantId: params.tenantId,
+          userId: params.userId,
+          reconcileTasks: false,
+        })
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -1279,6 +1289,17 @@ export async function buildPortalAIContext(
       ready: roadmap.business.readiness.ready,
       missing_steps: roadmap.business.readiness.missing_steps,
     },
+    trading_summary: tradingAccess
+      ? {
+          eligible: tradingAccess.eligible,
+          access_ready: tradingAccess.access_ready,
+          blockers: tradingAccess.blockers,
+          learning_journey_state: tradingAccess.learning_journey_state,
+          started_paper_trading: tradingAccess.started_paper_trading,
+          selected_tool: tradingAccess.selected_tool,
+          first_simulation_completed: tradingAccess.first_simulation_completed,
+        }
+      : null,
     task_board: {
       urgent_count: tasks.urgent.length,
       recommended_count: tasks.recommended.length,
