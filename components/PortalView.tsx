@@ -1,11 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-    CheckCircle, Clock, FileText, MessageSquare, ExternalLink, 
-    Target, Wallet as WalletIcon, X, CreditCard, 
-    Upload, RefreshCw, LayoutDashboard, 
+import {
+    CheckCircle, Clock, FileText, MessageSquare, ExternalLink,
+    Target, Wallet as WalletIcon, X, CreditCard,
+    Upload, RefreshCw, LayoutDashboard,
     Layers, ArrowRight, ShieldCheck, Activity, BrainCircuit, AlertTriangle, Star,
-    // Added Sparkles and Users to imports
     Mic, UserCheck, Zap, Search, Trophy, Hammer, Building2, LogOut, Sparkles, Users, DollarSign, Receipt
 } from 'lucide-react';
 import { Contact, AgencyBranding, Course } from '../types';
@@ -20,6 +19,8 @@ import ReferralHub from './ReferralHub';
 import NexusPulse from './NexusPulse';
 import FundabilityDashboard from './FundabilityDashboard';
 import CapitalAllocationSimulator from './CapitalAllocationSimulator';
+import CapitalProtectionPanel from './CapitalProtectionPanel';
+import CapitalAllocationPanel from './CapitalAllocationPanel';
 import VoiceConcierge from './VoiceConcierge';
 import IdentityVerification from './IdentityVerification';
 import CreditRepairAI from './CreditRepairAI';
@@ -29,6 +30,7 @@ import ClientCardSuggestions from './ClientCardSuggestions';
 import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
 import ClientPortalDashboard from './ClientPortalDashboard';
+import useCapitalReadiness from '../hooks/useCapitalReadiness';
 
 interface PortalViewProps {
   contact: Contact;
@@ -40,11 +42,12 @@ interface PortalViewProps {
 }
 
 const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, branding, onLogout, isAdminPreview = false }) => {
-  const [activeTab, setActiveTab] = useState<'messages' | 'pulse' | 'tasks' | 'fundability' | 'simulator' | 'repair' | 'profile' | 'roadmap' | 'vault' | 'offers' | 'cards' | 'subscription' | 'settlement' | 'invest' | 'partner' | 'kyc'>('pulse');
+  const [activeTab, setActiveTab] = useState<'messages' | 'pulse' | 'tasks' | 'fundability' | 'capitalProtection' | 'capitalAllocation' | 'simulator' | 'repair' | 'profile' | 'roadmap' | 'vault' | 'offers' | 'cards' | 'subscription' | 'settlement' | 'invest' | 'partner' | 'kyc'>('pulse');
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
-  
+
   const isFunded = contact.status === 'Closed' || (contact.fundedDeals && contact.fundedDeals.length > 0);
   const pendingInvoices = contact.invoices?.filter(i => i.status !== 'Paid').length || 0;
+  const capitalReadiness = useCapitalReadiness(contact.id, true);
 
   const roadmapSteps = [
     { phase: 1, title: 'Genesis Audit', desc: 'Forensic credit and entity validation.', icon: <Search size={18}/>, status: contact.creditAnalysis ? 'complete' : 'active' },
@@ -58,6 +61,8 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
         { id: 'pulse', label: 'Briefing', icon: <LayoutDashboard size={18}/> },
         { id: 'tasks', label: 'Tasks', icon: <CheckCircle size={18}/> },
         { id: 'fundability', label: 'Fundability', icon: <Target size={18}/> },
+        { id: 'capitalProtection', label: 'Capital Protect', icon: <ShieldCheck size={18}/>, visible: isFunded },
+        { id: 'capitalAllocation', label: 'Allocation', icon: <WalletIcon size={18}/>, visible: isFunded },
         { id: 'simulator', label: 'Simulator', icon: <WalletIcon size={18}/> },
         { id: 'roadmap', label: 'Roadmap', icon: <Zap size={18}/> },
         { id: 'messages', label: 'Concierge', icon: <MessageSquare size={18}/> },
@@ -81,14 +86,12 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
 
     const timeout = window.setTimeout(() => {
       if (!cancelled) {
-        // Fail open after timeout so client can still access portal UI.
         setProfileState('has_profile');
       }
     }, 6000);
 
     const check = async () => {
       try {
-        // Admin preview should not be blocked by client onboarding gates.
         if (isAdminPreview) {
           if (!cancelled) setProfileState('has_profile');
           return;
@@ -103,7 +106,6 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
         if (cancelled) return;
 
         if (error) {
-          // If RLS blocks or query fails, fail open to avoid hard-locking the portal.
           setProfileState('has_profile');
           return;
         }
@@ -137,10 +139,9 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
     return <OnboardingWizard contact={contact} onComplete={onUpdateContact} />;
   }
 
-
   return (
     <div className="min-h-screen bg-[#0B0C10] flex flex-col pb-24 md:pb-10 font-sans text-slate-100 overflow-x-hidden">
-       
+
        <div className="bg-[#0B0C10] text-white px-8 py-8 border-b border-white/5 sticky top-0 z-40 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto flex justify-between items-center gap-4">
             <div className="flex items-center gap-4 flex-1">
@@ -156,7 +157,7 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
                   </div>
                </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
                 <button onClick={() => setIsVoiceOpen(true)} className="flex items-center gap-2 bg-[#059669]/10 text-[#059669] px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-[#059669]/20 hover:bg-[#059669]/20 transition-all active:scale-95 group/voice">
                     <Mic size={16} className="group-hover:animate-pulse" /><span className="hidden md:inline">Advisor Live</span>
@@ -171,9 +172,9 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
        <div className="max-w-7xl mx-auto w-full px-4 -mt-4 z-30 relative">
           <div className="bg-[#1F2833]/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] p-1.5 shadow-2xl flex overflow-x-auto no-scrollbar gap-1.5 snap-x">
              {sortedTabs.map(tab => (
-               <button 
-                  key={tab.id} 
-                  onClick={() => setActiveTab(tab.id as any)} 
+               <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
                   className={`py-3.5 px-6 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap snap-center relative border border-transparent ${activeTab === tab.id ? 'bg-[#059669] text-slate-950 shadow-xl shadow-[#059669]/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
                >
                  {tab.icon} {tab.label}
@@ -185,12 +186,162 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
 
        <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 pt-10 pb-20 overflow-x-hidden relative">
           {activeTab === 'messages' && <div className="h-[80vh]"><MessageCenter contact={contact} onUpdateContact={onUpdateContact} currentUserRole="client" /></div>}
-          {activeTab === 'pulse' && <NexusPulse contact={contact} onOpenVoice={() => setIsVoiceOpen(true)} onUpdateContact={onUpdateContact} />}
-          {activeTab === 'tasks' && <ClientPortalDashboard contact={contact} onUpdateContact={onUpdateContact} />}
+          {activeTab === 'pulse' && (
+            <div className="space-y-8">
+              {isFunded ? (
+                <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
+                  <div className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Post-Funding Summary</div>
+                  <h3 className="text-2xl font-black tracking-tight text-slate-900 mt-2">Reserve-First Capital Stage</h3>
+                  {capitalReadiness.loading && !capitalReadiness.data ? (
+                    <p className="text-sm text-slate-500 mt-2 font-medium">Loading capital readiness...</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Readiness</div>
+                        <div className="text-xl font-black text-slate-900 mt-1">
+                          {capitalReadiness.data?.readiness.ready ? 'Complete' : 'In Progress'}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Reserve Confirmed</div>
+                        <div className="text-xl font-black text-slate-900 mt-1">
+                          {capitalReadiness.data?.readiness.reserve_guidance.reserve_confirmed ? 'Yes' : 'No'}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Selected Path</div>
+                        <div className="text-xl font-black text-slate-900 mt-1">
+                          {(capitalReadiness.data?.allocation.selected_path || 'not_selected').replace(/_/g, ' ')}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-3 mt-5">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('capitalProtection')}
+                      className="rounded-xl bg-slate-900 text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest"
+                    >
+                      Open Capital Protection
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('capitalAllocation')}
+                      disabled={!capitalReadiness.data?.readiness.ready}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-40"
+                    >
+                      Open Capital Allocation
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              <NexusPulse contact={contact} onOpenVoice={() => setIsVoiceOpen(true)} onUpdateContact={onUpdateContact} />
+            </div>
+          )}
+          {activeTab === 'tasks' && (
+            <div className="space-y-8">
+              {isFunded ? (
+                <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
+                  <div className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Capital Tasks</div>
+                  <h3 className="text-2xl font-black tracking-tight text-slate-900 mt-2">Post-Funding Next Steps</h3>
+                  <div className="mt-3 space-y-2">
+                    {(capitalReadiness.data?.readiness.recommended_next_steps || []).slice(0, 4).map((step) => (
+                      <div key={step} className="text-sm text-slate-700 font-medium flex items-start gap-2">
+                        <AlertTriangle size={14} className="mt-0.5 text-amber-500" />
+                        <span>{step}</span>
+                      </div>
+                    ))}
+                    {!capitalReadiness.data?.readiness.recommended_next_steps?.length ? (
+                      <div className="text-sm text-emerald-700 font-medium">Capital tasks are clear right now.</div>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-3 mt-5">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('capitalProtection')}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                    >
+                      Capital Protection
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('capitalAllocation')}
+                      disabled={!capitalReadiness.data?.readiness.ready}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-40"
+                    >
+                      Capital Allocation
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              <ClientPortalDashboard contact={contact} onUpdateContact={onUpdateContact} />
+            </div>
+          )}
           {activeTab === 'fundability' && <FundabilityDashboard contact={contact} />}
+          {activeTab === 'capitalProtection' && (
+            <CapitalProtectionPanel
+              contact={contact}
+              onOpenAllocation={() => setActiveTab('capitalAllocation')}
+            />
+          )}
+          {activeTab === 'capitalAllocation' && (
+            <CapitalAllocationPanel
+              contact={contact}
+              onOpenProtection={() => setActiveTab('capitalProtection')}
+              onOpenSimulator={() => setActiveTab('simulator')}
+              onOpenTrading={() => setActiveTab('invest')}
+            />
+          )}
           {activeTab === 'simulator' && <CapitalAllocationSimulator contact={contact} />}
           {activeTab === 'roadmap' && (
               <div className="max-w-4xl mx-auto space-y-12 animate-fade-in py-10">
+                  {isFunded ? (
+                    <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
+                      <div className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Funding Complete Handoff</div>
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight mt-2">Next: Capital Protection</h3>
+                      <p className="text-sm text-slate-500 font-medium mt-2">
+                        Transition from funding outcomes into reserve-first setup and controlled allocation.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Reserve Confirmed</div>
+                          <div className="text-xl font-black text-slate-900 mt-1">
+                            {capitalReadiness.data?.readiness.reserve_guidance.reserve_confirmed ? 'Yes' : 'No'}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Capital Readiness</div>
+                          <div className="text-xl font-black text-slate-900 mt-1">
+                            {capitalReadiness.data?.readiness.ready ? 'Complete' : 'In Progress'}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Selected Path</div>
+                          <div className="text-xl font-black text-slate-900 mt-1">
+                            {(capitalReadiness.data?.allocation.selected_path || 'not_selected').replace(/_/g, ' ')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-3 mt-5">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('capitalProtection')}
+                          className="rounded-xl bg-slate-900 text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest"
+                        >
+                          Open Capital Protection
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('capitalAllocation')}
+                          disabled={!capitalReadiness.data?.readiness.ready}
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-40"
+                        >
+                          Open Capital Allocation
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="text-center">
                     <h2 className="text-4xl font-black uppercase tracking-tighter text-white mb-4">Protocol Maturity</h2>
                     <p className="text-slate-400 max-w-xl mx-auto font-medium">Your shortest path to institutional liquidity.</p>
@@ -221,11 +372,10 @@ const PortalView: React.FC<PortalViewProps> = ({ contact, onUpdateContact, brand
           {activeTab === 'invest' && <InvestmentLab contact={contact} onUpdateContact={onUpdateContact} />}
           {activeTab === 'partner' && <ReferralHub contact={contact} />}
        </div>
-       
+
        <VoiceConcierge isOpen={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} context={{ name: contact.name, company: contact.company, bankability: contact.aiScore || 65 }} />
     </div>
   );
 };
-
 
 export default PortalView;
