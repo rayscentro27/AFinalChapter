@@ -27,6 +27,9 @@ import {
   listApprovedStrategies,
 } from '../services/approvedStrategyService';
 import { ApprovedSignalSummary, listApprovedSignals } from '../services/approvedSignalService';
+import PaperTradeJournalSection from './tradingJournal/PaperTradeJournalSection';
+import usePaperTradingJournal from '../hooks/usePaperTradingJournal';
+import { PaperTradePracticeContext } from '../services/paperTradingJournalService';
 
 interface InvestmentLabProps {
   contact: Contact;
@@ -46,8 +49,11 @@ const InvestmentLab: React.FC<InvestmentLabProps> = ({ contact }) => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const tradingAccess = useTradingAccess(contact.id, { reconcileOnFetch: true });
+  const [practiceContext, setPracticeContext] = useState<Partial<PaperTradePracticeContext> | null>(null);
 
   const unlocked = Boolean(tradingAccess.snapshot?.access_ready);
+  const journalScopeId = tradingAccess.snapshot?.tenant_id || contact.id;
+  const journalTracker = usePaperTradingJournal(journalScopeId, unlocked);
   const approvedCount = approvedStrategies.length;
   const signalCount = approvedSignals.length;
   const optionsCount = approvedStrategies.filter((strategy) => strategy.assetType === 'options').length;
@@ -108,6 +114,7 @@ const InvestmentLab: React.FC<InvestmentLabProps> = ({ contact }) => {
     setSelectedStrategyDetail(null);
     setDetailLoading(true);
     setDetailError(null);
+    journalTracker.markStrategyReviewed({ strategyId: strategy.id, title: strategy.title });
 
     try {
       const detail = await getApprovedStrategyDetail({
@@ -120,6 +127,35 @@ const InvestmentLab: React.FC<InvestmentLabProps> = ({ contact }) => {
     } finally {
       setDetailLoading(false);
     }
+  };
+
+  const openPracticeFromStrategy = (strategy: ApprovedStrategySummary) => {
+    setPracticeContext({
+      sourceType: 'strategy',
+      sourceId: strategy.id,
+      sourceTitle: strategy.title,
+      marketSymbol: strategy.symbolLabel,
+      marketType: strategy.assetType === 'options' ? 'options' : 'forex',
+      strategyUsed: strategy.title,
+      setupSummary: `${strategy.symbolLabel} • ${strategy.timeframeLabel}`,
+      rationale: strategy.educationalFocus,
+      timeframeLabel: strategy.timeframeLabel,
+    });
+  };
+
+  const openPracticeFromSignal = (signal: ApprovedSignalSummary) => {
+    setPracticeContext({
+      sourceType: 'signal',
+      sourceId: signal.id,
+      sourceTitle: signal.title,
+      marketSymbol: signal.symbolLabel,
+      marketType: signal.assetType === 'options' ? 'options' : 'forex',
+      strategyUsed: signal.title,
+      setupSummary: `${signal.symbolLabel} • ${signal.timeframeLabel} • ${signal.sideLabel}`,
+      rationale: signal.rationale,
+      timeframeLabel: signal.timeframeLabel,
+      sideLabel: signal.sideLabel,
+    });
   };
 
   return (
@@ -214,6 +250,12 @@ const InvestmentLab: React.FC<InvestmentLabProps> = ({ contact }) => {
               Access unlocked. This library now pulls approved Oracle-backed educational strategies only. Keep simulation-first discipline before applying live capital.
             </div>
           </div>
+
+          <PaperTradeJournalSection
+            journal={journalTracker}
+            practiceContext={practiceContext}
+            onConsumePracticeContext={() => setPracticeContext(null)}
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
             <div className="lg:col-span-4 space-y-8">
@@ -368,6 +410,12 @@ const InvestmentLab: React.FC<InvestmentLabProps> = ({ contact }) => {
                           >
                             {isSelected ? 'Hide Educational Brief' : 'View Educational Brief'} <ArrowRight size={14} />
                           </button>
+                          <button
+                            onClick={() => openPracticeFromStrategy(strat)}
+                            className={`${fintechSecondaryButton} mt-3 w-full rounded-2xl flex items-center justify-center gap-2`}
+                          >
+                            Practice This Strategy <ArrowRight size={14} />
+                          </button>
                         </div>
                       </div>
 
@@ -488,6 +536,12 @@ const InvestmentLab: React.FC<InvestmentLabProps> = ({ contact }) => {
                             className={`${isSelected ? fintechSecondaryButton : fintechPrimaryButton} w-full md:w-auto flex items-center justify-center gap-2`}
                           >
                             {isSelected ? 'Hide Signal Context' : 'View Signal Context'} <ArrowRight size={14} />
+                          </button>
+                          <button
+                            onClick={() => openPracticeFromSignal(signal)}
+                            className={`${fintechSecondaryButton} w-full md:w-auto flex items-center justify-center gap-2`}
+                          >
+                            Practice This Setup <ArrowRight size={14} />
                           </button>
                           {isSelected ? (
                             <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-5">
