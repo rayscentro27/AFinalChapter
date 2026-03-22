@@ -170,6 +170,16 @@ export interface Message {
   content: string;
   timestamp: string;
   read: boolean;
+  createdAt?: string;
+  threadId?: string;
+  messageType?: 'reminder' | 'follow_up' | 'system_prompt' | 'ai_guidance' | 'task_nudge' | 'system_update' | 'approval_needed' | 'status_change';
+  relatedTaskId?: string;
+  relatedStage?: string;
+  relatedClientId?: string;
+  priority?: 'normal' | 'high' | 'urgent';
+  createdBy?: 'system' | 'ai_employee' | 'user' | 'admin';
+  destination?: string;
+  internalOnly?: boolean;
   actionRequired?: any;
   deliveryStatus?: string;
   provider?: string;
@@ -351,7 +361,10 @@ export enum ViewMode {
   ADMIN_FUNNEL_SEQUENCES = 'ADMIN_FUNNEL_SEQUENCES',
   ADMIN_FUNNEL_LEADS = 'ADMIN_FUNNEL_LEADS',
   ADMIN_FUNNEL_METRICS = 'ADMIN_FUNNEL_METRICS',
+  ADMIN_EXECUTIVE_DASHBOARD = 'ADMIN_EXECUTIVE_DASHBOARD',
+  ADMIN_LIFECYCLE_AUTOMATION = 'ADMIN_LIFECYCLE_AUTOMATION',
   ADMIN_FUNDING_CATALOG = 'ADMIN_FUNDING_CATALOG',
+  ADMIN_REVIEW_ANALYTICS = 'ADMIN_REVIEW_ANALYTICS',
   ADMIN_RESEARCH_APPROVALS = 'ADMIN_RESEARCH_APPROVALS',
   ADMIN_GRANTS_CATALOG = 'ADMIN_GRANTS_CATALOG',
   ADMIN_GRANTS_TRACKING = 'ADMIN_GRANTS_TRACKING',
