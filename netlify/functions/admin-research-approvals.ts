@@ -41,9 +41,9 @@ export const handler: Handler = async (event) => {
     const tenant_id = parsed.tenant_id;
 
     const [strategyRes, optionsRes, signalsRes, queueRes, riskRes, replayRes, healthRes] = await Promise.all([
-      proxyToOracle({ path: '/api/research/strategy-rankings', method: 'GET', query: { tenant_id, limit }, forwardAuth: true, event }),
-      proxyToOracle({ path: '/api/research/options-rankings', method: 'GET', query: { tenant_id, limit }, forwardAuth: true, event }),
-      proxyToOracle({ path: '/api/research/approved-signals', method: 'GET', query: { tenant_id, limit }, forwardAuth: true, event }),
+      proxyToOracle({ path: '/api/internal/review/strategies', method: 'GET', query: { tenant_id, limit, approval_status: 'approved' }, forwardAuth: true, event }),
+      proxyToOracle({ path: '/api/internal/review/options', method: 'GET', query: { tenant_id, limit, approval_status: 'approved' }, forwardAuth: true, event }),
+      proxyToOracle({ path: '/api/internal/review/signals', method: 'GET', query: { tenant_id, limit, approval_status: 'approved' }, forwardAuth: true, event }),
       proxyToOracle({ path: '/api/research/approval-queue', method: 'GET', query: { tenant_id, limit }, forwardAuth: true, event }),
       proxyToOracle({ path: '/api/research/risk-decisions', method: 'GET', query: { tenant_id, limit }, forwardAuth: true, event }),
       proxyToOracle({ path: '/api/research/recent-replay-results', method: 'GET', query: { tenant_id, limit }, forwardAuth: true, event }),
@@ -55,8 +55,8 @@ export const handler: Handler = async (event) => {
       return json(failures.status, failures.json || { ok: false, error: 'admin_research_approvals_failed' });
     }
 
-    const strategies = onlyApproved(((strategyRes.json || {}) as OracleListResponse).items);
-    const options = onlyApproved(((optionsRes.json || {}) as OracleListResponse).items);
+    const strategies = Array.isArray(((strategyRes.json || {}) as OracleListResponse).items) ? ((strategyRes.json || {}) as OracleListResponse).items : [];
+    const options = Array.isArray(((optionsRes.json || {}) as OracleListResponse).items) ? ((optionsRes.json || {}) as OracleListResponse).items : [];
     const signals = Array.isArray(((signalsRes.json || {}) as OracleListResponse).items) ? ((signalsRes.json || {}) as OracleListResponse).items : [];
     const queue = Array.isArray(((queueRes.json || {}) as OracleListResponse).items) ? ((queueRes.json || {}) as OracleListResponse).items : [];
     const risk = Array.isArray(((riskRes.json || {}) as OracleListResponse).items) ? ((riskRes.json || {}) as OracleListResponse).items : [];

@@ -62,6 +62,9 @@ const NeuralStrategySandbox = lazy(() => import('./components/NeuralStrategySand
 
 const FundingResearchPage = lazy(() => import('./src/pages/FundingResearchPage'));
 const ResearchDashboardPage = lazy(() => import('./src/pages/ResearchDashboardPage'));
+const AdminExecutiveDashboardPage = lazy(() => import('./src/pages/AdminExecutiveDashboardPage'));
+const LifecycleAutomationPage = lazy(() => import('./src/pages/LifecycleAutomationPage'));
+const AdminReviewAnalyticsPage = lazy(() => import('./src/pages/AdminReviewAnalyticsPage'));
 const AdminResearchApprovalsPage = lazy(() => import('./src/pages/AdminResearchApprovalsPage'));
 const AdminFundingCatalogPage = lazy(() => import('./src/pages/AdminFundingCatalogPage'));
 const GrantsPage = lazy(() => import('./src/pages/GrantsPage'));
@@ -157,7 +160,11 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/sba': ViewMode.SBA_PREP,
   '/funding/research': ViewMode.FUNDING_RESEARCH,
   '/research': ViewMode.RESEARCH_DASHBOARD,
+  '/admin/executive-dashboard': ViewMode.ADMIN_EXECUTIVE_DASHBOARD,
+  '/admin/lifecycle-automation': ViewMode.ADMIN_LIFECYCLE_AUTOMATION,
+  '/admin/review-analytics': ViewMode.ADMIN_REVIEW_ANALYTICS,
   '/admin/research-approvals': ViewMode.ADMIN_RESEARCH_APPROVALS,
+  '/admin/content-review': ViewMode.ADMIN_RESEARCH_APPROVALS,
   '/funding/outcomes': ViewMode.FUNDING_OUTCOMES,
   '/billing/commissions': ViewMode.BILLING_COMMISSIONS,
   '/grants': ViewMode.GRANTS,
@@ -669,6 +676,9 @@ export const App = () => {
                     case ViewMode.FUNDING_FLOW: return renderTierGate(ViewMode.FUNDING_FLOW, <PGFundingFlow />);
                     case ViewMode.FUNDING_RESEARCH: return renderTierGate(ViewMode.FUNDING_RESEARCH, <FundingResearchPage />);
                     case ViewMode.RESEARCH_DASHBOARD: return <ResearchDashboardPage />;
+                    case ViewMode.ADMIN_EXECUTIVE_DASHBOARD: return <AdminExecutiveDashboardPage />;
+                    case ViewMode.ADMIN_LIFECYCLE_AUTOMATION: return <LifecycleAutomationPage />;
+                    case ViewMode.ADMIN_REVIEW_ANALYTICS: return <AdminReviewAnalyticsPage />;
                     case ViewMode.ADMIN_RESEARCH_APPROVALS: return <AdminResearchApprovalsPage />;
                     case ViewMode.FUNDING_OUTCOMES: return renderTierGate(ViewMode.FUNDING_OUTCOMES, <FundingOutcomesPage />);
                     case ViewMode.BILLING_COMMISSIONS: return renderTierGate(ViewMode.BILLING_COMMISSIONS, <BillingCommissionsPage />);

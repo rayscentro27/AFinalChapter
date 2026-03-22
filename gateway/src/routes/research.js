@@ -36,6 +36,247 @@ function normalizeApprovalDecision(value) {
   return null;
 }
 
+const STRATEGY_REVIEW_SELECT = 'id,tenant_id,strategy_id,asset_type,symbol,timeframe,trades_total,win_rate,profit_factor,net_pnl,max_drawdown,sharpe,confidence_band,status,decision,approval_status,is_published,published_at,expires_at,expired_at,created_at,updated_at,rank';
+const OPTIONS_REVIEW_SELECT = 'id,tenant_id,strategy_id,asset_type,symbol,underlying_symbol,structure_type,trades_total,win_rate,profit_factor,net_pnl,max_drawdown,sharpe,confidence_band,status,decision,approval_status,is_published,published_at,expires_at,expired_at,created_at,updated_at,rank';
+const SIGNAL_REVIEW_SELECT = 'id,tenant_id,proposal_key,strategy_id,asset_type,symbol,timeframe,side,confidence,confidence_band,status,decision,approval_status,summary,rationale,source_trace_id,meta,is_published,published_at,expires_at,expired_at,created_at,updated_at';
+const STRATEGY_MUTATION_SELECT = 'id,tenant_id,strategy_id,asset_type,symbol,timeframe,approval_status,status,is_published,published_at,expires_at,expired_at,created_at,updated_at,meta';
+const OPTIONS_MUTATION_SELECT = 'id,tenant_id,strategy_id,asset_type,symbol,underlying_symbol,structure_type,approval_status,status,is_published,published_at,expires_at,expired_at,created_at,updated_at,meta';
+const SIGNAL_MUTATION_SELECT = 'id,tenant_id,proposal_key,strategy_id,asset_type,symbol,timeframe,side,approval_status,status,summary,rationale,is_published,published_at,expires_at,expired_at,created_at,updated_at,meta';
+
+function normalizeNotes(value) {
+  return asText(value).slice(0, 500);
+}
+
+function isApproved(row) {
+  return asText(row?.approval_status).toLowerCase() === 'approved';
+}
+
+function isPublished(row) {
+  return row?.is_published === true;
+}
+
+function isExpired(row) {
+  if (toIsoStringOrNull(row?.expired_at)) return true;
+  const expiresAt = toIsoStringOrNull(row?.expires_at);
+  if (!expiresAt) return false;
+  return new Date(expiresAt).getTime() <= Date.now();
+}
+
+function applyPortalLifecycleFilter(query) {
+  const now = new Date().toISOString();
+  return query
+    .eq('approval_status', 'approved')
+    .eq('is_published', true)
+    .or(`expires_at.is.null,expires_at.gt.${now}`);
+}
+
+function summarizeLifecycleRow(recordRef, row) {
+  return {
+    id: asText(row?.id),
+    tenant_id: asText(row?.tenant_id),
+    target_type: recordRef.targetType,
+    source_table: recordRef.table,
+    strategy_id: asText(row?.strategy_id) || null,
+    asset_type: asText(row?.asset_type) || null,
+    symbol: asText(row?.symbol || row?.underlying_symbol) || null,
+    approval_status: asText(row?.approval_status) || null,
+    status: asText(row?.status) || null,
+    is_published: Boolean(row?.is_published),
+    published: Boolean(row?.is_published),
+    published_at: toIsoStringOrNull(row?.published_at),
+    expires_at: toIsoStringOrNull(row?.expires_at),
+    expired_at: toIsoStringOrNull(row?.expired_at),
+    expired: isExpired(row),
+    updated_at: toIsoStringOrNull(row?.updated_at || row?.created_at),
+    created_at: toIsoStringOrNull(row?.created_at),
+  };
+}
+
+function lifecycleError(statusCode, error, reason, details = {}) {
+  return {
+    statusCode,
+    payload: {
+      ok: false,
+      error,
+      reason,
+      details,
+    },
+  };
+}
+
+function getMissingPublishFields(recordRef, row) {
+  const missing = [];
+
+  if (!asText(row?.strategy_id)) missing.push('strategy_id');
+
+  if (recordRef.targetType === 'signal') {
+    if (!asText(row?.symbol)) missing.push('symbol');
+    if (!asText(row?.timeframe)) missing.push('timeframe');
+    if (!asText(row?.side)) missing.push('side');
+    if (!asText(row?.summary)) missing.push('summary');
+    if (!asText(row?.rationale)) missing.push('rationale');
+    return missing;
+  }
+
+  if (recordRef.table === 'options_strategy_performance') {
+    if (!asText(row?.underlying_symbol || row?.symbol)) missing.push('underlying_symbol');
+    if (!asText(row?.structure_type)) missing.push('structure_type');
+    return missing;
+  }
+
+  if (!asText(row?.symbol)) missing.push('symbol');
+  if (!asText(row?.timeframe)) missing.push('timeframe');
+  return missing;
+}
+
+function validateLifecycleAction(recordRef, row, action) {
+  if (!isApproved(row)) {
+    return lifecycleError(409, 'review_item_not_eligible', 'review_not_approved', {
+      target_type: recordRef.targetType,
+      approval_status: asText(row?.approval_status) || null,
+    });
+  }
+
+  if (action === 'publish') {
+    if (isExpired(row)) {
+      return lifecycleError(409, 'review_item_not_eligible', 'item_expired', {
+        target_type: recordRef.targetType,
+        expires_at: toIsoStringOrNull(row?.expires_at),
+        expired_at: toIsoStringOrNull(row?.expired_at),
+      });
+    }
+
+    if (isPublished(row)) {
+      return lifecycleError(409, 'review_item_not_eligible', 'already_published', {
+        target_type: recordRef.targetType,
+        published_at: toIsoStringOrNull(row?.published_at),
+      });
+    }
+
+    const missingFields = getMissingPublishFields(recordRef, row);
+    if (missingFields.length > 0) {
+      return lifecycleError(422, 'review_item_not_eligible', 'missing_required_fields', {
+        target_type: recordRef.targetType,
+        missing_fields: missingFields,
+      });
+    }
+
+    return null;
+  }
+
+  if (action === 'unpublish') {
+    if (!isPublished(row)) {
+      return lifecycleError(409, 'review_item_not_eligible', 'already_unpublished', {
+        target_type: recordRef.targetType,
+      });
+    }
+
+    return null;
+  }
+
+  if (action === 'expire') {
+    if (isExpired(row)) {
+      return lifecycleError(409, 'review_item_not_eligible', 'already_expired', {
+        target_type: recordRef.targetType,
+        expires_at: toIsoStringOrNull(row?.expires_at),
+        expired_at: toIsoStringOrNull(row?.expired_at),
+      });
+    }
+
+    return null;
+  }
+
+  return lifecycleError(400, 'invalid_lifecycle_action', 'unsupported_action', { action });
+}
+
+function buildLifecycleUpdate(row, action, notes, actor, now) {
+  const meta = row?.meta && typeof row.meta === 'object' ? row.meta : {};
+  const next = {
+    meta: {
+      ...meta,
+      last_lifecycle_action: action,
+      last_lifecycle_actor: actor || null,
+      last_lifecycle_at: now,
+      last_lifecycle_note: notes || null,
+    },
+  };
+
+  if (Object.prototype.hasOwnProperty.call(row || {}, 'updated_at')) {
+    next.updated_at = now;
+  }
+
+  if (action === 'publish') {
+    next.is_published = true;
+    next.published_at = toIsoStringOrNull(row?.published_at) || now;
+    next.expired_at = null;
+    return next;
+  }
+
+  if (action === 'unpublish') {
+    next.is_published = false;
+    return next;
+  }
+
+  next.is_published = false;
+  next.expires_at = now;
+  next.expired_at = now;
+  return next;
+}
+
+async function maybeLoadRecord(table, select, tenantId, id) {
+  const result = await supabaseAdmin
+    .from(table)
+    .select(select)
+    .eq('tenant_id', tenantId)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (result.error && !isMissingSchema(result.error)) {
+    throw new Error(`${table} lookup failed: ${result.error.message}`);
+  }
+
+  return result.data || null;
+}
+
+async function loadStrategyLifecycleRecord(tenantId, id) {
+  const strategyRow = await maybeLoadRecord('strategy_performance', STRATEGY_MUTATION_SELECT, tenantId, id);
+  if (strategyRow) {
+    return {
+      table: 'strategy_performance',
+      select: STRATEGY_MUTATION_SELECT,
+      targetType: 'strategy',
+      entityType: 'research_strategy',
+      row: strategyRow,
+    };
+  }
+
+  const optionsRow = await maybeLoadRecord('options_strategy_performance', OPTIONS_MUTATION_SELECT, tenantId, id);
+  if (optionsRow) {
+    return {
+      table: 'options_strategy_performance',
+      select: OPTIONS_MUTATION_SELECT,
+      targetType: 'strategy',
+      entityType: 'research_strategy',
+      row: optionsRow,
+    };
+  }
+
+  return null;
+}
+
+async function loadSignalLifecycleRecord(tenantId, id) {
+  const signalRow = await maybeLoadRecord('reviewed_signal_proposals', SIGNAL_MUTATION_SELECT, tenantId, id);
+  if (!signalRow) return null;
+
+  return {
+    table: 'reviewed_signal_proposals',
+    select: SIGNAL_MUTATION_SELECT,
+    targetType: 'signal',
+    entityType: 'research_signal',
+    row: signalRow,
+  };
+}
+
 function normalizeTenantId(req) {
   return asText(req.query?.tenant_id || req.params?.tenant_id || '');
 }
@@ -205,6 +446,7 @@ function buildReplayPerformance(rows) {
 export async function researchRoutes(fastify) {
   fastify.addHook('onRequest', requireApiKey);
   const agentRoleGuard = requireTenantRole({ supabaseAdmin, allowedRoles: ['owner', 'admin', 'agent'] });
+  const lifecycleMutationGuard = requireTenantRole({ supabaseAdmin, allowedRoles: ['owner', 'admin'] });
 
   fastify.get('/api/research/strategy-rankings', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
@@ -212,14 +454,14 @@ export async function researchRoutes(fastify) {
     const status = asText(req.query?.status);
     const symbol = asText(req.query?.symbol);
 
-    let query = applyTenantFilter(
+    let query = applyPortalLifecycleFilter(applyTenantFilter(
       supabaseAdmin
         .from('v_research_strategy_rankings')
-        .select('id,tenant_id,strategy_id,asset_type,symbol,timeframe,trades_total,win_rate,profit_factor,net_pnl,max_drawdown,sharpe,confidence_band,status,decision,approval_status,created_at,rank')
+        .select(STRATEGY_REVIEW_SELECT)
         .order('rank', { ascending: true })
         .limit(limit),
       tenantId
-    );
+    ));
 
     if (status) query = query.eq('status', status);
     if (symbol) query = query.eq('symbol', symbol);
@@ -236,14 +478,14 @@ export async function researchRoutes(fastify) {
     const status = asText(req.query?.status);
     const symbol = asText(req.query?.symbol);
 
-    let query = applyTenantFilter(
+    let query = applyPortalLifecycleFilter(applyTenantFilter(
       supabaseAdmin
         .from('v_research_options_rankings')
-        .select('id,tenant_id,strategy_id,asset_type,symbol,underlying_symbol,structure_type,trades_total,win_rate,profit_factor,net_pnl,max_drawdown,sharpe,confidence_band,status,decision,approval_status,created_at,rank')
+        .select(OPTIONS_REVIEW_SELECT)
         .order('rank', { ascending: true })
         .limit(limit),
       tenantId
-    );
+    ));
 
     if (status) query = query.eq('status', status);
     if (symbol) query = query.eq('symbol', symbol);
@@ -261,15 +503,14 @@ export async function researchRoutes(fastify) {
     const symbol = asText(req.query?.symbol);
     const strategyId = asText(req.query?.strategy_id);
 
-    let query = applyTenantFilter(
+    let query = applyPortalLifecycleFilter(applyTenantFilter(
       supabaseAdmin
         .from('reviewed_signal_proposals')
-        .select('id,tenant_id,proposal_key,strategy_id,asset_type,symbol,timeframe,side,confidence,confidence_band,status,decision,approval_status,summary,rationale,source_trace_id,meta,created_at,updated_at')
-        .eq('approval_status', 'approved')
+        .select(SIGNAL_REVIEW_SELECT)
         .order('created_at', { ascending: false })
         .limit(limit),
       tenantId
-    );
+    ));
 
     if (assetType) query = query.eq('asset_type', assetType);
     if (symbol) query = query.eq('symbol', symbol);
@@ -277,6 +518,90 @@ export async function researchRoutes(fastify) {
 
     const { data, error } = await query;
     if (error) return reply.code(500).send({ ok: false, error: summarizeQueryError(error, 'approved signals query failed') });
+
+    return reply.send({ ok: true, count: (data || []).length, items: data || [] });
+  });
+
+  fastify.get('/api/internal/review/strategies', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
+    const tenantId = normalizeTenantId(req);
+    const limit = normalizeLimit(req.query?.limit, 50, 200);
+    const approvalStatus = asText(req.query?.approval_status || 'approved');
+    const publishState = asText(req.query?.publish_state).toLowerCase();
+    const expirationState = asText(req.query?.expiration_state).toLowerCase();
+
+    let query = applyTenantFilter(
+      supabaseAdmin
+        .from('v_research_strategy_rankings')
+        .select(STRATEGY_REVIEW_SELECT)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      tenantId
+    );
+
+    if (approvalStatus) query = query.eq('approval_status', approvalStatus);
+    if (publishState === 'published') query = query.eq('is_published', true);
+    if (publishState === 'unpublished') query = query.eq('is_published', false);
+    if (expirationState === 'active') query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+    if (expirationState === 'expired') query = query.not('expires_at', 'is', null).lte('expires_at', new Date().toISOString());
+
+    const { data, error } = await query;
+    if (error) return reply.code(500).send({ ok: false, error: summarizeQueryError(error, 'internal strategy review query failed') });
+
+    return reply.send({ ok: true, count: (data || []).length, items: data || [] });
+  });
+
+  fastify.get('/api/internal/review/options', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
+    const tenantId = normalizeTenantId(req);
+    const limit = normalizeLimit(req.query?.limit, 50, 200);
+    const approvalStatus = asText(req.query?.approval_status || 'approved');
+    const publishState = asText(req.query?.publish_state).toLowerCase();
+    const expirationState = asText(req.query?.expiration_state).toLowerCase();
+
+    let query = applyTenantFilter(
+      supabaseAdmin
+        .from('v_research_options_rankings')
+        .select(OPTIONS_REVIEW_SELECT)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      tenantId
+    );
+
+    if (approvalStatus) query = query.eq('approval_status', approvalStatus);
+    if (publishState === 'published') query = query.eq('is_published', true);
+    if (publishState === 'unpublished') query = query.eq('is_published', false);
+    if (expirationState === 'active') query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+    if (expirationState === 'expired') query = query.not('expires_at', 'is', null).lte('expires_at', new Date().toISOString());
+
+    const { data, error } = await query;
+    if (error) return reply.code(500).send({ ok: false, error: summarizeQueryError(error, 'internal options review query failed') });
+
+    return reply.send({ ok: true, count: (data || []).length, items: data || [] });
+  });
+
+  fastify.get('/api/internal/review/signals', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
+    const tenantId = normalizeTenantId(req);
+    const limit = normalizeLimit(req.query?.limit, 50, 200);
+    const approvalStatus = asText(req.query?.approval_status || 'approved');
+    const publishState = asText(req.query?.publish_state).toLowerCase();
+    const expirationState = asText(req.query?.expiration_state).toLowerCase();
+
+    let query = applyTenantFilter(
+      supabaseAdmin
+        .from('reviewed_signal_proposals')
+        .select(SIGNAL_REVIEW_SELECT)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      tenantId
+    );
+
+    if (approvalStatus) query = query.eq('approval_status', approvalStatus);
+    if (publishState === 'published') query = query.eq('is_published', true);
+    if (publishState === 'unpublished') query = query.eq('is_published', false);
+    if (expirationState === 'active') query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+    if (expirationState === 'expired') query = query.not('expires_at', 'is', null).lte('expires_at', new Date().toISOString());
+
+    const { data, error } = await query;
+    if (error) return reply.code(500).send({ ok: false, error: summarizeQueryError(error, 'internal signal review query failed') });
 
     return reply.send({ ok: true, count: (data || []).length, items: data || [] });
   });
@@ -504,6 +829,99 @@ export async function researchRoutes(fastify) {
       return reply.code(500).send({ ok: false, error: String(error?.message || error) });
     }
   });
+
+  async function handleLifecycleMutation(req, reply, targetType, action) {
+    const tenantId = getTenantIdFromRequest(req);
+    const itemId = asText(req.params?.id);
+    const notes = normalizeNotes(req.body?.notes);
+
+    if (!tenantId || !itemId) {
+      return reply.code(400).send({ ok: false, error: 'missing_required_fields', reason: 'tenant_id_and_id_required' });
+    }
+
+    try {
+      const recordRef = targetType === 'signal'
+        ? await loadSignalLifecycleRecord(tenantId, itemId)
+        : await loadStrategyLifecycleRecord(tenantId, itemId);
+
+      if (!recordRef) {
+        return reply.code(404).send({ ok: false, error: 'review_item_not_found', reason: 'id_not_found', details: { id: itemId, target_type: targetType } });
+      }
+
+      const validationError = validateLifecycleAction(recordRef, recordRef.row, action);
+      if (validationError) {
+        return reply.code(validationError.statusCode).send(validationError.payload);
+      }
+
+      const actor = asText(req.user?.id) || null;
+      const now = new Date().toISOString();
+      const before = summarizeLifecycleRow(recordRef, recordRef.row);
+      const updates = buildLifecycleUpdate(recordRef.row, action, notes, actor, now);
+
+      const updateRes = await supabaseAdmin
+        .from(recordRef.table)
+        .update(updates)
+        .eq('tenant_id', tenantId)
+        .eq('id', itemId)
+        .select(recordRef.select)
+        .single();
+
+      if (updateRes.error) throw new Error(`${recordRef.table} lifecycle update failed: ${updateRes.error.message}`);
+
+      const after = summarizeLifecycleRow(recordRef, updateRes.data);
+
+      await logAudit({
+        tenant_id: tenantId,
+        actor_user_id: actor,
+        actor_type: 'user',
+        action: `research_review_${action}`,
+        entity_type: recordRef.entityType,
+        entity_id: itemId,
+        metadata: {
+          target_type: recordRef.targetType,
+          source_table: recordRef.table,
+          notes: notes || null,
+          before,
+          after,
+        },
+      }).catch(() => {});
+
+      return reply.send({ ok: true, action, item: after });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, item_id: itemId, action, target_type: targetType }, 'research lifecycle mutation failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
+  }
+
+  fastify.post('/api/internal/review/strategies/:id/publish', {
+    preHandler: [lifecycleMutationGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => handleLifecycleMutation(req, reply, 'strategy', 'publish'));
+
+  fastify.post('/api/internal/review/strategies/:id/unpublish', {
+    preHandler: [lifecycleMutationGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => handleLifecycleMutation(req, reply, 'strategy', 'unpublish'));
+
+  fastify.post('/api/internal/review/strategies/:id/expire', {
+    preHandler: [lifecycleMutationGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => handleLifecycleMutation(req, reply, 'strategy', 'expire'));
+
+  fastify.post('/api/internal/review/signals/:id/publish', {
+    preHandler: [lifecycleMutationGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => handleLifecycleMutation(req, reply, 'signal', 'publish'));
+
+  fastify.post('/api/internal/review/signals/:id/unpublish', {
+    preHandler: [lifecycleMutationGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => handleLifecycleMutation(req, reply, 'signal', 'unpublish'));
+
+  fastify.post('/api/internal/review/signals/:id/expire', {
+    preHandler: [lifecycleMutationGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => handleLifecycleMutation(req, reply, 'signal', 'expire'));
 
   fastify.get('/api/research/agent-scorecards', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
