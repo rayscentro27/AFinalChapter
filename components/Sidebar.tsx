@@ -152,7 +152,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <SidebarItem id={ViewMode.ADMIN_EMAIL_PROVIDERS} label="Email Providers" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_EMAIL_ROUTING} label="Email Routing" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_EMAIL_LOGS} label="Email Logs" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_RESEARCH_APPROVALS} label="Research Approvals" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_EXECUTIVE_DASHBOARD} label="Executive Dashboard" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_LIFECYCLE_AUTOMATION} label="Lifecycle Automation" icon={AlertCircle} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_REVIEW_ANALYTICS} label="Review Analytics" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_RESEARCH_APPROVALS} label="Content Review" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_FUNDING_CATALOG} label="Funding Catalog" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_GRANTS_CATALOG} label="Grants Catalog" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_GRANTS_TRACKING} label="Grants Tracking" icon={FileText} currentView={currentView} onViewChange={handleNav} />

@@ -9,6 +9,7 @@ interface CapitalAllocationPanelProps {
   onOpenProtection?: () => void;
   onOpenSimulator?: () => void;
   onOpenTrading?: () => void;
+  onOpenGrants?: () => void;
 }
 
 const pathMeta: Record<CapitalPath, { title: string; body: string; tone: string }> = {
@@ -24,8 +25,8 @@ const pathMeta: Record<CapitalPath, { title: string; body: string; tone: string 
   },
   grant_funding: {
     title: 'Grant Funding',
-    body: 'Secondary placeholder path. Not active in this phase.',
-    tone: 'border-slate-200 bg-slate-50 text-slate-600',
+    body: 'Optional post-funding path for grant research, prep, and submission tracking.',
+    tone: 'border-amber-200 bg-amber-50 text-amber-800',
   },
 };
 
@@ -36,6 +37,7 @@ const CapitalAllocationPanel: React.FC<CapitalAllocationPanelProps> = ({
   onOpenProtection,
   onOpenSimulator,
   onOpenTrading,
+  onOpenGrants,
 }) => {
   const { data, loading, saving, error, refresh, selectPath } = useCapitalAllocation(contact.id);
 
@@ -54,6 +56,12 @@ const CapitalAllocationPanel: React.FC<CapitalAllocationPanelProps> = ({
       return {
         title: 'Complete capital protection',
         body: 'Reserve confirmation and setup checklist must be completed before path selection.',
+      };
+    }
+    if (allocation?.selected_path === 'grant_funding') {
+      return {
+        title: 'Review grant pipeline',
+        body: 'Treat grants as an optional branch: verify fit, prepare evidence, and keep Business Growth as the primary execution path.',
       };
     }
     if (allocation?.selected_path !== 'business_growth') {
@@ -78,7 +86,7 @@ const CapitalAllocationPanel: React.FC<CapitalAllocationPanelProps> = ({
               <PieChart size={24} /> Capital Allocation
             </h2>
             <p className="text-sm text-slate-500 font-medium mt-2 max-w-2xl">
-              Business Growth is primary. Trading and grants remain locked placeholders in this phase.
+              Business Growth is primary. Grant Funding is an optional post-funding branch after reserve-first protection is complete. Trading remains educational and gated.
             </p>
           </div>
 
@@ -131,6 +139,7 @@ const CapitalAllocationPanel: React.FC<CapitalAllocationPanelProps> = ({
               const isLocked = option?.gated ?? true;
               const isSelected = allocation?.selected_path === path;
               const isPrimary = path === 'business_growth';
+              const isGrantPath = path === 'grant_funding';
 
               return (
                 <div key={path} className={`rounded-[2rem] border p-6 ${pathMeta[path].tone}`}>
@@ -158,6 +167,17 @@ const CapitalAllocationPanel: React.FC<CapitalAllocationPanelProps> = ({
                       className="mt-4 rounded-xl bg-slate-900 text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
                     >
                       {isSelected ? 'Business Growth Active' : saving ? 'Saving...' : 'Select Business Growth'}
+                    </button>
+                  ) : isGrantPath ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void selectPath('grant_funding');
+                      }}
+                      disabled={isLocked || isSelected || saving}
+                      className="mt-4 rounded-xl bg-slate-900 text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+                    >
+                      {isSelected ? 'Grant Funding Active' : saving ? 'Saving...' : 'Select Grant Funding'}
                     </button>
                   ) : (
                     <button
@@ -224,6 +244,17 @@ const CapitalAllocationPanel: React.FC<CapitalAllocationPanelProps> = ({
                   className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-40"
                 >
                   Open Trading Module
+                </button>
+              ) : null}
+
+              {onOpenGrants ? (
+                <button
+                  type="button"
+                  onClick={onOpenGrants}
+                  disabled={!readiness?.ready}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-40"
+                >
+                  Open Grants Workflow
                 </button>
               ) : null}
             </div>

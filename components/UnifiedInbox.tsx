@@ -1141,6 +1141,11 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                     <Bot size={10} /> Concierge Active
                   </div>
                 )}
+                {thread.lastMessage.internalOnly ? (
+                  <div className="mt-2 flex items-center gap-1.5 text-[8px] font-black text-blue-700 uppercase tracking-widest bg-blue-50 w-fit px-2 py-0.5 rounded-full border border-blue-100">
+                    <MessageSquare size={10} /> Internal Guidance
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -1231,7 +1236,15 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                   {msg.sender === 'bot' && (
                     <div className="flex items-center gap-1.5 text-[8px] font-black uppercase text-indigo-400 mb-3 border-b border-white/10 pb-2"><Bot size={12} /> Nexus Autonomous Proxy</div>
                   )}
+                  {(msg.messageType || msg.internalOnly) && msg.sender !== 'client' ? (
+                    <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-white/10 pb-2 text-[9px] font-black uppercase tracking-widest text-slate-300">
+                      <span>{msg.messageType ? String(msg.messageType).replace(/_/g, ' ') : 'system update'}</span>
+                      {msg.priority ? <span className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-white/90">{msg.priority}</span> : null}
+                      {msg.relatedStage ? <span className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-white/90">{String(msg.relatedStage).replace(/_/g, ' ')}</span> : null}
+                    </div>
+                  ) : null}
                   <p className="whitespace-pre-wrap">{msg.content}</p>
+                  {msg.actionRequired?.reason ? <p className="mt-3 text-xs text-white/70">Why this exists: {String(msg.actionRequired.reason)}</p> : null}
                   {Array.isArray(msg.attachments) && msg.attachments.length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {msg.attachments.map((attachment, index) => {
