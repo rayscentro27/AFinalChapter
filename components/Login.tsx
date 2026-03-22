@@ -146,14 +146,6 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
     setLoading(true);
     setError(null);
 
-    if (isSupabaseConfigured && !TURNSTILE_SITE_KEY) {
-      const msg = 'Captcha site key is missing. Set VITE_TURNSTILE_SITE_KEY in frontend env.';
-      setError(msg);
-      setNotify({ show: true, title: 'Auth Config Missing', message: msg, type: 'error' });
-      setLoading(false);
-      return;
-    }
-
     if (captchaEnabled && !captchaToken) {
       const msg = 'Complete captcha verification before signing in.';
       setError(msg);
@@ -178,14 +170,6 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
-
-    if (isSupabaseConfigured && !TURNSTILE_SITE_KEY) {
-      const msg = 'Captcha site key is missing. Set VITE_TURNSTILE_SITE_KEY in frontend env.';
-      setError(msg);
-      setNotify({ show: true, title: 'Auth Config Missing', message: msg, type: 'error' });
-      setLoading(false);
-      return;
-    }
 
     if (captchaEnabled && !captchaToken) {
       const msg = 'Complete captcha verification before continuing with Google.';
