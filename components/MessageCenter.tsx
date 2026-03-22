@@ -61,9 +61,10 @@ interface MessageCenterProps {
   contact: Contact;
   onUpdateContact?: (contact: Contact) => void;
   currentUserRole: 'admin' | 'client';
+  onNavigateToAction?: (target: string) => void;
 }
 
-const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact, currentUserRole }) => {
+const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact, currentUserRole, onNavigateToAction }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [isCorrecting, setIsCorrecting] = useState<string | null>(null);
@@ -150,6 +151,7 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
       senderName: currentUserRole === 'client' ? contact.name : 'Advisor',
       content: newMessage,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(),
       read: false
     };
     
@@ -172,6 +174,7 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
               senderName: 'Nexus Concierge',
               content: response.final_answer, 
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+              createdAt: new Date().toISOString(),
               read: false,
               actionRequired: {
                   tool_requests: response.tool_requests,
@@ -194,6 +197,7 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
                   senderName: 'Nexus Concierge',
                   content: response.text, 
                   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+                  createdAt: new Date().toISOString(),
                   read: false,
                   actionRequired: (response as any).action
               };
@@ -298,6 +302,13 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
                         isBot ? 'bg-white border-indigo-100 text-slate-700 rounded-bl-none shadow-indigo-100' : 
                         'bg-white border-slate-200 text-slate-800 rounded-bl-none'
                     }`}>
+                        {(msg.messageType || msg.sender === 'system') && !isMe ? (
+                          <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-slate-100 pb-2 text-[9px] font-black uppercase tracking-widest">
+                           <span className={`${isBot ? 'text-indigo-500' : 'text-slate-500'}`}>{msg.messageType ? String(msg.messageType).replace(/_/g, ' ') : 'system update'}</span>
+                           {msg.priority ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-600">{msg.priority}</span> : null}
+                           {msg.relatedStage ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-600">{String(msg.relatedStage).replace(/_/g, ' ')}</span> : null}
+                          </div>
+                        ) : null}
                        {isBot && currentUserRole === 'admin' && !isMe && (
                            <button 
                              onClick={() => setIsCorrecting(msg.id)}
@@ -308,6 +319,18 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
                            </button>
                        )}
                        <p className="font-medium whitespace-pre-wrap">{msg.content}</p>
+                       {msg.actionRequired?.reason ? <p className="mt-3 text-xs opacity-70">Why this exists: {String(msg.actionRequired.reason)}</p> : null}
+                       {onNavigateToAction && msg.destination ? (
+                         <div className="mt-3">
+                           <button
+                             type="button"
+                             onClick={() => onNavigateToAction(String(msg.destination))}
+                             className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                           >
+                             Open Related Step
+                           </button>
+                         </div>
+                       ) : null}
                        <div className={`text-[9px] mt-3 font-black uppercase opacity-40 flex items-center gap-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
                           {msg.timestamp} {isMe && <CheckCheck size={10} />}
                        </div>
