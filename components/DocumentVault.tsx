@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Contact, ClientDocument, FinancialSpreading, Activity, BusinessProfile } from '../types';
 import { Folder, FileText, Upload, CheckCircle, AlertCircle, Clock, Eye, Download, Shield, X, MoreVertical, Loader, BrainCircuit, ScanLine, Share2, MessageSquare, Send, Sparkles, AlertTriangle, Fingerprint, RefreshCw, Wand2, Info, Search } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
@@ -10,12 +10,26 @@ interface DocumentVaultProps {
   contact: Contact;
   readOnly?: boolean; 
   onUpdateContact?: (contact: Contact) => void;
+  defaultCategory?: DocumentVaultCategory;
+  uploadRequestId?: number;
+  uploadIntentLabel?: string;
 }
+
+export type DocumentVaultCategory = 'All' | ClientDocument['type'];
 
 const ALLOWED_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
 
-const DocumentVault: React.FC<DocumentVaultProps> = ({ contact, readOnly = false, onUpdateContact }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+const CATEGORY_FILTERS: DocumentVaultCategory[] = ['All', 'Credit', 'Financial', 'Legal', 'Identification', 'Contract', 'Receipt', 'Other'];
+
+const DocumentVault: React.FC<DocumentVaultProps> = ({
+  contact,
+  readOnly = false,
+  onUpdateContact,
+  defaultCategory = 'All',
+  uploadRequestId = 0,
+  uploadIntentLabel = '',
+}) => {
+  const [selectedCategory, setSelectedCategory] = useState<DocumentVaultCategory>(defaultCategory);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -27,6 +41,20 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ contact, readOnly = false
     { id: 'req_3', name: 'Driver\'s License (Front/Back)', type: 'Identification', status: 'Missing', required: true },
     { id: 'req_4', name: 'Bank Statements (Last 3 Months)', type: 'Financial', status: 'Missing', required: true },
   ];
+
+  const filteredDocuments = useMemo(
+    () => (selectedCategory === 'All' ? documents : documents.filter((document) => document.type === selectedCategory)),
+    [documents, selectedCategory]
+  );
+
+  useEffect(() => {
+    setSelectedCategory(defaultCategory);
+  }, [defaultCategory]);
+
+  useEffect(() => {
+    if (!uploadRequestId) return;
+    fileInputRef.current?.click();
+  }, [uploadRequestId]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, isAiScan: boolean = false) => {
     if (!event.target.files || event.target.files.length === 0 || !onUpdateContact) return;
@@ -137,8 +165,27 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ contact, readOnly = false
         </div>
       </div>
 
+      {uploadIntentLabel ? (
+        <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          Guided upload intent: <span className="font-black">{uploadIntentLabel}</span>. The vault is focused on <span className="font-black">{selectedCategory}</span> items for this upload.
+        </div>
+      ) : null}
+
+      <div className="mb-5 flex flex-wrap gap-2">
+        {CATEGORY_FILTERS.map((category) => (
+          <button
+            key={category}
+            type="button"
+            onClick={() => setSelectedCategory(category)}
+            className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] ${selectedCategory === category ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600'}`}
+          >
+            {category}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar p-1">
-        {documents.map((doc) => (
+        {filteredDocuments.map((doc) => (
           <div key={doc.id} className={`p-8 rounded-[2.5rem] border-2 transition-all flex flex-col relative group bg-white shadow-sm hover:shadow-xl ${doc.status === 'Verified' ? 'border-emerald-100 hover:border-emerald-300' : 'border-slate-100 hover:border-blue-300'}`}>
             
             {/* FORENSIC X-RAY OVERLAY */}

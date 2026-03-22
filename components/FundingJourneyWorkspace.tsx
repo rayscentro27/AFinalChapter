@@ -1,8 +1,9 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, Loader2, Lock, LogOut, RefreshCw, Sparkles } from 'lucide-react';
 import { AgencyBranding, Contact } from '../types';
 import MessageCenter from './MessageCenter';
 import DocumentVault from './DocumentVault';
+import ClientDocumentWorkspace from './documents/ClientDocumentWorkspace';
 import BusinessProfile from './BusinessProfile';
 import SubscriptionManager from './SubscriptionManager';
 import CapitalProtectionPanel from './CapitalProtectionPanel';
@@ -15,6 +16,11 @@ import useBusinessFoundation from '../hooks/useBusinessFoundation';
 import usePortalAI from '../hooks/usePortalAI';
 import useCapitalReadiness from '../hooks/useCapitalReadiness';
 import useTradingAccess from '../hooks/useTradingAccess';
+import useLifecycleReminders from '../hooks/useLifecycleReminders';
+import useInternalThreads from '../hooks/useInternalThreads';
+import useClientActivityFeed from '../hooks/useClientActivityFeed';
+import TaskLinkedMessageCard from './internalComms/TaskLinkedMessageCard';
+import DealTimelinePage from './timeline/DealTimelinePage';
 import {
   FundingDecisionStatus,
   getFundingHistory,
@@ -42,6 +48,7 @@ type PortalTab =
   | 'home'
   | 'fundingRoadmap'
   | 'actionCenter'
+  | 'activity'
   | 'messages'
   | 'documents'
   | 'account'
@@ -187,6 +194,20 @@ export default function FundingJourneyWorkspace(props: {
   const business = useBusinessFoundation(contact.id);
   const capital = useCapitalReadiness(contact.id, true);
   const trading = useTradingAccess(contact.id, { reconcileOnFetch: true });
+  const lifecycleReminders = useLifecycleReminders(contact.id, contact.company || contact.name);
+  const internalThreads = useInternalThreads(contact, lifecycleReminders.reminders);
+  const activityFeed = useClientActivityFeed({
+    contact,
+    currentStage: roadmap.data?.stage,
+    portalTasks: tasks.data,
+    fundingHistory: history,
+    business: business.data,
+    credit: credit.data,
+    capital: capital.data,
+    loadingStates: [roadmap.loading, tasks.loading, historyLoading, business.loading, credit.loading, capital.loading],
+    errorStates: [roadmap.error, tasks.error, historyError, business.error, credit.error, capital.error],
+    visibility: 'client',
+  });
 
   const fundingAI = usePortalAI(contact.id, 'funding_guide');
   const creditAI = usePortalAI(contact.id, 'credit_advisor');
@@ -213,10 +234,19 @@ export default function FundingJourneyWorkspace(props: {
     void fetchHistory();
   }, [fetchHistory]);
 
+  useEffect(() => {
+    if (!internalThreads.needsHistorySync) return;
+    onUpdateContact({
+      ...contact,
+      messageHistory: internalThreads.syncedHistory,
+    });
+  }, [contact, internalThreads.needsHistorySync, internalThreads.syncedHistory, onUpdateContact]);
+
   const navItems: Array<{ key: PortalTab; label: string }> = [
     { key: 'home', label: 'Home' },
     { key: 'fundingRoadmap', label: 'Funding Roadmap' },
     { key: 'actionCenter', label: 'Action Center' },
+    { key: 'activity', label: 'Activity' },
     { key: 'messages', label: 'Messages' },
     { key: 'documents', label: 'Documents' },
     { key: 'account', label: 'Account' },
@@ -294,6 +324,14 @@ export default function FundingJourneyWorkspace(props: {
     } finally {
       setApplySaving(false);
     }
+  }
+
+  function openReminderTarget(target: string) {
+    if (target === 'grants') {
+      window.location.hash = 'grants';
+      return;
+    }
+    setActiveTab(target as PortalTab);
   }
 
   return (
@@ -427,6 +465,20 @@ export default function FundingJourneyWorkspace(props: {
               )}
             </PrimaryCard>
 
+            <TaskLinkedMessageCard
+              messages={internalThreads.actionableMessages}
+              loading={lifecycleReminders.loading}
+              error={lifecycleReminders.error}
+              onOpenTarget={(message) => {
+                openReminderTarget(message.destination);
+                if (message.reminderId) lifecycleReminders.updateReminder(message.reminderId, 'mark_sent');
+              }}
+              onOpenThread={() => setActiveTab('messages')}
+              onDismiss={(message) => {
+                if (message.reminderId) lifecycleReminders.updateReminder(message.reminderId, 'dismiss');
+              }}
+            />
+
             <AssistantPanel
               title="Funding Guide"
               loading={fundingAI.loading}
@@ -461,56 +513,72 @@ export default function FundingJourneyWorkspace(props: {
               ) : tasks.error ? (
                 <p className="mt-4 text-sm font-medium text-red-600">{tasks.error}</p>
               ) : (
-                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="rounded-[1.75rem] border border-red-100 bg-red-50/85 p-4 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-red-600">Urgent</p>
-                    <div className="mt-3 space-y-2">
-                      {(tasks.data?.urgent || []).slice(0, 6).map((task: any) => (
-                        <button
-                          key={task.task_id || task.id}
-                          type="button"
-                          onClick={() => {
-                            const category = String(task.task_category || task.meta?.category || '');
-                            if (category.includes('credit')) setActiveTab('creditCenter');
-                            else if (category.includes('business')) setActiveTab('businessFoundation');
-                            else if (category.includes('capital')) setActiveTab('capitalProtection');
-                            else setActiveTab('fundingRoadmap');
-                          }}
-                          className="w-full rounded-xl border border-red-200 bg-white p-3 text-left"
-                        >
-                          <p className="text-xs font-black text-slate-900">{task.title}</p>
-                          <p className="mt-1 text-xs text-slate-600">{task.description}</p>
-                        </button>
-                      ))}
-                      {!(tasks.data?.urgent || []).length ? <p className="text-xs text-red-700">No urgent tasks.</p> : null}
-                    </div>
-                  </div>
+                <div className="mt-4 space-y-4">
+                  <TaskLinkedMessageCard
+                    messages={internalThreads.actionableMessages}
+                    loading={lifecycleReminders.loading}
+                    error={lifecycleReminders.error}
+                    onOpenTarget={(message) => {
+                      openReminderTarget(message.destination);
+                      if (message.reminderId) lifecycleReminders.updateReminder(message.reminderId, 'mark_sent');
+                    }}
+                    onOpenThread={() => setActiveTab('messages')}
+                    onDismiss={(message) => {
+                      if (message.reminderId) lifecycleReminders.updateReminder(message.reminderId, 'dismiss');
+                    }}
+                  />
 
-                  <div className="rounded-[1.75rem] border border-amber-100 bg-amber-50/85 p-4 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Recommended</p>
-                    <div className="mt-3 space-y-2">
-                      {(tasks.data?.recommended || []).slice(0, 6).map((task: any) => (
-                        <div key={task.task_id || task.id} className="rounded-xl border border-amber-200 bg-white p-3">
-                          <div className="flex items-center justify-between gap-2">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="rounded-[1.75rem] border border-red-100 bg-red-50/85 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-red-600">Urgent</p>
+                      <div className="mt-3 space-y-2">
+                        {(tasks.data?.urgent || []).slice(0, 6).map((task: any) => (
+                          <button
+                            key={task.task_id || task.id}
+                            type="button"
+                            onClick={() => {
+                              const category = String(task.task_category || task.meta?.category || '');
+                              if (category.includes('credit')) setActiveTab('creditCenter');
+                              else if (category.includes('business')) setActiveTab('businessFoundation');
+                              else if (category.includes('capital')) setActiveTab('capitalProtection');
+                              else setActiveTab('fundingRoadmap');
+                            }}
+                            className="w-full rounded-xl border border-red-200 bg-white p-3 text-left"
+                          >
                             <p className="text-xs font-black text-slate-900">{task.title}</p>
-                            <TaskPill status={String(task.priority || 'recommended')} />
-                          </div>
-                          <p className="mt-1 text-xs text-slate-600">{task.description}</p>
-                        </div>
-                      ))}
-                      {!(tasks.data?.recommended || []).length ? <p className="text-xs text-amber-700">No recommended tasks.</p> : null}
+                            <p className="mt-1 text-xs text-slate-600">{task.description}</p>
+                          </button>
+                        ))}
+                        {!(tasks.data?.urgent || []).length ? <p className="text-xs text-red-700">No urgent tasks.</p> : null}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="rounded-[1.75rem] border border-emerald-100 bg-emerald-50/85 p-4 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Completed</p>
-                    <div className="mt-3 space-y-2">
-                      {(tasks.data?.completed || []).slice(0, 6).map((task: any) => (
-                        <div key={task.task_id || task.id} className="rounded-xl border border-emerald-200 bg-white p-3">
-                          <p className="text-xs font-black text-slate-900">{task.title}</p>
-                        </div>
-                      ))}
-                      {!(tasks.data?.completed || []).length ? <p className="text-xs text-emerald-700">Nothing completed yet.</p> : null}
+                    <div className="rounded-[1.75rem] border border-amber-100 bg-amber-50/85 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Recommended</p>
+                      <div className="mt-3 space-y-2">
+                        {(tasks.data?.recommended || []).slice(0, 6).map((task: any) => (
+                          <div key={task.task_id || task.id} className="rounded-xl border border-amber-200 bg-white p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs font-black text-slate-900">{task.title}</p>
+                              <TaskPill status={String(task.priority || 'recommended')} />
+                            </div>
+                            <p className="mt-1 text-xs text-slate-600">{task.description}</p>
+                          </div>
+                        ))}
+                        {!(tasks.data?.recommended || []).length ? <p className="text-xs text-amber-700">No recommended tasks.</p> : null}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[1.75rem] border border-emerald-100 bg-emerald-50/85 p-4 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Completed</p>
+                      <div className="mt-3 space-y-2">
+                        {(tasks.data?.completed || []).slice(0, 6).map((task: any) => (
+                          <div key={task.task_id || task.id} className="rounded-xl border border-emerald-200 bg-white p-3">
+                            <p className="text-xs font-black text-slate-900">{task.title}</p>
+                          </div>
+                        ))}
+                        {!(tasks.data?.completed || []).length ? <p className="text-xs text-emerald-700">Nothing completed yet.</p> : null}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -850,6 +918,9 @@ export default function FundingJourneyWorkspace(props: {
             onOpenProtection={() => setActiveTab('capitalProtection')}
             onOpenSimulator={() => setActiveTab('capitalAllocation')}
             onOpenTrading={() => setActiveTab('tradingAccess')}
+            onOpenGrants={() => {
+              window.location.hash = 'GRANTS';
+            }}
           />
         ) : null}
 
@@ -927,14 +998,25 @@ export default function FundingJourneyWorkspace(props: {
 
         {activeTab === 'messages' ? (
           <div className={`${shellClass} h-[72vh] overflow-hidden p-2`}>
-            <MessageCenter contact={contact} onUpdateContact={onUpdateContact} currentUserRole="client" />
+            <MessageCenter contact={contact} onUpdateContact={onUpdateContact} currentUserRole="client" onNavigateToAction={(target) => openReminderTarget(target as PortalTab)} />
           </div>
         ) : null}
 
+        {activeTab === 'activity' ? (
+          <DealTimelinePage
+            currentStageLabel={activityFeed.currentStageLabel}
+            nextStepLabel={activityFeed.nextStepLabel}
+            events={activityFeed.events}
+            categories={activityFeed.availableCategories}
+            actors={activityFeed.availableActors}
+            loading={activityFeed.loading}
+            error={activityFeed.error}
+            onOpenDestination={(target) => openReminderTarget(target)}
+          />
+        ) : null}
+
         {activeTab === 'documents' ? (
-          <div className={`${shellClass} p-4`}>
-            <DocumentVault contact={contact} onUpdateContact={onUpdateContact} readOnly={true} />
-          </div>
+          <ClientDocumentWorkspace contact={contact} onUpdateContact={onUpdateContact} currentStage={roadmap.data?.stage} />
         ) : null}
 
         {activeTab === 'account' ? (
