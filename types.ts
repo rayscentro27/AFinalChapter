@@ -8,6 +8,67 @@ export { Type };
 export type MerchantPersona = 'Visionary Scaler' | 'Skeptical Veteran' | 'First-Time Founder' | 'Conservative Operator';
 export type SentimentLevel = 'Positive' | 'Neutral' | 'Agitated' | 'Critical';
 export type AiIntensity = 'Ghost' | 'Concierge' | 'Hunter';
+export type PortalExperienceTarget =
+  | 'home'
+  | 'fundingRoadmap'
+  | 'actionCenter'
+  | 'activity'
+  | 'messages'
+  | 'documents'
+  | 'account'
+  | 'creditCenter'
+  | 'businessFoundation'
+  | 'capitalProtection'
+  | 'capitalAllocation'
+  | 'tradingAccess'
+  | 'grants';
+
+export type ClientProfileType =
+  | 'startup_credit_builder'
+  | 'startup_funding_ready'
+  | 'established_credit_rebuild'
+  | 'established_funding_ready'
+  | 'established_growth_operator'
+  | 'post_funding_operator';
+
+export type BusinessMaturityBand = 'startup' | 'established';
+export type CreditProfileBand = 'high_credit' | 'building_credit' | 'low_credit' | 'unknown';
+export type FundingExperienceBand = 'early_stage' | 'funding_ready' | 'application_active' | 'post_funding';
+
+export interface ExperienceRecommendation {
+  id: string;
+  title: string;
+  body: string;
+  target: PortalExperienceTarget;
+}
+
+export interface ExperienceConfig {
+  profileType: ClientProfileType;
+  dimensions: {
+    businessMaturity: BusinessMaturityBand;
+    creditBand: CreditProfileBand;
+    readinessBand: FundingExperienceBand;
+  };
+  hero: {
+    eyebrow: string;
+    title: string;
+    subtitle: string;
+  };
+  messaging: {
+    toneLabel: string;
+    summary: string;
+  };
+  emphasis: {
+    primaryGoal: string;
+    statusLabel: string;
+    highlightedTargets: PortalExperienceTarget[];
+  };
+  taskPriority: {
+    targetOrder: PortalExperienceTarget[];
+    explanation: string;
+  };
+  recommendations: ExperienceRecommendation[];
+}
 
 export interface InboxRouting {
   tenant_id?: string;
@@ -115,6 +176,8 @@ export interface Contact {
   callReady?: boolean;
   feesWaived?: boolean;
   inboxRouting?: InboxRouting;
+  client_profile_type?: ClientProfileType;
+  experience_config?: ExperienceConfig;
 }
 
 export interface ClientTask {

@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, FileText, FolderOpen, Loader2, RefreshCw, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import useClientDocuments from '../../hooks/useClientDocuments';
-import { ClientDocument, ClientTask, Contact } from '../../types';
+import { ClientDocument, ClientTask, Contact, ExperienceConfig, PortalExperienceTarget } from '../../types';
 import {
   DocumentCategory,
   DocumentRow,
@@ -13,6 +13,7 @@ import DocumentVault, { DocumentVaultCategory } from '../DocumentVault';
 type Props = {
   contact: Contact;
   currentStage?: string | null;
+  experienceConfig?: ExperienceConfig;
   onUpdateContact: (contact: Contact) => void;
 };
 
@@ -42,6 +43,16 @@ const STAGE_LABELS: Record<string, string> = {
   funding_roadmap: 'Funding Readiness',
   application_loop: 'Application Loop',
   post_funding_capital: 'Post-Funding Capital',
+};
+
+const STAGE_TARGETS: Record<string, PortalExperienceTarget> = {
+  untracked: 'documents',
+  starting: 'documents',
+  credit_optimization: 'creditCenter',
+  business_foundation: 'businessFoundation',
+  funding_roadmap: 'fundingRoadmap',
+  application_loop: 'activity',
+  post_funding_capital: 'capitalProtection',
 };
 
 function prettyLabel(value: string) {
@@ -199,7 +210,7 @@ function documentTone(status: string) {
   return 'text-slate-600';
 }
 
-export default function ClientDocumentWorkspace({ contact, currentStage, onUpdateContact }: Props) {
+export default function ClientDocumentWorkspace({ contact, currentStage, experienceConfig, onUpdateContact }: Props) {
   const { user } = useAuth();
   const { documents, loading, error, refresh } = useClientDocuments(user?.id);
   const [uploadIntent, setUploadIntent] = useState<UploadIntent>({ id: 0, category: 'All', label: '' });
@@ -216,8 +227,18 @@ export default function ClientDocumentWorkspace({ contact, currentStage, onUpdat
       bucket.push(requirement);
       groups.set(requirement.stage, bucket);
     }
-    return Array.from(groups.entries());
-  }, [requirements]);
+    const targetOrder = experienceConfig?.taskPriority.targetOrder || [];
+    return Array.from(groups.entries()).sort(([leftStage], [rightStage]) => {
+      const leftTarget = STAGE_TARGETS[leftStage] || 'documents';
+      const rightTarget = STAGE_TARGETS[rightStage] || 'documents';
+      const leftRank = targetOrder.indexOf(leftTarget);
+      const rightRank = targetOrder.indexOf(rightTarget);
+      const normalizedLeft = leftRank === -1 ? targetOrder.length : leftRank;
+      const normalizedRight = rightRank === -1 ? targetOrder.length : rightRank;
+      if (normalizedLeft !== normalizedRight) return normalizedLeft - normalizedRight;
+      return (STAGE_LABELS[leftStage] || prettyLabel(leftStage)).localeCompare(STAGE_LABELS[rightStage] || prettyLabel(rightStage));
+    });
+  }, [experienceConfig, requirements]);
 
   const generatedDocuments = useMemo(
     () => documents.filter((document) => ['ai_artifact', 'finalized_letter'].includes(document.source_type)),
@@ -238,6 +259,20 @@ export default function ClientDocumentWorkspace({ contact, currentStage, onUpdat
     () => requirements.filter((requirement) => requirement.status !== 'ready').length,
     [requirements]
   );
+
+  const highlightedDocumentRecommendation = useMemo(
+    () => experienceConfig?.recommendations.find((recommendation) => recommendation.target === 'documents'),
+    [experienceConfig]
+  );
+
+  const orchestrationSummary = experienceConfig
+    ? `${experienceConfig.messaging.summary} Upload guidance is reordered to support ${experienceConfig.emphasis.primaryGoal.toLowerCase()}`
+    : 'Upload priorities stay tied to the current workflow, while generated and approved artifacts stay visible in one client-safe surface.';
+
+  const guidanceSummary = highlightedDocumentRecommendation?.body ||
+    (experienceConfig
+      ? `Current document guidance follows ${experienceConfig.messaging.toneLabel.toLowerCase()} priorities and the active portal experience.`
+      : 'Derived only from active task attachment requirements, then grouped by workflow stage.');
 
   async function openStoredDocument(document: DocumentRow) {
     if (!document.storage_path) return;
@@ -274,7 +309,7 @@ export default function ClientDocumentWorkspace({ contact, currentStage, onUpdat
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Document Orchestration</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Stage-aware upload and document workspace</h2>
             <p className="mt-2 max-w-3xl text-sm text-slate-500">
-              Upload priorities stay tied to the current workflow, while generated and approved artifacts stay visible in one client-safe surface.
+              {orchestrationSummary}
             </p>
           </div>
           <button
@@ -313,7 +348,7 @@ export default function ClientDocumentWorkspace({ contact, currentStage, onUpdat
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Missing-Document Guidance</p>
             <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">Task-linked upload priorities</h3>
-            <p className="mt-2 text-sm text-slate-500">Derived only from active task attachment requirements, then grouped by workflow stage.</p>
+            <p className="mt-2 text-sm text-slate-500">{guidanceSummary}</p>
           </div>
           <button
             type="button"
@@ -383,6 +418,14 @@ export default function ClientDocumentWorkspace({ contact, currentStage, onUpdat
           </div>
         )}
       </section>
+
+      {highlightedDocumentRecommendation ? (
+        <section className="rounded-[2rem] border border-blue-200 bg-blue-50 p-5 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-blue-600">Experience-Aligned Focus</p>
+          <h3 className="mt-2 text-lg font-black tracking-tight text-slate-900">{highlightedDocumentRecommendation.title}</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-700">{highlightedDocumentRecommendation.body}</p>
+        </section>
+      ) : null}
 
       <section ref={generatedRef} className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-start justify-between gap-4 flex-wrap">

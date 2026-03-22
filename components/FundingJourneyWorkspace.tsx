@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, Loader2, Lock, LogOut, RefreshCw, Sparkles } from 'lucide-react';
-import { AgencyBranding, Contact } from '../types';
+import { AgencyBranding, Contact, PortalExperienceTarget } from '../types';
 import MessageCenter from './MessageCenter';
-import DocumentVault from './DocumentVault';
 import ClientDocumentWorkspace from './documents/ClientDocumentWorkspace';
 import BusinessProfile from './BusinessProfile';
 import SubscriptionManager from './SubscriptionManager';
@@ -19,6 +18,7 @@ import useTradingAccess from '../hooks/useTradingAccess';
 import useLifecycleReminders from '../hooks/useLifecycleReminders';
 import useInternalThreads from '../hooks/useInternalThreads';
 import useClientActivityFeed from '../hooks/useClientActivityFeed';
+import useClientExperience from '../hooks/useClientExperience';
 import TaskLinkedMessageCard from './internalComms/TaskLinkedMessageCard';
 import DealTimelinePage from './timeline/DealTimelinePage';
 import {
@@ -26,6 +26,7 @@ import {
   getFundingHistory,
   logFundingApplyEvent,
 } from '../services/fundingFoundationService';
+import { formatClientProfileType } from '../services/clientExperienceService';
 import {
   fintechHero,
   fintechInput,
@@ -208,6 +209,15 @@ export default function FundingJourneyWorkspace(props: {
     errorStates: [roadmap.error, tasks.error, historyError, business.error, credit.error, capital.error],
     visibility: 'client',
   });
+  const experience = useClientExperience({
+    contact,
+    roadmap: roadmap.data,
+    tasks: tasks.data,
+    business: business.data,
+    credit: credit.data,
+    capital: capital.data,
+    isFunded,
+  });
 
   const fundingAI = usePortalAI(contact.id, 'funding_guide');
   const creditAI = usePortalAI(contact.id, 'credit_advisor');
@@ -263,10 +273,14 @@ export default function FundingJourneyWorkspace(props: {
         ]
       : []),
   ];
+  const orderedQuickItems = useMemo(
+    () => experience.sortTargets(quickItems, experience.experienceConfig),
+    [experience, quickItems]
+  );
 
   const activeLabel = [...navItems, ...quickItems].find((item) => item.key === activeTab)?.label || 'Home';
-  const topTaskTitle = tasks.data?.top_task?.title || 'Review your guided next step';
-  const topTaskType = tasks.data?.top_task?.type || 'workflow';
+  const topTaskTitle = tasks.data?.top_task?.title || experience.experienceConfig.emphasis.primaryGoal || 'Review your guided next step';
+  const topTaskType = tasks.data?.top_task?.type || experience.experienceConfig.emphasis.statusLabel || 'workflow';
   const stageLabel = (roadmap.data?.stage || 'starting').replace(/_/g, ' ');
 
   const currentPathSteps = useMemo(() => {
@@ -334,21 +348,26 @@ export default function FundingJourneyWorkspace(props: {
     setActiveTab(target as PortalTab);
   }
 
+  function openExperienceTarget(target: PortalExperienceTarget) {
+    openReminderTarget(target);
+  }
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)] text-slate-900">
       <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-4 py-4 md:px-8">
           <div className={`${fintechHero} flex items-start justify-between gap-4 flex-wrap px-5 py-5 md:px-6`}>
             <div className="space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">{branding.name || 'Nexus Portal'}</p>
-              <h1 className="text-2xl font-black tracking-tight text-slate-900">Funding-First Client Journey</h1>
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">{experience.experienceConfig.hero.eyebrow} · {branding.name || 'Nexus Portal'}</p>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900">{experience.experienceConfig.hero.title}</h1>
               <p className="max-w-2xl text-sm text-slate-600">
-                A calm capital-readiness workspace for funding, credit, business foundation, and post-funding planning.
+                {experience.experienceConfig.hero.subtitle}
               </p>
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Current View: {activeLabel}</span>
                 <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">Stage: {stageLabel}</span>
                 <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-700">Next Task: {topTaskType}</span>
+                <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-fuchsia-700">Profile: {formatClientProfileType(experience.experienceConfig.profileType)}</span>
               </div>
             </div>
 
@@ -386,15 +405,15 @@ export default function FundingJourneyWorkspace(props: {
             </div>
           </div>
 
-          {quickItems.length ? (
+          {orderedQuickItems.length ? (
             <div className="mt-4 rounded-[1.5rem] border border-slate-200 bg-white/85 p-4">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Specialized Workspaces</p>
-                  <p className="mt-1 text-sm text-slate-500">Open focused modules without crowding the main journey navigation.</p>
+                  <p className="mt-1 text-sm text-slate-500">Ordered by your current client profile so the highest-emphasis workspaces stay at the front.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {quickItems.map((item) => (
+                  {orderedQuickItems.map((item) => (
                     <button
                       key={item.key}
                       type="button"
@@ -465,6 +484,40 @@ export default function FundingJourneyWorkspace(props: {
               )}
             </PrimaryCard>
 
+            <section className={`${shellClass} p-5`}>
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Experience Mode</p>
+                  <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">{experience.experienceConfig.emphasis.primaryGoal}</h3>
+                  <p className="mt-2 max-w-3xl text-sm text-slate-600">{experience.experienceConfig.messaging.summary}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Messaging Tone</p>
+                  <p className="mt-1 text-sm font-black text-slate-900">{experience.experienceConfig.messaging.toneLabel}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Task Priority Model</p>
+                <p className="mt-2 text-sm text-slate-600">{experience.experienceConfig.taskPriority.explanation}</p>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                {experience.experienceConfig.recommendations.map((recommendation) => (
+                  <button
+                    key={recommendation.id}
+                    type="button"
+                    onClick={() => openExperienceTarget(recommendation.target)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left shadow-sm"
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Recommended Focus</p>
+                    <p className="mt-2 text-sm font-black text-slate-900">{recommendation.title}</p>
+                    <p className="mt-2 text-sm text-slate-600">{recommendation.body}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+
             <TaskLinkedMessageCard
               messages={internalThreads.actionableMessages}
               loading={lifecycleReminders.loading}
@@ -496,6 +549,12 @@ export default function FundingJourneyWorkspace(props: {
         {activeTab === 'actionCenter' ? (
           <>
             <PrimaryCard title="Action Center" subtitle="Task Brain">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Action Center Mode</p>
+                <p className="mt-2 text-sm font-black text-slate-900">{experience.experienceConfig.emphasis.statusLabel}</p>
+                <p className="mt-1 text-sm text-slate-600">{experience.experienceConfig.taskPriority.explanation}</p>
+              </div>
+
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -532,7 +591,7 @@ export default function FundingJourneyWorkspace(props: {
                     <div className="rounded-[1.75rem] border border-red-100 bg-red-50/85 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase tracking-widest text-red-600">Urgent</p>
                       <div className="mt-3 space-y-2">
-                        {(tasks.data?.urgent || []).slice(0, 6).map((task: any) => (
+                        {experience.sortedUrgent.slice(0, 6).map((task: any) => (
                           <button
                             key={task.task_id || task.id}
                             type="button"
@@ -549,14 +608,14 @@ export default function FundingJourneyWorkspace(props: {
                             <p className="mt-1 text-xs text-slate-600">{task.description}</p>
                           </button>
                         ))}
-                        {!(tasks.data?.urgent || []).length ? <p className="text-xs text-red-700">No urgent tasks.</p> : null}
+                        {!experience.sortedUrgent.length ? <p className="text-xs text-red-700">No urgent tasks.</p> : null}
                       </div>
                     </div>
 
                     <div className="rounded-[1.75rem] border border-amber-100 bg-amber-50/85 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Recommended</p>
                       <div className="mt-3 space-y-2">
-                        {(tasks.data?.recommended || []).slice(0, 6).map((task: any) => (
+                        {experience.sortedRecommended.slice(0, 6).map((task: any) => (
                           <div key={task.task_id || task.id} className="rounded-xl border border-amber-200 bg-white p-3">
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-xs font-black text-slate-900">{task.title}</p>
@@ -565,19 +624,19 @@ export default function FundingJourneyWorkspace(props: {
                             <p className="mt-1 text-xs text-slate-600">{task.description}</p>
                           </div>
                         ))}
-                        {!(tasks.data?.recommended || []).length ? <p className="text-xs text-amber-700">No recommended tasks.</p> : null}
+                        {!experience.sortedRecommended.length ? <p className="text-xs text-amber-700">No recommended tasks.</p> : null}
                       </div>
                     </div>
 
                     <div className="rounded-[1.75rem] border border-emerald-100 bg-emerald-50/85 p-4 shadow-sm">
                       <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Completed</p>
                       <div className="mt-3 space-y-2">
-                        {(tasks.data?.completed || []).slice(0, 6).map((task: any) => (
+                        {experience.sortedCompleted.slice(0, 6).map((task: any) => (
                           <div key={task.task_id || task.id} className="rounded-xl border border-emerald-200 bg-white p-3">
                             <p className="text-xs font-black text-slate-900">{task.title}</p>
                           </div>
                         ))}
-                        {!(tasks.data?.completed || []).length ? <p className="text-xs text-emerald-700">Nothing completed yet.</p> : null}
+                        {!experience.sortedCompleted.length ? <p className="text-xs text-emerald-700">Nothing completed yet.</p> : null}
                       </div>
                     </div>
                   </div>
@@ -998,7 +1057,7 @@ export default function FundingJourneyWorkspace(props: {
 
         {activeTab === 'messages' ? (
           <div className={`${shellClass} h-[72vh] overflow-hidden p-2`}>
-            <MessageCenter contact={contact} onUpdateContact={onUpdateContact} currentUserRole="client" onNavigateToAction={(target) => openReminderTarget(target as PortalTab)} />
+            <MessageCenter contact={contact} onUpdateContact={onUpdateContact} currentUserRole="client" onNavigateToAction={(target) => openReminderTarget(target as PortalTab)} experienceConfig={experience.experienceConfig} />
           </div>
         ) : null}
 
@@ -1016,7 +1075,7 @@ export default function FundingJourneyWorkspace(props: {
         ) : null}
 
         {activeTab === 'documents' ? (
-          <ClientDocumentWorkspace contact={contact} onUpdateContact={onUpdateContact} currentStage={roadmap.data?.stage} />
+          <ClientDocumentWorkspace contact={contact} onUpdateContact={onUpdateContact} currentStage={roadmap.data?.stage} experienceConfig={experience.experienceConfig} />
         ) : null}
 
         {activeTab === 'account' ? (
@@ -1151,7 +1210,7 @@ export default function FundingJourneyWorkspace(props: {
       <footer className="mx-auto mt-6 max-w-7xl px-4 pb-8 text-xs text-slate-500 md:px-8">
         <div className="flex items-center gap-2">
           <Sparkles size={12} />
-          Funding-first workflow active. Optional paths remain gated until reserve-first readiness is complete.
+          {experience.experienceConfig.emphasis.primaryGoal}
         </div>
         {capital.data?.readiness?.ready ? (
           <div className="mt-2 inline-flex items-center gap-1 text-emerald-700">

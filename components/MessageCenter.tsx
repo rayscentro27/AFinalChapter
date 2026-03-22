@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Contact, Message, TrainingPair } from '../types';
+import { Contact, ExperienceConfig, Message, TrainingPair } from '../types';
 // Added Zap to imports
 import { Send, User, Bot, CheckCheck, Sparkles, Upload, PenTool, Smartphone, RefreshCw, MessageSquare, Shield, Gavel, X, Zap } from 'lucide-react';
 import * as geminiService from '../services/geminiService';
@@ -62,9 +62,10 @@ interface MessageCenterProps {
   onUpdateContact?: (contact: Contact) => void;
   currentUserRole: 'admin' | 'client';
   onNavigateToAction?: (target: string) => void;
+  experienceConfig?: ExperienceConfig;
 }
 
-const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact, currentUserRole, onNavigateToAction }) => {
+const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact, currentUserRole, onNavigateToAction, experienceConfig }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [isCorrecting, setIsCorrecting] = useState<string | null>(null);
@@ -72,6 +73,13 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messages = contact.messageHistory || [];
+  const toneLabel = experienceConfig?.messaging.toneLabel || 'Specialist Grounding Active';
+  const toneSummary = experienceConfig?.messaging.summary || 'Threading stays grounded in the current workflow so guidance remains client-safe and operational.';
+  const composePlaceholder = currentUserRole === 'client'
+    ? experienceConfig
+      ? `Send a ${experienceConfig.messaging.toneLabel.toLowerCase()} update or question...`
+      : 'Transmit message to advisor...'
+    : 'Draft or send an advisor response...';
 
 
   const getEscalationFromMessage = (msg: Message): { severity: 'orange' | 'red'; reason: string } | null => {
@@ -279,8 +287,9 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
            <div>
               <h3 className="font-black text-lg uppercase tracking-tighter leading-none">Nexus Concierge</h3>
               <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
-                  <Sparkles size={10} /> Specialist Grounding Active
+                <Sparkles size={10} /> {toneLabel}
               </p>
+              <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-300">{toneSummary}</p>
            </div>
         </div>
       </div>
@@ -373,7 +382,7 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
              <textarea 
                value={newMessage} 
                onChange={(e) => setNewMessage(e.target.value)} 
-               placeholder="Transmit message to advisor..." 
+               placeholder={composePlaceholder} 
                className="w-full pl-6 pr-16 py-4 bg-slate-100 border-none rounded-[2rem] text-sm font-medium focus:ring-2 focus:ring-indigo-500 resize-none outline-none transition-all placeholder:text-slate-400 shadow-inner custom-scrollbar" 
                rows={1}
              />
