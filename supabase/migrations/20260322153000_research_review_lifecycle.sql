@@ -37,6 +37,9 @@ set is_published = true,
 where approval_status = 'approved'
   and coalesce(is_published, false) = false;
 
+drop view if exists public.v_research_strategy_rankings;
+drop view if exists public.v_research_options_rankings;
+
 create index if not exists reviewed_signal_proposals_lifecycle_idx
   on public.reviewed_signal_proposals (tenant_id, approval_status, is_published, expires_at, created_at desc);
 
