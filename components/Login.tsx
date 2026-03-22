@@ -34,6 +34,7 @@ declare global {
 const TURNSTILE_SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)
   || (import.meta.env.VITE_AUTH_TURNSTILE_SITE_KEY as string | undefined)
   || '';
+const TURNSTILE_ENABLED = String(import.meta.env.VITE_TURNSTILE_ENABLED || '').toLowerCase() === 'true';
 
 const Login: React.FC<LoginProps> = ({ onBack }) => {
   const { signIn, signInWithGoogle } = useAuth();
@@ -43,11 +44,13 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaRuntimeFailed, setCaptchaRuntimeFailed] = useState(false);
   const [notify, setNotify] = useState({ show: false, message: '', title: '', type: 'info' as 'info' | 'success' | 'error' });
 
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
   const turnstileWidgetIdRef = useRef<TurnstileWidgetId | null>(null);
-  const captchaEnabled = isSupabaseConfigured && Boolean(TURNSTILE_SITE_KEY);
+  const captchaConfigured = isSupabaseConfigured && TURNSTILE_ENABLED && Boolean(TURNSTILE_SITE_KEY);
+  const captchaEnabled = captchaConfigured && !captchaRuntimeFailed;
 
   useEffect(() => {
     const checkGenesis = async () => {
@@ -76,6 +79,12 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
   }, []);
 
   useEffect(() => {
+    if (!captchaConfigured) {
+      setCaptchaRuntimeFailed(false);
+      setCaptchaToken('');
+      return undefined;
+    }
+
     if (!captchaEnabled) return undefined;
 
     let cancelled = false;
@@ -95,7 +104,14 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
         },
         'error-callback': () => {
           setCaptchaToken('');
-          setError('captcha verification process failed');
+          setCaptchaRuntimeFailed(true);
+          setError(null);
+          setNotify({
+            show: true,
+            title: 'Captcha Unavailable',
+            message: 'Security verification is temporarily unavailable. Continuing without captcha.',
+            type: 'info',
+          });
         },
       });
     };
@@ -132,7 +148,7 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
         turnstileWidgetIdRef.current = null;
       }
     };
-  }, [captchaEnabled]);
+  }, [captchaConfigured, captchaEnabled]);
 
   const resetCaptchaWidget = () => {
     setCaptchaToken('');
