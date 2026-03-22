@@ -30,6 +30,7 @@ import { researchRoutes } from './routes/research.js';
 import { systemHealthRoutes } from './routes/system_health.js';
 import { adminMembershipRoutes } from './routes/admin_membership.js';
 import { controlPlaneRoutes } from './routes/control_plane.js';
+import { recordRequestMetric } from './lib/observability/requestMetrics.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -131,13 +132,25 @@ fastify.addHook('onRequest', async (req) => {
 fastify.addHook('onResponse', async (req, reply) => {
   const startedAt = typeof req._startTimeNs === 'bigint' ? req._startTimeNs : process.hrtime.bigint();
   const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+  const route = asText(req?.routeOptions?.url || req?.routerPath || req?.raw?.url);
+  const tenantId = requestTenantId(req);
+  const provider = requestProvider(req);
+
+  recordRequestMetric({
+    route,
+    method: req.method,
+    tenant_id: tenantId,
+    provider,
+    status_code: reply.statusCode,
+    ms: elapsedMs,
+  });
 
   req.log.info({
     request_id: req.id,
-    tenant_id: requestTenantId(req),
+    tenant_id: tenantId,
     user_id: asText(req?.user?.id) || null,
-    route: asText(req?.routeOptions?.url || req?.routerPath || req?.raw?.url),
-    provider: requestProvider(req),
+    route,
+    provider,
     status_code: reply.statusCode,
     ms: Number(elapsedMs.toFixed(2)),
   }, 'request_completed');

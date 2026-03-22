@@ -1,6 +1,7 @@
 import { ENV } from '../env.js';
 import { supabaseAdmin } from '../supabase.js';
 import { getAiCacheMetrics } from '../ai/cache.js';
+import { getRequestLatencySnapshot } from '../lib/observability/requestMetrics.js';
 import { requireTenantPermission } from '../lib/auth/requireTenantPermission.js';
 import { logAudit } from '../lib/audit/auditLog.js';
 import {
@@ -483,6 +484,7 @@ export async function systemHealthRoutes(fastify, opts = {}) {
       oldestPending: await safeOldestPendingJob(db),
       cacheHitRate: await safeCacheHitRate24h(db),
     };
+    const requestLatency = getRequestLatencySnapshot({ window_minutes: 60, top: 5 });
 
     const missing_tables = [];
     for (const [key, value] of Object.entries(checks)) {
@@ -526,6 +528,7 @@ export async function systemHealthRoutes(fastify, opts = {}) {
         provider: ENV.AI_PROVIDER,
         metrics: aiCacheMetricsFn(),
       },
+      api_latency: requestLatency,
       errors: {
         recent_24h: checks.errors24h.count,
       },
