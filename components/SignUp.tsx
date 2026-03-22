@@ -4,6 +4,7 @@ import { Hexagon, ArrowRight, Shield, TrendingUp, AlertCircle, RefreshCw } from 
 import { ViewMode, Contact } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
+import { useTurnstileCaptcha } from '../hooks/useTurnstileCaptcha';
 import { sanitizeString, isValidEmail } from '../utils/security';
 import RequiredDisclaimers from './legal/RequiredDisclaimers';
 
@@ -13,7 +14,7 @@ interface SignUpProps {
 }
 
 const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
-  const { signIn } = useAuth();
+  const { refreshUser } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     company: '',
@@ -22,16 +23,46 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const {
+    captchaBlockedReason,
+    captchaReady,
+    captchaRequired,
+    captchaToken,
+    captchaTokenIsFresh,
+    resetCaptcha,
+    turnstileContainerRef,
+  } = useTurnstileCaptcha({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setStatusMessage(null);
     
     if (!isValidEmail(formData.email)) {
         setError("Invalid email address.");
         setLoading(false);
         return;
+    }
+
+    if (captchaRequired && !captchaReady) {
+      setError(captchaBlockedReason || 'Captcha verification is required, but the widget is unavailable.');
+      setLoading(false);
+      return;
+    }
+
+    if (captchaReady && !captchaToken) {
+      setError('Complete captcha verification before creating an account.');
+      setLoading(false);
+      return;
+    }
+
+    if (captchaReady && !captchaTokenIsFresh) {
+      setError('Captcha verification expired. Complete it again before creating an account.');
+      resetCaptcha();
+      setLoading(false);
+      return;
     }
 
     try {
@@ -40,6 +71,7 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
         email: formData.email,
         password: formData.password,
         options: {
+          captchaToken: captchaReady ? captchaToken : undefined,
           data: {
             name: sanitizeString(formData.name),
             company: sanitizeString(formData.company),
@@ -50,6 +82,14 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
 
       if (authError) throw authError;
       if (!authData.user) throw new Error("Infrastructure registration failed.");
+
+      if (!authData.session) {
+        setStatusMessage('Account created. Confirm your email from the verification message, then sign in. Tenant setup will continue after your first authenticated session.');
+        setFormData(prev => ({ ...prev, password: '' }));
+        if (captchaRequired) resetCaptcha();
+        setLoading(false);
+        return;
+      }
 
       // 2. Provision Tenant Node
       const { data: tenant, error: tenantError } = await supabase
@@ -79,13 +119,6 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
 
       const memberRole = String(membership?.role || 'client');
       const isOperator = ['admin', 'supervisor', 'sales', 'salesperson'].includes(memberRole);
-
-      // Refresh AuthContext with the authoritative role now that membership exists.
-      try {
-        await signIn(formData.email, formData.password);
-      } catch (e) {
-        // Non-fatal: session may already be active depending on Supabase settings.
-      }
 
       // Send onboarding welcome email through Supabase email orchestrator (non-fatal).
       try {
@@ -119,11 +152,29 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
           });
       }
 
+      await refreshUser().catch(() => {
+        // Non-fatal. onAuthStateChange or a later bootstrap can still hydrate the user.
+      });
+
       window.location.hash = isOperator ? 'dashboard' : 'portal';
       
     } catch (err: any) {
       console.error("Infrastructure Error:", err);
-      setError(err.message || 'Registration sequence interrupted.');
+      const message = String(err?.message || 'Registration sequence interrupted.');
+      const normalizedMessage = message.toLowerCase();
+      if (normalizedMessage.includes('captcha verification process failed')) {
+        setError('Captcha verification failed. Complete the challenge again, then resubmit registration.');
+        resetCaptcha();
+      } else if (normalizedMessage.includes('email rate limit exceeded')) {
+        setError('Signup reached Supabase Auth email limits. The built-in provider is not suitable for production and can throttle confirmation emails. Configure custom SMTP in Supabase Auth or wait for the email quota window to reset, then retry.');
+        if (captchaRequired) resetCaptcha();
+      } else if (normalizedMessage.includes('email address not authorized')) {
+        setError('Supabase Auth is still using the built-in email provider, which only sends to authorized team addresses. Configure custom SMTP in Supabase Auth before allowing public signup emails.');
+        if (captchaRequired) resetCaptcha();
+      } else {
+        setError(message);
+        if (captchaRequired) resetCaptcha();
+      }
       setLoading(false);
     }
   };
@@ -165,6 +216,19 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
             </div>
           )}
 
+          {statusMessage && (
+            <div className="mb-8 bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 p-4 rounded-2xl text-xs font-bold flex items-start justify-between gap-3 animate-fade-in">
+              <span>{statusMessage}</span>
+              <button
+                type="button"
+                onClick={() => onNavigate(ViewMode.LOGIN)}
+                className="shrink-0 text-[10px] uppercase tracking-[0.18em] text-emerald-300 hover:text-white transition-colors"
+              >
+                Go To Login
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-[10px] font-black text-[#45A29E] uppercase tracking-widest mb-2 ml-1">Legal Name</label>
@@ -182,6 +246,26 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
               <label className="block text-[10px] font-black text-[#45A29E] uppercase tracking-widest mb-2 ml-1">Access Cipher</label>
               <input required type="password" minLength={8} className="w-full px-4 py-4 bg-[#0B0C10] border border-[#45A29E]/30 rounded-xl focus:ring-2 focus:ring-[#66FCF1]/50 outline-none transition-all text-[#C5C6C7] text-sm font-bold" placeholder="••••••••" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
             </div>
+
+            {captchaRequired && (
+              <div className="rounded-2xl border border-[#45A29E]/20 bg-[#0B0C10] p-4">
+                {captchaReady ? (
+                  <>
+                    <div ref={turnstileContainerRef} className="min-h-[65px]" />
+                    {!captchaToken && (
+                      <p className="mt-2 text-[10px] text-[#C5C6C7] font-black uppercase tracking-[0.12em]">
+                        Complete captcha verification to continue.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-[10px] text-red-300 font-black uppercase tracking-[0.12em] leading-relaxed">
+                    {captchaBlockedReason}
+                  </p>
+                )}
+              </div>
+            )}
+
             <RequiredDisclaimers title="Educational Use Disclaimers" />
 
             <p className="text-[10px] text-slate-400 leading-relaxed">
@@ -191,7 +275,7 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
               <a href="/ai-disclosure" className="text-cyan-300 hover:text-cyan-200"> AI Disclosure</a>.
             </p>
 
-            <button disabled={loading} type="submit" className="w-full bg-[#45A29E] text-white font-black py-5 rounded-2xl hover:bg-[#66FCF1] hover:text-slate-950 transition-all shadow-xl flex items-center justify-center gap-3 mt-10 uppercase tracking-[0.2em] text-xs disabled:opacity-50 transform active:scale-95">
+            <button disabled={loading || (captchaRequired && !captchaReady)} type="submit" className="w-full bg-[#45A29E] text-white font-black py-5 rounded-2xl hover:bg-[#66FCF1] hover:text-slate-950 transition-all shadow-xl flex items-center justify-center gap-3 mt-10 uppercase tracking-[0.2em] text-xs disabled:opacity-50 transform active:scale-95">
               {loading ? <RefreshCw className="animate-spin" size={20} /> : <>Execute Registration <ArrowRight size={20} /></>}
             </button>
           </form>

@@ -62,6 +62,7 @@ const NeuralStrategySandbox = lazy(() => import('./components/NeuralStrategySand
 
 const FundingResearchPage = lazy(() => import('./src/pages/FundingResearchPage'));
 const ResearchDashboardPage = lazy(() => import('./src/pages/ResearchDashboardPage'));
+const AdminResearchApprovalsPage = lazy(() => import('./src/pages/AdminResearchApprovalsPage'));
 const AdminFundingCatalogPage = lazy(() => import('./src/pages/AdminFundingCatalogPage'));
 const GrantsPage = lazy(() => import('./src/pages/GrantsPage'));
 const AdminGrantsCatalogPage = lazy(() => import('./src/pages/AdminGrantsCatalogPage'));
@@ -156,6 +157,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/sba': ViewMode.SBA_PREP,
   '/funding/research': ViewMode.FUNDING_RESEARCH,
   '/research': ViewMode.RESEARCH_DASHBOARD,
+  '/admin/research-approvals': ViewMode.ADMIN_RESEARCH_APPROVALS,
   '/funding/outcomes': ViewMode.FUNDING_OUTCOMES,
   '/billing/commissions': ViewMode.BILLING_COMMISSIONS,
   '/grants': ViewMode.GRANTS,
@@ -204,9 +206,9 @@ const LEGAL_VIEWS: ViewMode[] = [
 ];
 
 const RouteFallback = () => (
-  <div className="min-h-[50vh] flex items-center justify-center bg-slate-950 text-slate-300">
+  <div className="min-h-[50vh] flex items-center justify-center bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)] text-slate-500">
     <div className="flex items-center gap-3 text-sm font-medium">
-      <RefreshCw className="h-4 w-4 animate-spin text-cyan-400" />
+      <RefreshCw className="h-4 w-4 animate-spin text-emerald-600" />
       Loading module...
     </div>
   </div>
@@ -529,7 +531,7 @@ export const App = () => {
 
     if (tierLoading) {
       return (
-        <div className="min-h-[50vh] flex items-center justify-center text-slate-300">
+        <div className="min-h-[50vh] flex items-center justify-center text-slate-500">
           Checking subscription tier...
         </div>
       );
@@ -544,14 +546,14 @@ export const App = () => {
 
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
-        <div className="rounded-2xl border border-cyan-500/30 bg-slate-900 p-6 space-y-3">
-          <h2 className="text-xl font-black text-white">Upgrade Required</h2>
-          <p className="text-sm text-slate-300">
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 space-y-3 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <h2 className="text-xl font-black text-slate-900">Upgrade Required</h2>
+          <p className="text-sm text-slate-600">
             {requirement.moduleLabel} requires the {requirement.requiredTier} tier with an active subscription.
           </p>
           <p className="text-xs text-slate-500">Educational tools only. Results vary and are not guaranteed.</p>
           <button
-            className="rounded-xl bg-cyan-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-950"
+            className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white"
             onClick={() => navigate(ViewMode.BILLING)}
           >
             Open Billing
@@ -562,7 +564,7 @@ export const App = () => {
   };
 
   const renderContent = () => {
-    if (loading) return <div className="h-screen flex items-center justify-center bg-slate-950"><RefreshCw className="animate-spin text-blue-500" /></div>;
+    if (loading) return <div className="h-screen flex items-center justify-center bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)]"><RefreshCw className="animate-spin text-emerald-600" /></div>;
 
     if (isLegalViewMode(currentView)) {
       switch (currentView) {
@@ -592,7 +594,7 @@ export const App = () => {
     if (user && consentGate.needsAcceptance) {
       return (
         <div className="min-h-[60vh] flex items-center justify-center">
-          <div className="rounded-2xl border border-cyan-300/25 bg-slate-900 p-6 text-sm text-slate-200">
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 text-sm text-slate-700 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
             Accept required policies to continue.
           </div>
         </div>
@@ -667,6 +669,7 @@ export const App = () => {
                     case ViewMode.FUNDING_FLOW: return renderTierGate(ViewMode.FUNDING_FLOW, <PGFundingFlow />);
                     case ViewMode.FUNDING_RESEARCH: return renderTierGate(ViewMode.FUNDING_RESEARCH, <FundingResearchPage />);
                     case ViewMode.RESEARCH_DASHBOARD: return <ResearchDashboardPage />;
+                    case ViewMode.ADMIN_RESEARCH_APPROVALS: return <AdminResearchApprovalsPage />;
                     case ViewMode.FUNDING_OUTCOMES: return renderTierGate(ViewMode.FUNDING_OUTCOMES, <FundingOutcomesPage />);
                     case ViewMode.BILLING_COMMISSIONS: return renderTierGate(ViewMode.BILLING_COMMISSIONS, <BillingCommissionsPage />);
                     case ViewMode.AUTOMATION: return <LiveAutomationMonitor />;
@@ -732,7 +735,7 @@ export const App = () => {
   const unreadNotifCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="flex h-screen bg-slate-950 overflow-hidden font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="flex h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)] overflow-hidden font-sans text-slate-900 selection:bg-emerald-100 selection:text-emerald-900">
       {showNavigation && (
           <Sidebar 
             currentView={currentView} 
@@ -744,11 +747,11 @@ export const App = () => {
             userRole={user?.role}
           />
       )}
-      <main className={`flex-1 flex flex-col h-full overflow-hidden transition-all duration-500 ${showNavigation ? 'md:ml-64 bg-slate-900 border-l border-white/5' : ''}`}>
+      <main className={`flex-1 flex flex-col h-full overflow-hidden transition-all duration-500 ${showNavigation ? 'md:ml-64 border-l border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)]' : 'bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)]'}`}>
         {showNavigation && (
-          <header className="h-16 bg-[#0B0C10] border-b border-[#66FCF1]/20 flex items-center justify-between px-6 z-20 sticky top-0 shadow-2xl">
-             <div onClick={() => setIsCommandOpen(true)} className="flex items-center gap-3 bg-white/5 hover:bg-white/10 transition-all px-4 py-2 rounded-xl cursor-pointer text-slate-500 text-xs w-full max-sm border border-white/5 group">
-                <Search size={14} className="group-hover:text-[#66FCF1] transition-colors" /><span className="flex-1 font-bold uppercase tracking-widest">Execute Command...</span><kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[9px] font-mono font-bold text-slate-500"><Command size={8} /> K</kbd>
+         <header className="h-16 bg-white/90 border-b border-slate-200/80 flex items-center justify-between px-6 z-20 sticky top-0 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+           <div onClick={() => setIsCommandOpen(true)} className="flex items-center gap-3 bg-slate-50 hover:bg-white transition-all px-4 py-2 rounded-xl cursor-pointer text-slate-500 text-xs w-full max-sm border border-slate-200 group shadow-sm">
+             <Search size={14} className="group-hover:text-emerald-600 transition-colors" /><span className="flex-1 font-bold uppercase tracking-widest">Search workspace</span><kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-mono font-bold text-slate-500"><Command size={8} /> K</kbd>
              </div>
              <div className="flex items-center gap-3 ml-4">
                <RequiredDisclaimers variant="badge" />
@@ -763,7 +766,7 @@ export const App = () => {
           </Suspense>
         </div>
         {!isLegalView && (
-          <div className={showNavigation ? "border-t border-white/10 bg-slate-900 px-6" : "border-t border-white/10 bg-slate-950 px-4 sm:px-6"}>
+          <div className={showNavigation ? "border-t border-slate-200/80 bg-white/80 px-6 backdrop-blur-xl" : "border-t border-slate-200/80 bg-white/80 px-4 sm:px-6 backdrop-blur-xl"}>
             <LegalFooterLinks compact />
           </div>
         )}

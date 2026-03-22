@@ -53,4 +53,41 @@ At your sending domain DNS:
 
 ## 8) Environment Notes
 - Local parity is tracked in `supabase/config.toml`.
+- Frontend captcha requires both `VITE_TURNSTILE_ENABLED=true` and a valid `VITE_TURNSTILE_SITE_KEY` (or `VITE_AUTH_TURNSTILE_SITE_KEY`).
+- Local Supabase CLI reads the captcha secret from `SUPABASE_AUTH_CAPTCHA_SECRET`.
 - Hosted dashboard remains source of truth for production auth behavior.
+
+## 9) Windows Local Setup
+Use this PowerShell sequence to set the local captcha secret without echoing it back into the terminal history as plain text input:
+
+```powershell
+$secure = Read-Host "Enter SUPABASE_AUTH_CAPTCHA_SECRET" -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try {
+	$secret = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+	[Environment]::SetEnvironmentVariable("SUPABASE_AUTH_CAPTCHA_SECRET", $secret, "User")
+	$env:SUPABASE_AUTH_CAPTCHA_SECRET = $secret
+} finally {
+	if ($ptr -ne [IntPtr]::Zero) {
+		[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+	}
+}
+
+Set-Location C:\Users\raysc\AFinalChapter
+npm run auth:check-env
+supabase.exe stop
+supabase.exe start
+```
+
+If you only want a session-scoped secret instead of persisting it to your user profile:
+
+```powershell
+$env:SUPABASE_AUTH_CAPTCHA_SECRET = Read-Host "Enter SUPABASE_AUTH_CAPTCHA_SECRET"
+Set-Location C:\Users\raysc\AFinalChapter
+npm run auth:check-env
+supabase.exe stop
+supabase.exe start
+```
+
+## 10) Operator Checklist
+- See [docs/SUPABASE_TURNSTILE_VERIFICATION_CHECKLIST.md](docs/SUPABASE_TURNSTILE_VERIFICATION_CHECKLIST.md) for the end-to-end hosted/local verification flow.

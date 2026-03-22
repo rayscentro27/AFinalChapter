@@ -11,6 +11,7 @@ interface ImportMetaEnv {
   readonly VITE_AI_ENABLED: string
   readonly VITE_SHEETS_API_BASE_URL: string
   readonly VITE_SHEETS_ADMIN_TOKEN: string
+  readonly VITE_TURNSTILE_ENABLED: string
   readonly VITE_TURNSTILE_SITE_KEY: string
   readonly VITE_AUTH_TURNSTILE_SITE_KEY: string
   readonly DEV: boolean

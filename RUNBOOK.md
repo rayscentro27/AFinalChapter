@@ -73,6 +73,15 @@ cp deploy/netlify/netlify.toml.example netlify.toml
 
 Required frontend env var:
 - `VITE_API_BASE_URL=https://api.goclearonline.cc`
+- `VITE_SUPABASE_URL=https://<SUPABASE_PROJECT>.supabase.co`
+- `VITE_SUPABASE_ANON_KEY=<SUPABASE_ANON_KEY>`
+
+Required when Supabase Authentication -> Bot Detection is enabled:
+- `VITE_TURNSTILE_ENABLED=true`
+- `VITE_TURNSTILE_SITE_KEY=<TURNSTILE_SITE_KEY>`
+
+Required for local Supabase CLI parity when `supabase/config.toml` keeps captcha enabled:
+- `SUPABASE_AUTH_CAPTCHA_SECRET=<TURNSTILE_SECRET>`
 
 Optional redirects (beneficial for SPA):
 - `deploy/netlify/_redirects.example`
@@ -93,9 +102,20 @@ netlify link --name <NETLIFY_SITE_NAME>
 
 # Set env var for production context
 netlify env:set VITE_API_BASE_URL "https://api.goclearonline.cc" --context production
+netlify env:set VITE_SUPABASE_URL "https://<SUPABASE_PROJECT>.supabase.co" --context production
+netlify env:set VITE_SUPABASE_ANON_KEY "<SUPABASE_ANON_KEY>" --context production
+netlify env:set VITE_TURNSTILE_ENABLED "true" --context production
+netlify env:set VITE_TURNSTILE_SITE_KEY "<TURNSTILE_SITE_KEY>" --context production
 
 # Optional for deploy previews
 netlify env:set VITE_API_BASE_URL "https://api.goclearonline.cc" --context deploy-preview
+netlify env:set VITE_SUPABASE_URL "https://<SUPABASE_PROJECT>.supabase.co" --context deploy-preview
+netlify env:set VITE_SUPABASE_ANON_KEY "<SUPABASE_ANON_KEY>" --context deploy-preview
+netlify env:set VITE_TURNSTILE_ENABLED "true" --context deploy-preview
+netlify env:set VITE_TURNSTILE_SITE_KEY "<TURNSTILE_SITE_KEY>" --context deploy-preview
+
+# Validate local/frontend auth env assumptions before deploy
+npm run auth:check-env
 
 # Deploy preview
 netlify deploy
@@ -107,6 +127,52 @@ netlify deploy --prod
 Expected output:
 - Production deploy URL exists.
 - Netlify project has `VITE_API_BASE_URL` set.
+- Netlify project has the Supabase auth vars and Turnstile frontend vars set when captcha is enforced.
+
+## 1.3 Auth troubleshooting
+
+Use this when login or signup fails with captcha-related errors, especially `auth/v1/token` returning `500`.
+
+Local setup helper:
+
+```powershell
+Set-Location C:\Users\raysc\AFinalChapter
+.\scripts\set-supabase-auth-captcha-secret.ps1
+```
+
+Or through npm:
+
+```powershell
+Set-Location C:\Users\raysc\AFinalChapter
+npm run auth:set-captcha-secret
+```
+
+Session-only test run without restarting Supabase:
+
+```powershell
+Set-Location C:\Users\raysc\AFinalChapter
+.\scripts\set-supabase-auth-captcha-secret.ps1 -SessionOnly -SkipRestart
+```
+
+Exact Supabase dashboard fields to verify:
+- Supabase Dashboard -> Authentication -> Bot Detection
+- `Enable Bot Detection`: ON
+- `Provider`: Cloudflare Turnstile
+- `Secret key`: the secret from the same Cloudflare Turnstile widget as your frontend site key
+
+Exact Netlify fields to verify:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_TURNSTILE_ENABLED=true`
+- `VITE_TURNSTILE_SITE_KEY`
+
+Exact frontend behavior expected after deploy:
+- Login page renders a Turnstile widget when captcha is enabled.
+- Signup page renders a Turnstile widget when captcha is enabled.
+- Login without solving captcha is blocked in the UI.
+- Signup without solving captcha is blocked in the UI.
+
+If the frontend blocks correctly but `auth/v1/token` still returns `500`, treat the remaining issue as hosted Supabase Turnstile configuration until proven otherwise.
 
 ---
 

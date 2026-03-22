@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Hexagon, Lock, Mail, ArrowRight, ShieldCheck, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { User as UserType } from '../types';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { useTurnstileCaptcha } from '../hooks/useTurnstileCaptcha';
 import PhoneNotification from './PhoneNotification';
 import { data } from '../adapters';
 
@@ -11,31 +12,6 @@ interface LoginProps {
   onBack?: () => void;
 }
 
-type TurnstileWidgetId = string | number;
-
-interface TurnstileRenderOptions {
-  sitekey: string;
-  theme?: 'light' | 'dark' | 'auto';
-  callback?: (token: string) => void;
-  'expired-callback'?: () => void;
-  'error-callback'?: () => void;
-}
-
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (container: HTMLElement, options: TurnstileRenderOptions) => TurnstileWidgetId;
-      reset: (widgetId: TurnstileWidgetId) => void;
-      remove: (widgetId: TurnstileWidgetId) => void;
-    };
-  }
-}
-
-const TURNSTILE_SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)
-  || (import.meta.env.VITE_AUTH_TURNSTILE_SITE_KEY as string | undefined)
-  || '';
-const TURNSTILE_ENABLED = String(import.meta.env.VITE_TURNSTILE_ENABLED || '').toLowerCase() === 'true';
-
 const Login: React.FC<LoginProps> = ({ onBack }) => {
   const { signIn, signInWithGoogle } = useAuth();
   const [isSystemEmpty, setIsSystemEmpty] = useState(false);
@@ -43,14 +19,16 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [captchaToken, setCaptchaToken] = useState('');
-  const [captchaRuntimeFailed, setCaptchaRuntimeFailed] = useState(false);
   const [notify, setNotify] = useState({ show: false, message: '', title: '', type: 'info' as 'info' | 'success' | 'error' });
-
-  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
-  const turnstileWidgetIdRef = useRef<TurnstileWidgetId | null>(null);
-  const captchaConfigured = isSupabaseConfigured && TURNSTILE_ENABLED && Boolean(TURNSTILE_SITE_KEY);
-  const captchaEnabled = captchaConfigured && !captchaRuntimeFailed;
+  const {
+    captchaBlockedReason,
+    captchaReady,
+    captchaRequired,
+    captchaToken,
+    captchaTokenIsFresh,
+    resetCaptcha,
+    turnstileContainerRef,
+  } = useTurnstileCaptcha({ action: 'login' });
 
   useEffect(() => {
     const checkGenesis = async () => {
@@ -78,91 +56,20 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
     checkGenesis();
   }, []);
 
-  useEffect(() => {
-    if (!captchaConfigured) {
-      setCaptchaRuntimeFailed(false);
-      setCaptchaToken('');
-      return undefined;
-    }
-
-    if (!captchaEnabled) return undefined;
-
-    let cancelled = false;
-    const renderWidget = () => {
-      if (cancelled || !window.turnstile || !turnstileContainerRef.current) return;
-      if (turnstileWidgetIdRef.current !== null) return;
-
-      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: TURNSTILE_SITE_KEY,
-        theme: 'dark',
-        callback: (token: string) => {
-          setCaptchaToken(token);
-          setError((prev) => (prev && prev.toLowerCase().includes('captcha') ? null : prev));
-        },
-        'expired-callback': () => {
-          setCaptchaToken('');
-        },
-        'error-callback': () => {
-          setCaptchaToken('');
-          setCaptchaRuntimeFailed(true);
-          setError(null);
-          setNotify({
-            show: true,
-            title: 'Captcha Unavailable',
-            message: 'Security verification is temporarily unavailable. Continuing without captcha.',
-            type: 'info',
-          });
-        },
-      });
-    };
-
-    if (window.turnstile) {
-      renderWidget();
-      return () => {
-        cancelled = true;
-        if (window.turnstile && turnstileWidgetIdRef.current !== null) {
-          window.turnstile.remove(turnstileWidgetIdRef.current);
-          turnstileWidgetIdRef.current = null;
-        }
-      };
-    }
-
-    let script = document.querySelector('script[data-nexus-turnstile="true"]') as HTMLScriptElement | null;
-    if (!script) {
-      script = document.createElement('script');
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      script.async = true;
-      script.defer = true;
-      script.dataset.nexusTurnstile = 'true';
-      document.head.appendChild(script);
-    }
-
-    const onLoad = () => renderWidget();
-    script.addEventListener('load', onLoad);
-
-    return () => {
-      cancelled = true;
-      script?.removeEventListener('load', onLoad);
-      if (window.turnstile && turnstileWidgetIdRef.current !== null) {
-        window.turnstile.remove(turnstileWidgetIdRef.current);
-        turnstileWidgetIdRef.current = null;
-      }
-    };
-  }, [captchaConfigured, captchaEnabled]);
-
-  const resetCaptchaWidget = () => {
-    setCaptchaToken('');
-    if (window.turnstile && turnstileWidgetIdRef.current !== null) {
-      window.turnstile.reset(turnstileWidgetIdRef.current);
-    }
-  };
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    if (captchaEnabled && !captchaToken) {
+    if (captchaRequired && !captchaReady) {
+      const msg = captchaBlockedReason || 'Captcha verification is required, but the widget is unavailable.';
+      setError(msg);
+      setNotify({ show: true, title: 'Captcha Unavailable', message: msg, type: 'error' });
+      setLoading(false);
+      return;
+    }
+
+    if (captchaReady && !captchaToken) {
       const msg = 'Complete captcha verification before signing in.';
       setError(msg);
       setNotify({ show: true, title: 'Captcha Required', message: msg, type: 'error' });
@@ -170,14 +77,23 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
       return;
     }
 
+    if (captchaReady && !captchaTokenIsFresh) {
+      const msg = 'Captcha verification expired. Complete it again before signing in.';
+      setError(msg);
+      setNotify({ show: true, title: 'Captcha Expired', message: msg, type: 'error' });
+      resetCaptcha();
+      setLoading(false);
+      return;
+    }
+
     try {
-      await signIn(email, password, captchaEnabled ? captchaToken : undefined);
+      await signIn(email, password, captchaReady ? captchaToken : undefined);
       setNotify({ show: true, title: 'Session Resumed', message: 'Access granted. Synchronizing workspace...', type: 'success' });
     } catch (err: any) {
       const msg = err.message || 'Authentication failed';
       setError(msg);
       setNotify({ show: true, title: 'Auth Failed', message: msg, type: 'error' });
-      if (captchaEnabled) resetCaptchaWidget();
+      if (captchaRequired) resetCaptcha();
     } finally {
       setLoading(false);
     }
@@ -187,7 +103,15 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
     setLoading(true);
     setError(null);
 
-    if (captchaEnabled && !captchaToken) {
+    if (captchaRequired && !captchaReady) {
+      const msg = captchaBlockedReason || 'Captcha verification is required, but the widget is unavailable.';
+      setError(msg);
+      setNotify({ show: true, title: 'Captcha Unavailable', message: msg, type: 'error' });
+      setLoading(false);
+      return;
+    }
+
+    if (captchaReady && !captchaToken) {
       const msg = 'Complete captcha verification before continuing with Google.';
       setError(msg);
       setNotify({ show: true, title: 'Captcha Required', message: msg, type: 'error' });
@@ -195,14 +119,23 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
       return;
     }
 
+    if (captchaReady && !captchaTokenIsFresh) {
+      const msg = 'Captcha verification expired. Complete it again before continuing with Google.';
+      setError(msg);
+      setNotify({ show: true, title: 'Captcha Expired', message: msg, type: 'error' });
+      resetCaptcha();
+      setLoading(false);
+      return;
+    }
+
     try {
-      await signInWithGoogle(captchaEnabled ? captchaToken : undefined);
+      await signInWithGoogle(captchaReady ? captchaToken : undefined);
       setNotify({ show: true, title: 'Redirecting', message: 'Continue with Google in the popup/redirect flow.', type: 'info' });
     } catch (err: any) {
       const msg = err?.message || 'Google sign-in failed';
       setError(msg);
       setNotify({ show: true, title: 'Google SSO Failed', message: msg, type: 'error' });
-      if (captchaEnabled) resetCaptchaWidget();
+      if (captchaRequired) resetCaptcha();
     } finally {
       setLoading(false);
     }
@@ -289,24 +222,32 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                 />
               </div>
 
-              {captchaEnabled && (
+              {captchaRequired && (
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div ref={turnstileContainerRef} className="min-h-[65px]" />
-                  {!captchaToken && (
-                    <p className="mt-2 text-[10px] text-slate-400 font-black uppercase tracking-[0.12em]">
-                      Complete captcha verification to continue.
+                  {captchaReady ? (
+                    <>
+                      <div ref={turnstileContainerRef} className="min-h-[65px]" />
+                      {!captchaToken && (
+                        <p className="mt-2 text-[10px] text-slate-400 font-black uppercase tracking-[0.12em]">
+                          Complete captcha verification to continue.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-[10px] text-red-300 font-black uppercase tracking-[0.12em] leading-relaxed">
+                      {captchaBlockedReason}
                     </p>
                   )}
                 </div>
               )}
 
-              <button type="submit" disabled={loading} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-[2rem] transition-all flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/10 disabled:opacity-70 mt-8 uppercase tracking-[0.2em] text-xs transform active:scale-95">
+              <button type="submit" disabled={loading || (captchaRequired && !captchaReady)} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-[2rem] transition-all flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/10 disabled:opacity-70 mt-8 uppercase tracking-[0.2em] text-xs transform active:scale-95">
                 {loading ? <RefreshCw className="animate-spin" size={18}/> : <>Resume Session <ArrowRight size={18} /></>}
               </button>
 
               <button
                 type="button"
-                disabled={loading || !isSupabaseConfigured}
+                disabled={loading || !isSupabaseConfigured || (captchaRequired && !captchaReady)}
                 onClick={() => void handleGoogleSignIn()}
                 className="w-full bg-white/10 hover:bg-white/20 text-white font-black py-4 rounded-2xl transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-xs"
               >

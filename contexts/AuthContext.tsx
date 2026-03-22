@@ -9,6 +9,7 @@ interface AuthContextType {
   signInWithGoogle: (captchaToken?: string) => Promise<void>;
   signUp: (data: any) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => {},
   signUp: async () => {},
   signOut: async () => {},
+  refreshUser: async () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -89,8 +91,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    const refreshedUser = await auth.getCurrentUser();
+    setUser(refreshedUser);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signInWithGoogle, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signInWithGoogle, signUp, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

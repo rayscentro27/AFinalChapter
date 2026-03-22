@@ -20,6 +20,23 @@ import {
   getFundingHistory,
   logFundingApplyEvent,
 } from '../services/fundingFoundationService';
+import {
+  fintechHero,
+  fintechInput,
+  fintechInset,
+  fintechMetric,
+  fintechPrimaryButton,
+  fintechSecondaryButton,
+  fintechShell,
+  fintechTextarea,
+  fintechTertiaryButton,
+} from './portal/fintechStyles';
+
+const shellClass = fintechShell;
+const softPanelClass = fintechInset;
+const buttonPrimaryClass = fintechPrimaryButton;
+const buttonSecondaryClass = fintechSecondaryButton;
+const buttonTertiaryClass = fintechTertiaryButton;
 
 type PortalTab =
   | 'home'
@@ -72,11 +89,27 @@ function toLabel(step: string): string {
 
 function PrimaryCard(props: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className={`${shellClass} p-6`}>
       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{props.title}</p>
-      {props.subtitle ? <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">{props.subtitle}</h3> : null}
+      {props.subtitle ? <h3 className="mt-2 text-[1.85rem] font-black tracking-tight text-slate-900 leading-tight">{props.subtitle}</h3> : null}
       <div className="mt-4">{props.children}</div>
     </section>
+  );
+}
+
+function ExecutiveStat(props: { label: string; value: string; tone?: 'default' | 'success' | 'info' }) {
+  const toneClass =
+    props.tone === 'success'
+      ? 'text-emerald-700 border-emerald-200 bg-emerald-50/80'
+      : props.tone === 'info'
+      ? 'text-blue-700 border-blue-200 bg-blue-50/80'
+      : 'text-slate-900 border-slate-200 bg-white';
+
+  return (
+    <div className={`${fintechMetric} ${toneClass}`}>
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{props.label}</p>
+      <p className="mt-2 text-lg font-black tracking-tight">{props.value}</p>
+    </div>
   );
 }
 
@@ -99,21 +132,26 @@ function AssistantPanel(props: {
   onAsk: () => Promise<void>;
 }) {
   return (
-    <PrimaryCard title="Portal AI" subtitle={props.title}>
-      <button
-        type="button"
-        onClick={() => void props.onAsk()}
-        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
-      >
-        {props.loading ? 'Loading Guidance...' : 'Get Guidance'}
-      </button>
-      {props.error ? <p className="mt-3 text-sm font-medium text-red-600">{props.error}</p> : null}
+    <section className={`${shellClass} p-5`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Portal AI</p>
+          <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">{props.title}</h3>
+          <p className="mt-2 max-w-2xl text-sm text-slate-500">Keep guidance secondary to the workflow. Use it when you need the next best action clarified.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void props.onAsk()}
+          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
+        >
+          {props.loading ? 'Loading Guidance...' : 'Refresh Guidance'}
+        </button>
+      </div>
+      {props.error ? <p className="mt-4 text-sm font-medium text-red-600">{props.error}</p> : null}
       {props.answer ? (
-        <pre className="mt-3 whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">{props.answer}</pre>
-      ) : (
-        <p className="mt-3 text-sm text-slate-500">Assistant stays secondary to your main workflow and focuses on the next action.</p>
-      )}
-    </PrimaryCard>
+        <pre className="mt-4 whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">{props.answer}</pre>
+      ) : null}
+    </section>
   );
 }
 
@@ -196,6 +234,11 @@ export default function FundingJourneyWorkspace(props: {
       : []),
   ];
 
+  const activeLabel = [...navItems, ...quickItems].find((item) => item.key === activeTab)?.label || 'Home';
+  const topTaskTitle = tasks.data?.top_task?.title || 'Review your guided next step';
+  const topTaskType = tasks.data?.top_task?.type || 'workflow';
+  const stageLabel = (roadmap.data?.stage || 'starting').replace(/_/g, ' ');
+
   const currentPathSteps = useMemo(() => {
     const path = business.data?.readiness?.path;
     if (path === 'new_business') return NEW_BUSINESS_STEPS;
@@ -254,24 +297,40 @@ export default function FundingJourneyWorkspace(props: {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)] text-slate-900">
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-4 py-4 md:px-8">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+          <div className={`${fintechHero} flex items-start justify-between gap-4 flex-wrap px-5 py-5 md:px-6`}>
+            <div className="space-y-3">
               <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">{branding.name || 'Nexus Portal'}</p>
               <h1 className="text-2xl font-black tracking-tight text-slate-900">Funding-First Client Journey</h1>
+              <p className="max-w-2xl text-sm text-slate-600">
+                A calm capital-readiness workspace for funding, credit, business foundation, and post-funding planning.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Current View: {activeLabel}</span>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">Stage: {stageLabel}</span>
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-700">Next Task: {topTaskType}</span>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"
-            >
-              <LogOut size={14} /> Logout
-            </button>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Priority Focus</p>
+                <p className="mt-1 text-sm font-black text-slate-900">{topTaskTitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={onLogout}
+                className={buttonSecondaryClass + ' inline-flex items-center gap-2 text-xs'}
+              >
+                <LogOut size={14} /> Logout
+              </button>
+            </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-5 rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-2 shadow-sm">
+            <div className="flex flex-wrap gap-2">
             {navItems.map((item) => (
               <button
                 key={item.key}
@@ -279,34 +338,49 @@ export default function FundingJourneyWorkspace(props: {
                 onClick={() => setActiveTab(item.key)}
                 className={`rounded-xl px-4 py-2 text-[11px] font-black uppercase tracking-widest ${
                   activeTab === item.key
-                    ? 'bg-slate-900 text-white'
-                    : 'border border-slate-200 bg-slate-100 text-slate-700 hover:bg-white'
+                    ? 'bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)]'
+                    : 'border border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white'
                 }`}
               >
                 {item.label}
               </button>
             ))}
+            </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            {quickItems.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setActiveTab(item.key)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-600"
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+          {quickItems.length ? (
+            <div className="mt-4 rounded-[1.5rem] border border-slate-200 bg-white/85 p-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Specialized Workspaces</p>
+                  <p className="mt-1 text-sm text-slate-500">Open focused modules without crowding the main journey navigation.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {quickItems.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setActiveTab(item.key)}
+                      className={`rounded-lg border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${
+                        activeTab === item.key
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 bg-white text-slate-600'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8">
         {activeTab === 'home' ? (
           <>
-            <PrimaryCard title="Stage" subtitle={(roadmap.data?.stage || 'starting').replace(/_/g, ' ')}>
+            <PrimaryCard title="Executive Summary" subtitle={(roadmap.data?.stage || 'starting').replace(/_/g, ' ')}>
               {roadmap.loading ? (
                 <div className="inline-flex items-center gap-2 text-sm text-slate-500">
                   <Loader2 className="animate-spin" size={14} /> Loading funding stage...
@@ -319,34 +393,23 @@ export default function FundingJourneyWorkspace(props: {
                     {roadmap.data?.recommendation.reasoning_summary || 'Your next action is determined by readiness and recent results.'}
                   </p>
                   <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ready</p>
-                      <p className="mt-1 text-xl font-black text-slate-900">
-                        {roadmap.data?.readiness.ready ? 'Yes' : 'Blocked'}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Top Task</p>
-                      <p className="mt-1 text-sm font-bold text-slate-900">{tasks.data?.top_task?.title || 'No active task'}</p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Recent Decisions</p>
-                      <p className="mt-1 text-sm font-bold text-slate-900">{history?.results?.slice(0, 3).length || 0} logged</p>
-                    </div>
+                    <ExecutiveStat label="Readiness" value={roadmap.data?.readiness.ready ? 'Ready To Advance' : 'Needs Attention'} tone={roadmap.data?.readiness.ready ? 'success' : 'default'} />
+                    <ExecutiveStat label="Top Task" value={tasks.data?.top_task?.title || 'No active task'} tone="info" />
+                    <ExecutiveStat label="Recent Decisions" value={`${history?.results?.slice(0, 3).length || 0} logged`} />
                   </div>
 
                   <div className="mt-5 flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={() => setActiveTab('actionCenter')}
-                      className="rounded-xl bg-slate-900 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white"
+                      className={buttonPrimaryClass}
                     >
                       {tasks.data?.top_task?.title ? `Do Next: ${tasks.data.top_task.title}` : 'Open Action Center'}
                     </button>
                     <button
                       type="button"
                       onClick={() => setActiveTab('fundingRoadmap')}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                      className={buttonSecondaryClass}
                     >
                       Open Funding Roadmap
                     </button>
@@ -354,7 +417,7 @@ export default function FundingJourneyWorkspace(props: {
                       <button
                         type="button"
                         onClick={() => setActiveTab('capitalProtection')}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                        className={buttonSecondaryClass}
                       >
                         Capital Protection
                       </button>
@@ -385,7 +448,7 @@ export default function FundingJourneyWorkspace(props: {
                 <button
                   type="button"
                   onClick={() => void tasks.refresh()}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                  className={buttonSecondaryClass + ' inline-flex items-center gap-1 py-2'}
                 >
                   <RefreshCw size={12} /> Refresh
                 </button>
@@ -399,7 +462,7 @@ export default function FundingJourneyWorkspace(props: {
                 <p className="mt-4 text-sm font-medium text-red-600">{tasks.error}</p>
               ) : (
                 <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
+                  <div className="rounded-[1.75rem] border border-red-100 bg-red-50/85 p-4 shadow-sm">
                     <p className="text-[10px] font-black uppercase tracking-widest text-red-600">Urgent</p>
                     <div className="mt-3 space-y-2">
                       {(tasks.data?.urgent || []).slice(0, 6).map((task: any) => (
@@ -423,7 +486,7 @@ export default function FundingJourneyWorkspace(props: {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                  <div className="rounded-[1.75rem] border border-amber-100 bg-amber-50/85 p-4 shadow-sm">
                     <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Recommended</p>
                     <div className="mt-3 space-y-2">
                       {(tasks.data?.recommended || []).slice(0, 6).map((task: any) => (
@@ -439,7 +502,7 @@ export default function FundingJourneyWorkspace(props: {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <div className="rounded-[1.75rem] border border-emerald-100 bg-emerald-50/85 p-4 shadow-sm">
                     <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Completed</p>
                     <div className="mt-3 space-y-2">
                       {(tasks.data?.completed || []).slice(0, 6).map((task: any) => (
@@ -475,14 +538,14 @@ export default function FundingJourneyWorkspace(props: {
                 <button
                   type="button"
                   onClick={() => void roadmap.refresh()}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                  className={buttonSecondaryClass + ' inline-flex items-center gap-1 py-2'}
                 >
                   <RefreshCw size={12} /> Refresh
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowApplyModal(true)}
-                  className="rounded-lg bg-slate-900 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white"
+                  className={buttonPrimaryClass + ' py-2'}
                 >
                   Log Application Result
                 </button>
@@ -496,7 +559,7 @@ export default function FundingJourneyWorkspace(props: {
                 <p className="mt-4 text-sm font-medium text-red-600">{roadmap.error}</p>
               ) : (
                 <>
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className={`mt-4 ${softPanelClass} p-4`}>
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Next Recommendation</p>
                     <p className="mt-1 text-lg font-black text-slate-900">{roadmap.data?.recommendation.top_recommendation?.title || 'No recommendation yet'}</p>
                     <p className="mt-1 text-sm text-slate-600">{roadmap.data?.recommendation.top_recommendation?.action || 'Log activity to continue sequencing.'}</p>
@@ -595,14 +658,14 @@ export default function FundingJourneyWorkspace(props: {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <a
                       href="/credit-report-upload"
-                      className="rounded-xl bg-slate-900 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white"
+                      className={buttonPrimaryClass + ' py-2'}
                     >
                       Upload Credit Report
                     </a>
                     <button
                       type="button"
                       onClick={() => void credit.refresh()}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                      className={buttonSecondaryClass + ' py-2'}
                     >
                       Refresh
                     </button>
@@ -685,21 +748,21 @@ export default function FundingJourneyWorkspace(props: {
                     <button
                       type="button"
                       onClick={() => void business.setPath('new_business')}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                      className={buttonSecondaryClass + ' py-2'}
                     >
                       New Business Path
                     </button>
                     <button
                       type="button"
                       onClick={() => void business.setPath('existing_business_optimization')}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                      className={buttonSecondaryClass + ' py-2'}
                     >
                       Existing Business Optimization
                     </button>
                     <button
                       type="button"
                       onClick={() => void business.refresh()}
-                      className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                      className={buttonTertiaryClass + ' py-2'}
                     >
                       Refresh
                     </button>
@@ -863,23 +926,23 @@ export default function FundingJourneyWorkspace(props: {
         ) : null}
 
         {activeTab === 'messages' ? (
-          <div className="h-[72vh] overflow-hidden rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
+          <div className={`${shellClass} h-[72vh] overflow-hidden p-2`}>
             <MessageCenter contact={contact} onUpdateContact={onUpdateContact} currentUserRole="client" />
           </div>
         ) : null}
 
         {activeTab === 'documents' ? (
-          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className={`${shellClass} p-4`}>
             <DocumentVault contact={contact} onUpdateContact={onUpdateContact} readOnly={true} />
           </div>
         ) : null}
 
         {activeTab === 'account' ? (
           <div className="space-y-4">
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className={`${shellClass} p-4`}>
               <BusinessProfile contact={contact} onUpdateContact={onUpdateContact} />
             </div>
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className={`${shellClass} p-4`}>
               <SubscriptionManager contact={contact} onUpdateContact={onUpdateContact} branding={branding} />
             </div>
           </div>
@@ -888,16 +951,17 @@ export default function FundingJourneyWorkspace(props: {
 
       {showApplyModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+          <div className={`w-full max-w-xl ${shellClass} p-6`}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Apply / Log Result</p>
                 <h3 className="mt-1 text-xl font-black tracking-tight text-slate-900">Log Funding Application Outcome</h3>
+                <p className="mt-2 text-sm text-slate-500">Capture the lender decision clearly so roadmap sequencing and action priorities stay accurate.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowApplyModal(false)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700"
+                className={buttonSecondaryClass + ' px-3 py-1 text-xs'}
               >
                 Close
               </button>
@@ -909,7 +973,7 @@ export default function FundingJourneyWorkspace(props: {
                 <input
                   value={applyForm.provider_name}
                   onChange={(e) => setApplyForm((prev) => ({ ...prev, provider_name: e.target.value }))}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  className={fintechInput}
                   placeholder="Provider name"
                 />
               </label>
@@ -919,7 +983,7 @@ export default function FundingJourneyWorkspace(props: {
                 <input
                   value={applyForm.product_name}
                   onChange={(e) => setApplyForm((prev) => ({ ...prev, product_name: e.target.value }))}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  className={fintechInput}
                   placeholder="Product name"
                 />
               </label>
@@ -929,7 +993,7 @@ export default function FundingJourneyWorkspace(props: {
                 <input
                   value={applyForm.bureau_used}
                   onChange={(e) => setApplyForm((prev) => ({ ...prev, bureau_used: e.target.value }))}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  className={fintechInput}
                   placeholder="Experian / Equifax / TransUnion"
                 />
               </label>
@@ -939,7 +1003,7 @@ export default function FundingJourneyWorkspace(props: {
                 <select
                   value={applyForm.decision_status}
                   onChange={(e) => setApplyForm((prev) => ({ ...prev, decision_status: e.target.value as FundingDecisionStatus }))}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  className={fintechInput}
                 >
                   <option value="submitted">Submitted</option>
                   <option value="approved">Approved</option>
@@ -954,7 +1018,7 @@ export default function FundingJourneyWorkspace(props: {
                 <input
                   value={applyForm.approved_amount}
                   onChange={(e) => setApplyForm((prev) => ({ ...prev, approved_amount: e.target.value }))}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  className={fintechInput}
                   placeholder="15000"
                 />
               </label>
@@ -964,7 +1028,7 @@ export default function FundingJourneyWorkspace(props: {
                 <textarea
                   value={applyForm.notes}
                   onChange={(e) => setApplyForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  className={fintechTextarea}
                   placeholder="Notes about outcome or follow-up"
                 />
               </label>
@@ -986,14 +1050,14 @@ export default function FundingJourneyWorkspace(props: {
                 type="button"
                 onClick={() => void submitApplyLog()}
                 disabled={applySaving}
-                className="rounded-xl bg-slate-900 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-60"
+                className={buttonPrimaryClass + ' py-2 disabled:opacity-60'}
               >
                 {applySaving ? 'Saving...' : 'Submit Log'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowApplyModal(false)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
+                className={buttonSecondaryClass + ' py-2'}
               >
                 Cancel
               </button>

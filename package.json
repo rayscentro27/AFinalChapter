@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "auth:check-env": "node scripts/check-auth-captcha-env.mjs",
+    "auth:set-captcha-secret": "powershell -ExecutionPolicy Bypass -File .\\scripts\\set-supabase-auth-captcha-secret.ps1",
     "gateway:dev": "npm --prefix gateway run dev",
     "gateway:start": "npm --prefix gateway run start",
     "smoke:inbox-send": "node scripts/smoke-inbox-send.mjs",

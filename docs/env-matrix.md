@@ -82,6 +82,11 @@ Public (`VITE_*` only):
 - `VITE_BACKEND_MODE`
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `VITE_TURNSTILE_ENABLED`
+- `VITE_TURNSTILE_SITE_KEY` (or `VITE_AUTH_TURNSTILE_SITE_KEY` if you keep the legacy name)
+
+Local Supabase auth parity:
+- `SUPABASE_AUTH_CAPTCHA_SECRET`
 
 ## Mac Mini AI node (documentation only)
 

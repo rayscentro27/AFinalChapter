@@ -1,5 +1,8 @@
 import { supabaseAdmin } from '../supabase.js';
 import { ENV } from '../env.js';
+import { requireTenantRole } from '../lib/auth/requireTenantRole.js';
+import { logAudit } from '../lib/audit/auditLog.js';
+import { ADMIN_RATE_LIMIT } from '../util/rate-limit.js';
 
 function asText(value) {
   if (Array.isArray(value)) return String(value[0] || '').trim();
@@ -26,8 +29,19 @@ function normalizeLimit(value, fallback = 20, max = 200) {
   return clamp(asInt(value, fallback), 1, max);
 }
 
+function normalizeApprovalDecision(value) {
+  const text = asText(value).toLowerCase();
+  if (text === 'approve' || text === 'approved') return 'approved';
+  if (text === 'reject' || text === 'rejected') return 'rejected';
+  return null;
+}
+
 function normalizeTenantId(req) {
   return asText(req.query?.tenant_id || req.params?.tenant_id || '');
+}
+
+function getTenantIdFromRequest(req) {
+  return asText(req?.body?.tenant_id || req?.query?.tenant_id || req?.params?.tenant_id || req?.tenant?.id || '');
 }
 
 async function requireApiKey(req, reply) {
@@ -190,6 +204,7 @@ function buildReplayPerformance(rows) {
 
 export async function researchRoutes(fastify) {
   fastify.addHook('onRequest', requireApiKey);
+  const agentRoleGuard = requireTenantRole({ supabaseAdmin, allowedRoles: ['owner', 'admin', 'agent'] });
 
   fastify.get('/api/research/strategy-rankings', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
     const tenantId = normalizeTenantId(req);
@@ -237,6 +252,257 @@ export async function researchRoutes(fastify) {
     if (error) return reply.code(500).send({ ok: false, error: summarizeQueryError(error, 'options rankings query failed') });
 
     return reply.send({ ok: true, count: (data || []).length, items: data || [] });
+  });
+
+  fastify.get('/api/research/approved-signals', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
+    const tenantId = normalizeTenantId(req);
+    const limit = normalizeLimit(req.query?.limit, 20, 100);
+    const assetType = asText(req.query?.asset_type);
+    const symbol = asText(req.query?.symbol);
+    const strategyId = asText(req.query?.strategy_id);
+
+    let query = applyTenantFilter(
+      supabaseAdmin
+        .from('reviewed_signal_proposals')
+        .select('id,tenant_id,proposal_key,strategy_id,asset_type,symbol,timeframe,side,confidence,confidence_band,status,decision,approval_status,summary,rationale,source_trace_id,meta,created_at,updated_at')
+        .eq('approval_status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      tenantId
+    );
+
+    if (assetType) query = query.eq('asset_type', assetType);
+    if (symbol) query = query.eq('symbol', symbol);
+    if (strategyId) query = query.eq('strategy_id', strategyId);
+
+    const { data, error } = await query;
+    if (error) return reply.code(500).send({ ok: false, error: summarizeQueryError(error, 'approved signals query failed') });
+
+    return reply.send({ ok: true, count: (data || []).length, items: data || [] });
+  });
+
+  fastify.get('/api/research/approval-queue', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
+    const tenantId = normalizeTenantId(req);
+    const limit = normalizeLimit(req.query?.limit, 25, 100);
+    const status = asText(req.query?.status);
+
+    let query = applyTenantFilter(
+      supabaseAdmin
+        .from('approval_queue')
+        .select('id,tenant_id,proposal_id,strategy_id,symbol,status,decision,approval_status,priority,requested_by,resolved_by,resolved_at,notes,meta,created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      tenantId
+    );
+
+    if (status) query = query.eq('status', status);
+
+    const { data, error } = await query;
+    if (error) return reply.code(500).send({ ok: false, error: summarizeQueryError(error, 'approval queue query failed') });
+
+    return reply.send({ ok: true, count: (data || []).length, items: data || [] });
+  });
+
+  fastify.get('/api/research/risk-decisions', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {
+    const tenantId = normalizeTenantId(req);
+    const limit = normalizeLimit(req.query?.limit, 25, 100);
+    const approvalStatus = asText(req.query?.approval_status);
+
+    let query = applyTenantFilter(
+      supabaseAdmin
+        .from('risk_decisions')
+        .select('id,tenant_id,proposal_id,strategy_id,symbol,decision,approval_status,confidence_band,risk_score,risk_notes,reviewer,meta,created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      tenantId
+    );
+
+    if (approvalStatus) query = query.eq('approval_status', approvalStatus);
+
+    const { data, error } = await query;
+    if (error) return reply.code(500).send({ ok: false, error: summarizeQueryError(error, 'risk decisions query failed') });
+
+    return reply.send({ ok: true, count: (data || []).length, items: data || [] });
+  });
+
+  fastify.post('/admin/research/queue/decide', {
+    preHandler: [agentRoleGuard],
+    config: { rateLimit: ADMIN_RATE_LIMIT },
+  }, async (req, reply) => {
+    const tenantId = getTenantIdFromRequest(req);
+    const queueId = asText(req.body?.queue_id);
+    const decision = normalizeApprovalDecision(req.body?.decision);
+    const notes = asText(req.body?.notes);
+
+    if (!tenantId || !queueId || !decision) {
+      return reply.code(400).send({ ok: false, error: 'missing_required_fields' });
+    }
+
+    try {
+      const queueRes = await supabaseAdmin
+        .from('approval_queue')
+        .select('id,tenant_id,proposal_id,strategy_id,symbol,status,decision,approval_status,notes')
+        .eq('tenant_id', tenantId)
+        .eq('id', queueId)
+        .maybeSingle();
+
+      if (queueRes.error) throw new Error(`approval queue lookup failed: ${queueRes.error.message}`);
+      if (!queueRes.data) return reply.code(404).send({ ok: false, error: 'queue_item_not_found' });
+
+      const queueItem = queueRes.data;
+      const currentApproval = asText(queueItem.approval_status).toLowerCase();
+      const currentStatus = asText(queueItem.status).toLowerCase();
+      if (currentApproval === 'approved' || currentApproval === 'rejected' || currentStatus === 'approved' || currentStatus === 'rejected' || currentStatus === 'resolved') {
+        return reply.code(409).send({ ok: false, error: 'queue_item_already_resolved' });
+      }
+
+      const actor = asText(req.user?.id) || null;
+      const now = new Date().toISOString();
+
+      const queueUpdate = await supabaseAdmin
+        .from('approval_queue')
+        .update({
+          status: decision,
+          decision,
+          approval_status: decision,
+          resolved_by: actor,
+          resolved_at: now,
+          notes: notes || queueItem.notes || null,
+        })
+        .eq('tenant_id', tenantId)
+        .eq('id', queueId)
+        .select('id,tenant_id,proposal_id,strategy_id,symbol,status,decision,approval_status,priority,requested_by,resolved_by,resolved_at,notes,created_at')
+        .single();
+
+      if (queueUpdate.error) throw new Error(`approval queue update failed: ${queueUpdate.error.message}`);
+
+      const related = {
+        reviewed_signal_proposals: 0,
+        options_trade_proposals: 0,
+        risk_decisions: 0,
+        strategy_performance: 0,
+        options_strategy_performance: 0,
+        proposal_outcomes: 0,
+      };
+
+      if (queueItem.proposal_id) {
+        const reviewedRes = await supabaseAdmin
+          .from('reviewed_signal_proposals')
+          .update({
+            decision,
+            approval_status: decision,
+            status: decision,
+            updated_at: now,
+          })
+          .eq('tenant_id', tenantId)
+          .eq('id', queueItem.proposal_id)
+          .select('id', { count: 'exact' });
+        if (reviewedRes.error && !isMissingSchema(reviewedRes.error)) throw new Error(`reviewed signal proposal update failed: ${reviewedRes.error.message}`);
+        related.reviewed_signal_proposals = Number(reviewedRes.count || 0);
+
+        const optionsProposalRes = await supabaseAdmin
+          .from('options_trade_proposals')
+          .update({
+            decision,
+            approval_status: decision,
+            status: decision,
+            updated_at: now,
+          })
+          .eq('tenant_id', tenantId)
+          .eq('id', queueItem.proposal_id)
+          .select('id', { count: 'exact' });
+        if (optionsProposalRes.error && !isMissingSchema(optionsProposalRes.error)) throw new Error(`options trade proposal update failed: ${optionsProposalRes.error.message}`);
+        related.options_trade_proposals = Number(optionsProposalRes.count || 0);
+
+        const outcomesRes = await supabaseAdmin
+          .from('proposal_outcomes')
+          .update({
+            decision,
+            approval_status: decision,
+            status: decision,
+            notes: notes || null,
+          })
+          .eq('tenant_id', tenantId)
+          .eq('proposal_id', queueItem.proposal_id)
+          .select('id', { count: 'exact' });
+        if (outcomesRes.error && !isMissingSchema(outcomesRes.error)) throw new Error(`proposal outcomes update failed: ${outcomesRes.error.message}`);
+        related.proposal_outcomes = Number(outcomesRes.count || 0);
+
+        const riskByProposalRes = await supabaseAdmin
+          .from('risk_decisions')
+          .update({
+            decision,
+            approval_status: decision,
+            reviewer: actor,
+          })
+          .eq('tenant_id', tenantId)
+          .eq('proposal_id', queueItem.proposal_id)
+          .select('id', { count: 'exact' });
+        if (riskByProposalRes.error && !isMissingSchema(riskByProposalRes.error)) throw new Error(`risk decisions update failed: ${riskByProposalRes.error.message}`);
+        related.risk_decisions += Number(riskByProposalRes.count || 0);
+      }
+
+      if (queueItem.strategy_id) {
+        const strategyRes = await supabaseAdmin
+          .from('strategy_performance')
+          .update({
+            decision,
+            approval_status: decision,
+          })
+          .eq('tenant_id', tenantId)
+          .eq('strategy_id', queueItem.strategy_id)
+          .select('id', { count: 'exact' });
+        if (strategyRes.error && !isMissingSchema(strategyRes.error)) throw new Error(`strategy performance update failed: ${strategyRes.error.message}`);
+        related.strategy_performance = Number(strategyRes.count || 0);
+
+        const optionsStrategyRes = await supabaseAdmin
+          .from('options_strategy_performance')
+          .update({
+            decision,
+            approval_status: decision,
+          })
+          .eq('tenant_id', tenantId)
+          .eq('strategy_id', queueItem.strategy_id)
+          .select('id', { count: 'exact' });
+        if (optionsStrategyRes.error && !isMissingSchema(optionsStrategyRes.error)) throw new Error(`options strategy performance update failed: ${optionsStrategyRes.error.message}`);
+        related.options_strategy_performance = Number(optionsStrategyRes.count || 0);
+
+        const riskByStrategyRes = await supabaseAdmin
+          .from('risk_decisions')
+          .update({
+            decision,
+            approval_status: decision,
+            reviewer: actor,
+          })
+          .eq('tenant_id', tenantId)
+          .eq('strategy_id', queueItem.strategy_id)
+          .select('id', { count: 'exact' });
+        if (riskByStrategyRes.error && !isMissingSchema(riskByStrategyRes.error)) throw new Error(`risk decisions strategy update failed: ${riskByStrategyRes.error.message}`);
+        related.risk_decisions += Number(riskByStrategyRes.count || 0);
+      }
+
+      await logAudit({
+        tenant_id: tenantId,
+        actor_user_id: actor,
+        actor_type: 'user',
+        action: decision === 'approved' ? 'research_queue_approved' : 'research_queue_rejected',
+        entity_type: 'research_approval_queue',
+        entity_id: queueId,
+        metadata: {
+          decision,
+          strategy_id: queueItem.strategy_id || null,
+          proposal_id: queueItem.proposal_id || null,
+          symbol: queueItem.symbol || null,
+          notes: notes || null,
+          related,
+        },
+      }).catch(() => {});
+
+      return reply.send({ ok: true, queue: queueUpdate.data, related });
+    } catch (error) {
+      req.log.error({ err: error, tenant_id: tenantId, queue_id: queueId }, 'research queue decision failed');
+      return reply.code(500).send({ ok: false, error: String(error?.message || error) });
+    }
   });
 
   fastify.get('/api/research/agent-scorecards', { preHandler: requireTenantScopeForInternalKey }, async (req, reply) => {

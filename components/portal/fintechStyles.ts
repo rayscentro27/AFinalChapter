@@ -1,0 +1,10 @@
+export const fintechShell = 'rounded-[2rem] border border-slate-200/80 bg-white/92 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur';
+export const fintechHero = 'rounded-[2.5rem] border border-slate-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f6f9ff_55%,#edf7f1_100%)] shadow-[0_24px_80px_rgba(15,23,42,0.08)]';
+export const fintechInset = 'rounded-[1.5rem] border border-slate-200 bg-slate-50/85';
+export const fintechMetric = 'rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]';
+export const fintechPrimaryButton = 'rounded-xl bg-slate-900 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] transition-all hover:-translate-y-0.5 hover:bg-emerald-700 disabled:opacity-50';
+export const fintechSecondaryButton = 'rounded-xl border border-slate-200 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50';
+export const fintechTertiaryButton = 'rounded-xl border border-transparent bg-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-600 transition-all hover:bg-slate-200 disabled:opacity-50';
+export const fintechInput = 'mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-all focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100';
+export const fintechTextarea = 'mt-1 min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-all focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100';
+export const fintechState = 'rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 text-sm font-medium text-slate-700';
