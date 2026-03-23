@@ -83,6 +83,75 @@ type AuditResponse = {
   error?: string;
 };
 
+type ReadinessCheck = {
+  id: string;
+  checklist_key: string;
+  area: string;
+  label: string;
+  status: string;
+  severity: string;
+  owner?: string | null;
+  updated_at?: string;
+  completed_at?: string | null;
+  due_at?: string | null;
+};
+
+type SimulationRun = {
+  id: string;
+  simulation_type: string;
+  status: string;
+  target_users: number;
+  actual_users?: number | null;
+  incident_count: number;
+  started_at?: string | null;
+  ended_at?: string | null;
+  summary?: string | null;
+};
+
+type BriefingPreview = {
+  id: string;
+  briefing_type: string;
+  title: string;
+  summary: string;
+  created_at: string;
+};
+
+type AgentRunSummary = {
+  id: string;
+  agent_name: string;
+  run_status: string;
+  risk_level: string;
+  headline?: string | null;
+  summary: string;
+  estimated_cost_usd?: number | null;
+  duration_ms?: number | null;
+  created_at: string;
+};
+
+type ProductionReadinessResponse = {
+  ok: boolean;
+  summary?: {
+    active_incidents: number;
+    readiness_checks: {
+      total: number;
+      passed: number;
+      warn: number;
+      blocked: number;
+      pending: number;
+    };
+    blocking_or_warn_checks: number;
+    recent_briefings: number;
+    recent_agent_runs: number;
+    recent_simulations: number;
+  };
+  readiness_checks?: ReadinessCheck[];
+  recent_simulations?: SimulationRun[];
+  executive_briefings?: BriefingPreview[];
+  agent_run_summaries?: AgentRunSummary[];
+  missing_tables?: string[];
+  warnings?: string[];
+};
+
 type BadgeTone = 'ok' | 'warn' | 'critical';
 
 const SYSTEM_MODES = ['development', 'research', 'production', 'maintenance', 'degraded', 'emergency_stop'] as const;
@@ -114,6 +183,7 @@ export default function AdminControlPlanePage() {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [readiness, setReadiness] = useState<ProductionReadinessResponse | null>(null);
 
   const [modeDraft, setModeDraft] = useState<(typeof SYSTEM_MODES)[number]>('research');
   const [modeReason, setModeReason] = useState('');
@@ -175,9 +245,11 @@ export default function AdminControlPlanePage() {
     const all = [
       ...(snapshot?.warnings || []),
       ...((snapshot?.missing_tables || []).map((x) => `missing table: ${x}`)),
+      ...(readiness?.warnings || []),
+      ...((readiness?.missing_tables || []).map((x) => `missing table: ${x}`)),
     ];
     return all;
-  }, [snapshot]);
+  }, [snapshot, readiness]);
 
   async function authToken() {
     const { data } = await supabase.auth.getSession();
@@ -224,17 +296,19 @@ export default function AdminControlPlanePage() {
       setError('');
 
       const qs = `tenant_id=${encodeURIComponent(tenantId)}`;
-      const [stateRes, flagsRes, incidentsRes, auditRes] = await Promise.all([
+      const [stateRes, flagsRes, incidentsRes, auditRes, readinessRes] = await Promise.all([
         getJson<ControlPlaneStateResponse>(`/.netlify/functions/admin-control-plane-state?${qs}`),
         getJson<FlagsResponse>(`/.netlify/functions/admin-control-plane-flags?${qs}&limit=50`),
         getJson<IncidentsResponse>(`/.netlify/functions/admin-control-plane-incidents?${qs}&status=active&limit=20`),
         getJson<AuditResponse>(`/.netlify/functions/admin-control-plane-audit?${qs}&limit=20`),
+        getJson<ProductionReadinessResponse>(`/.netlify/functions/admin-production-readiness?${qs}&limit=10`),
       ]);
 
       setSnapshot(stateRes);
       setFlags(Array.isArray(flagsRes.flags) ? flagsRes.flags : []);
       setIncidents(Array.isArray(incidentsRes.incidents) ? incidentsRes.incidents : []);
       setAudit(Array.isArray(auditRes.entries) ? auditRes.entries : []);
+      setReadiness(readinessRes);
       if (stateRes?.state?.system_mode && SYSTEM_MODES.includes(stateRes.state.system_mode as (typeof SYSTEM_MODES)[number])) {
         setModeDraft(stateRes.state.system_mode as (typeof SYSTEM_MODES)[number]);
       }
@@ -417,6 +491,29 @@ export default function AdminControlPlanePage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className={panelClass()}>
+          <h2 className="text-xs font-black uppercase tracking-wider text-cyan-300">Readiness Checks</h2>
+          <div className="mt-3 text-3xl font-black text-white">{readiness?.summary?.readiness_checks.total ?? 0}</div>
+          <div className="mt-2 text-xs text-slate-400">pass {readiness?.summary?.readiness_checks.passed ?? 0} · warn {readiness?.summary?.readiness_checks.warn ?? 0} · blocked {readiness?.summary?.readiness_checks.blocked ?? 0}</div>
+        </div>
+        <div className={panelClass()}>
+          <h2 className="text-xs font-black uppercase tracking-wider text-cyan-300">Blocking / Warn</h2>
+          <div className="mt-3 text-3xl font-black text-white">{readiness?.summary?.blocking_or_warn_checks ?? 0}</div>
+          <div className="mt-2 text-xs text-slate-400">Production gate items needing action now.</div>
+        </div>
+        <div className={panelClass()}>
+          <h2 className="text-xs font-black uppercase tracking-wider text-cyan-300">Recent Simulations</h2>
+          <div className="mt-3 text-3xl font-black text-white">{readiness?.summary?.recent_simulations ?? 0}</div>
+          <div className="mt-2 text-xs text-slate-400">Latest 100-user or staged simulation records stored in Supabase.</div>
+        </div>
+        <div className={panelClass()}>
+          <h2 className="text-xs font-black uppercase tracking-wider text-cyan-300">Agent Summaries</h2>
+          <div className="mt-3 text-3xl font-black text-white">{readiness?.summary?.recent_agent_runs ?? 0}</div>
+          <div className="mt-2 text-xs text-slate-400">Recent high-level run summaries available for executive review.</div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className={panelClass()}>
           <h2 className="text-sm font-black uppercase tracking-wider text-cyan-300">Feature Flag Upsert</h2>
@@ -522,6 +619,65 @@ export default function AdminControlPlanePage() {
                 </div>
               ))
             )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className={panelClass()}>
+          <h2 className="text-sm font-black uppercase tracking-wider text-cyan-300">Launch Readiness Queue</h2>
+          <div className="mt-3 space-y-2 text-xs text-slate-300">
+            {(readiness?.readiness_checks || []).length === 0 ? (
+              <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-slate-500">No readiness checks recorded yet.</div>
+            ) : (
+              (readiness?.readiness_checks || []).map((item) => (
+                <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  <div className="font-semibold text-slate-100">{item.label}</div>
+                  <div className="mt-1">{item.area} · {item.status} · {item.severity}</div>
+                  <div className="text-slate-500">{item.owner || 'unassigned'} · {item.updated_at || 'n/a'}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className={panelClass()}>
+          <h2 className="text-sm font-black uppercase tracking-wider text-cyan-300">Simulation Runs</h2>
+          <div className="mt-3 space-y-2 text-xs text-slate-300">
+            {(readiness?.recent_simulations || []).length === 0 ? (
+              <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-slate-500">No simulation runs recorded yet.</div>
+            ) : (
+              (readiness?.recent_simulations || []).map((item) => (
+                <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  <div className="font-semibold text-slate-100">{item.simulation_type} · {item.status}</div>
+                  <div className="mt-1">target {item.target_users} · actual {item.actual_users ?? 'n/a'} · incidents {item.incident_count}</div>
+                  <div className="text-slate-500">{item.started_at || item.ended_at || 'no timestamps'}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className={panelClass()}>
+          <h2 className="text-sm font-black uppercase tracking-wider text-cyan-300">Executive Summaries</h2>
+          <div className="mt-3 space-y-2 text-xs text-slate-300">
+            {(readiness?.executive_briefings || []).length === 0 && (readiness?.agent_run_summaries || []).length === 0 ? (
+              <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-slate-500">No local briefings or run summaries recorded yet.</div>
+            ) : null}
+            {(readiness?.executive_briefings || []).map((item) => (
+              <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="font-semibold text-slate-100">{item.title}</div>
+                <div className="mt-1 text-slate-400">{item.summary}</div>
+                <div className="text-slate-500">{item.created_at}</div>
+              </div>
+            ))}
+            {(readiness?.agent_run_summaries || []).map((item) => (
+              <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="font-semibold text-slate-100">{item.agent_name} · {item.run_status} · {item.risk_level}</div>
+                <div className="mt-1 text-slate-400">{item.headline || item.summary}</div>
+                <div className="text-slate-500">{item.created_at}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
