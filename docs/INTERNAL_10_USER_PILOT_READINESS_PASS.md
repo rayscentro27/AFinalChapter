@@ -173,6 +173,10 @@ Call the pilot successful only if:
 - worker processing remains stable
 - no unsafe automation behavior appears
 
+Supporting pilot artifacts:
+- `docs/INTERNAL_10_USER_PILOT_SMOKE_PLAN.md`
+- `docs/INTERNAL_10_USER_PILOT_ISSUE_TRACKER_TEMPLATE.md`
+
 ## Recommended Sequence After Pilot
 
 1. Fix critical issues.
