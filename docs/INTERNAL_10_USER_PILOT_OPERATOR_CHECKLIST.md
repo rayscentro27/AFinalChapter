@@ -70,3 +70,6 @@ Record the final pilot result in the issue tracker exit summary:
   3.
 - Ready for short validation rerun: yes or no
 - Ready for 100-user test: yes or no
+
+Then fill:
+- `docs/INTERNAL_10_USER_PILOT_RESULTS_TEMPLATE.md`
