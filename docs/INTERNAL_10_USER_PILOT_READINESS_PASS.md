@@ -176,6 +176,7 @@ Call the pilot successful only if:
 Supporting pilot artifacts:
 - `docs/INTERNAL_10_USER_PILOT_SMOKE_PLAN.md`
 - `docs/INTERNAL_10_USER_PILOT_ISSUE_TRACKER_TEMPLATE.md`
+- `docs/INTERNAL_10_USER_PILOT_HANDOFF_2026-03-23.md`
 
 ## Recommended Sequence After Pilot
 
