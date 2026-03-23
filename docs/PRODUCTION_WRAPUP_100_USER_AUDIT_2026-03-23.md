@@ -136,7 +136,13 @@ Status after this branch: closer to production-ready on Windows-owned persistenc
 Immediate next steps for this branch:
 1. Keep the three additive wrap-up migrations as the source of truth for readiness, source health, and review-gated self-improvement state.
 2. Use the seeded sample data only as operator-facing smoke coverage, not as launch-signoff evidence.
-3. Run a 10-user internal pilot before the 100-user test, using `docs/INTERNAL_10_USER_PILOT_READINESS_PASS.md` as the primary pilot runbook.
+3. Run a 10-user internal pilot before the 100-user test, using the pilot document set:
+  - `docs/INTERNAL_10_USER_PILOT_READINESS_PASS.md`
+  - `docs/INTERNAL_10_USER_PILOT_SMOKE_PLAN.md`
+  - `docs/INTERNAL_10_USER_PILOT_ISSUE_TRACKER_TEMPLATE.md`
+  - `docs/INTERNAL_10_USER_PILOT_HANDOFF_2026-03-23.md`
+  - `docs/INTERNAL_10_USER_PILOT_OPERATOR_CHECKLIST.md`
+  - `docs/INTERNAL_10_USER_PILOT_RESULTS_TEMPLATE.md`
 4. After deploy, run a staff-authenticated smoke pass against:
   - /.netlify/functions/admin-production-readiness
   - /.netlify/functions/admin-super-admin-commands

@@ -4,6 +4,14 @@ Purpose: final real-world validation gate before running the Nexus 100-user simu
 
 Detailed 10-user pilot deliverables now live in `docs/INTERNAL_10_USER_PILOT_READINESS_PASS.md` and should be used as the primary pilot runbook before the 100-user simulation.
 
+Use the full pilot operations set during that gate:
+- `docs/INTERNAL_10_USER_PILOT_READINESS_PASS.md`
+- `docs/INTERNAL_10_USER_PILOT_SMOKE_PLAN.md`
+- `docs/INTERNAL_10_USER_PILOT_ISSUE_TRACKER_TEMPLATE.md`
+- `docs/INTERNAL_10_USER_PILOT_HANDOFF_2026-03-23.md`
+- `docs/INTERNAL_10_USER_PILOT_OPERATOR_CHECKLIST.md`
+- `docs/INTERNAL_10_USER_PILOT_RESULTS_TEMPLATE.md`
+
 Scope:
 - React CRM / Client Portal on Netlify
 - Fastify backend on Oracle VM
