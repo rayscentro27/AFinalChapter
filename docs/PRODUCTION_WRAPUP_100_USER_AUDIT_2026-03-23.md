@@ -136,14 +136,14 @@ Status after this branch: closer to production-ready on Windows-owned persistenc
 Immediate next steps for this branch:
 1. Keep the three additive wrap-up migrations as the source of truth for readiness, source health, and review-gated self-improvement state.
 2. Use the seeded sample data only as operator-facing smoke coverage, not as launch-signoff evidence.
-3. Deploy the current Windows-owned control-plane changes to the linked Netlify site only after a clean production build succeeds.
+3. Run a 10-user internal pilot before the 100-user test, using `docs/INTERNAL_10_USER_PILOT_READINESS_PASS.md` as the primary pilot runbook.
 4. After deploy, run a staff-authenticated smoke pass against:
   - /.netlify/functions/admin-production-readiness
   - /.netlify/functions/admin-super-admin-commands
   - /.netlify/functions/admin-command-inbox
   - /.netlify/functions/admin-source-registry
 5. Before the 100-user exercise, either replace or clean the seeded sample records for the target tenant so launch-readiness reporting reflects only intentional pilot data.
-6. Resolve the local netlify dev instability separately; it is an environment issue, not a blocker for this production-wrap-up deploy.
+6. Resolve the local netlify dev instability separately; it is an environment issue, not a blocker for the pilot or deploy path.
 
 Post-deploy acceptance criteria:
 - production build completes without new TypeScript or bundling errors

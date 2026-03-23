@@ -2,6 +2,8 @@
 
 Purpose: final real-world validation gate before running the Nexus 100-user simulation.
 
+Detailed 10-user pilot deliverables now live in `docs/INTERNAL_10_USER_PILOT_READINESS_PASS.md` and should be used as the primary pilot runbook before the 100-user simulation.
+
 Scope:
 - React CRM / Client Portal on Netlify
 - Fastify backend on Oracle VM
