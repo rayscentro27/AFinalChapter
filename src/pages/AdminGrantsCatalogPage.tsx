@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { GrantCatalogRow } from '../services/grantsEngineService';
@@ -40,9 +40,24 @@ function csvToArray(input: string): string[] {
     .filter(Boolean);
 }
 
+function scoreRow(row: DraftRow, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return 0;
+  const name = row.name.toLowerCase();
+  const sponsor = row.sponsor.toLowerCase();
+  const tags = row.tagsText.toLowerCase();
+  if (name === normalizedQuery) return 100;
+  if (name.startsWith(normalizedQuery)) return 80;
+  if (name.includes(normalizedQuery)) return 60;
+  if (sponsor.includes(normalizedQuery)) return 45;
+  if (tags.includes(normalizedQuery)) return 25;
+  return 10;
+}
+
 export default function AdminGrantsCatalogPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('query') || '');
 
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -83,6 +98,22 @@ export default function AdminGrantsCatalogPage() {
   useEffect(() => {
     void loadRows();
   }, [isAdmin]);
+
+  useEffect(() => {
+    const nextUrl = new URL(window.location.href);
+    if (search.trim()) nextUrl.searchParams.set('query', search.trim());
+    else nextUrl.searchParams.delete('query');
+    window.history.replaceState({}, '', `${nextUrl.pathname}${nextUrl.search}`);
+  }, [search]);
+
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return rows;
+    return rows
+      .filter((row) => [row.name, row.sponsor, row.source, row.url, row.geographyText, row.tagsText, row.eligibility_md, row.award_range_md].join(' ').toLowerCase().includes(query))
+      .sort((left, right) => scoreRow(right, query) - scoreRow(left, query));
+  }, [rows, search]);
+  const highlightedRowId = search.trim() ? filteredRows[0]?.id || '' : '';
 
   function updateRow(id: string, patch: Partial<DraftRow>) {
     setRows((prev) => prev.map((row) => row.id === id ? { ...row, ...patch } : row));
@@ -216,12 +247,26 @@ export default function AdminGrantsCatalogPage() {
         </button>
       </div>
 
+      <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+        <label className="block text-xs font-black uppercase tracking-[0.2em] text-slate-400">Scoped Search</label>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search grant name, sponsor, source, tags, geography, or eligibility"
+          className="mt-2 w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+        />
+        {search.trim() ? <p className="mt-2 text-xs text-cyan-300">Scoped drill-through active for: {search.trim()}</p> : null}
+      </div>
+
       {error ? <div className="rounded-md border border-rose-500/50 bg-rose-950/30 text-rose-200 text-sm px-4 py-3">{error}</div> : null}
       {success ? <div className="rounded-md border border-emerald-500/50 bg-emerald-950/30 text-emerald-200 text-sm px-4 py-3">{success}</div> : null}
 
+      {filteredRows.length === 0 ? <div className="text-sm text-slate-500">No grants match the current filter.</div> : null}
+
       <div className="space-y-4">
-        {rows.map((row) => (
-          <div key={row.id} className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-3">
+        {filteredRows.map((row) => (
+          <div key={row.id} className={`rounded-2xl border p-4 space-y-3 ${row.id === highlightedRowId ? 'border-cyan-400 bg-cyan-950/20 shadow-[0_0_0_1px_rgba(34,211,238,0.35)]' : 'border-slate-700 bg-slate-900'}`}>
+            {row.id === highlightedRowId ? <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">Top scoped match</div> : null}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
               <input
                 value={row.name}

@@ -137,6 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.CHANNEL_POOLS} label="Channel Pools" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.DEAD_LETTERS} label="Dead Letters" icon={AlertCircle} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.ADMIN_HEALTH} label="Gateway Health" icon={Shield} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_AUTONOMY} label="Autonomy Dashboard" icon={BrainCircuit} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.SRE_DASHBOARD} label="SRE Dashboard" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.OUTBOX} label="Outbox" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
             <SidebarItem id={ViewMode.BILLING} label="Billing" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
@@ -153,6 +154,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <SidebarItem id={ViewMode.ADMIN_EMAIL_ROUTING} label="Email Routing" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_EMAIL_LOGS} label="Email Logs" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_EXECUTIVE_DASHBOARD} label="Executive Dashboard" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_DEAL_ESCALATIONS} label="Deal Escalations" icon={AlertCircle} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_LIFECYCLE_AUTOMATION} label="Lifecycle Automation" icon={AlertCircle} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_REVIEW_ANALYTICS} label="Review Analytics" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_RESEARCH_APPROVALS} label="Content Review" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />

@@ -62,7 +62,17 @@ const NeuralStrategySandbox = lazy(() => import('./components/NeuralStrategySand
 
 const FundingResearchPage = lazy(() => import('./src/pages/FundingResearchPage'));
 const ResearchDashboardPage = lazy(() => import('./src/pages/ResearchDashboardPage'));
+const AdminCeoBriefingPage = lazy(() => import('./src/pages/AdminCeoBriefingPage'));
+const AdminSuperAdminCommandCenterPage = lazy(() => import('./src/pages/AdminSuperAdminCommandCenterPage'));
+const AdminSourceRegistryPage = lazy(() => import('./src/pages/AdminSourceRegistryPage'));
+const AdminCommandInboxPage = lazy(() => import('./src/pages/AdminCommandInboxPage'));
+const AdminMonetizationOpportunitiesPage = lazy(() => import('./src/pages/AdminMonetizationOpportunitiesPage'));
+const AdminAutonomousExpansionPage = lazy(() => import('./src/pages/AdminAutonomousExpansionPage'));
+const AdminOrganizationDashboardPage = lazy(() => import('./src/pages/AdminOrganizationDashboardPage'));
+const AdminFunnelControlCenterPage = lazy(() => import('./src/pages/AdminFunnelControlCenterPage'));
+const AdminWhiteLabelSettingsPage = lazy(() => import('./src/pages/AdminWhiteLabelSettingsPage'));
 const AdminExecutiveDashboardPage = lazy(() => import('./src/pages/AdminExecutiveDashboardPage'));
+const AdminDealEscalationsPage = lazy(() => import('./src/pages/AdminDealEscalationsPage'));
 const LifecycleAutomationPage = lazy(() => import('./src/pages/LifecycleAutomationPage'));
 const AdminReviewAnalyticsPage = lazy(() => import('./src/pages/AdminReviewAnalyticsPage'));
 const AdminResearchApprovalsPage = lazy(() => import('./src/pages/AdminResearchApprovalsPage'));
@@ -86,6 +96,7 @@ const AdminChannelPools = lazy(() => import('./src/pages/AdminChannelPools'));
 const AdminDeadLetters = lazy(() => import('./src/pages/AdminDeadLetters'));
 const AdminOutbox = lazy(() => import('./src/pages/AdminOutbox'));
 const AdminMonitoring = lazy(() => import('./src/pages/AdminMonitoring'));
+const AdminAutonomyDashboard = lazy(() => import('./src/pages/AdminAutonomyDashboard'));
 const AdminSRE = lazy(() => import('./src/pages/AdminSRE'));
 const AdminChannelHealth = lazy(() => import('./src/pages/AdminChannelHealth'));
 const AdminPublicApi = lazy(() => import('./src/pages/AdminPublicApi'));
@@ -138,6 +149,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/suggestions': ViewMode.SUGGESTIONS,
   '/admin/health': ViewMode.ADMIN_HEALTH,
   '/admin/monitoring': ViewMode.ADMIN_HEALTH,
+  '/admin/autonomy': ViewMode.ADMIN_AUTONOMY,
   '/admin/control-plane': ViewMode.ADMIN_CONTROL_PLANE,
   '/admin/sre': ViewMode.SRE_DASHBOARD,
   '/admin/channel-health': ViewMode.CHANNEL_HEALTH,
@@ -160,7 +172,17 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/sba': ViewMode.SBA_PREP,
   '/funding/research': ViewMode.FUNDING_RESEARCH,
   '/research': ViewMode.RESEARCH_DASHBOARD,
+  '/admin/ceo-briefing': ViewMode.ADMIN_CEO_BRIEFING,
+  '/admin/ai-command-center': ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER,
+  '/admin/source-registry': ViewMode.ADMIN_SOURCE_REGISTRY,
+  '/admin/command-inbox': ViewMode.ADMIN_COMMAND_INBOX,
+  '/admin/monetization-opportunities': ViewMode.ADMIN_MONETIZATION_OPPORTUNITIES,
+  '/admin/autonomous-expansion': ViewMode.ADMIN_AUTONOMOUS_EXPANSION,
+  '/admin/organizations': ViewMode.ADMIN_ORGANIZATION_DASHBOARD,
+  '/admin/funnel-control': ViewMode.ADMIN_FUNNEL_CONTROL_CENTER,
+  '/admin/white-label': ViewMode.ADMIN_WHITE_LABEL_SETTINGS,
   '/admin/executive-dashboard': ViewMode.ADMIN_EXECUTIVE_DASHBOARD,
+  '/admin/deal-escalations': ViewMode.ADMIN_DEAL_ESCALATIONS,
   '/admin/lifecycle-automation': ViewMode.ADMIN_LIFECYCLE_AUTOMATION,
   '/admin/review-analytics': ViewMode.ADMIN_REVIEW_ANALYTICS,
   '/admin/research-approvals': ViewMode.ADMIN_RESEARCH_APPROVALS,
@@ -676,7 +698,17 @@ export const App = () => {
                     case ViewMode.FUNDING_FLOW: return renderTierGate(ViewMode.FUNDING_FLOW, <PGFundingFlow />);
                     case ViewMode.FUNDING_RESEARCH: return renderTierGate(ViewMode.FUNDING_RESEARCH, <FundingResearchPage />);
                     case ViewMode.RESEARCH_DASHBOARD: return <ResearchDashboardPage />;
+                    case ViewMode.ADMIN_CEO_BRIEFING: return <AdminCeoBriefingPage />;
+                    case ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER: return <AdminSuperAdminCommandCenterPage />;
+                    case ViewMode.ADMIN_SOURCE_REGISTRY: return <AdminSourceRegistryPage />;
+                    case ViewMode.ADMIN_COMMAND_INBOX: return <AdminCommandInboxPage />;
+                    case ViewMode.ADMIN_MONETIZATION_OPPORTUNITIES: return <AdminMonetizationOpportunitiesPage />;
+                    case ViewMode.ADMIN_AUTONOMOUS_EXPANSION: return <AdminAutonomousExpansionPage />;
+                    case ViewMode.ADMIN_ORGANIZATION_DASHBOARD: return <AdminOrganizationDashboardPage />;
+                    case ViewMode.ADMIN_FUNNEL_CONTROL_CENTER: return <AdminFunnelControlCenterPage />;
+                    case ViewMode.ADMIN_WHITE_LABEL_SETTINGS: return <AdminWhiteLabelSettingsPage />;
                     case ViewMode.ADMIN_EXECUTIVE_DASHBOARD: return <AdminExecutiveDashboardPage />;
+                    case ViewMode.ADMIN_DEAL_ESCALATIONS: return <AdminDealEscalationsPage />;
                     case ViewMode.ADMIN_LIFECYCLE_AUTOMATION: return <LifecycleAutomationPage />;
                     case ViewMode.ADMIN_REVIEW_ANALYTICS: return <AdminReviewAnalyticsPage />;
                     case ViewMode.ADMIN_RESEARCH_APPROVALS: return <AdminResearchApprovalsPage />;
@@ -706,6 +738,7 @@ export const App = () => {
                     case ViewMode.DEAD_LETTERS: return <AdminDeadLetters />;
                     case ViewMode.CHANNEL_HEALTH: return <AdminChannelHealth />;
                     case ViewMode.ADMIN_HEALTH: return <AdminMonitoring />;
+                    case ViewMode.ADMIN_AUTONOMY: return <AdminAutonomyDashboard />;
                     case ViewMode.ADMIN_CONTROL_PLANE: return <AdminControlPlanePage />;
                     case ViewMode.SRE_DASHBOARD: return <AdminSRE />;
                     case ViewMode.OUTBOX: return <AdminOutbox />;

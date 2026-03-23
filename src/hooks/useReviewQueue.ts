@@ -17,6 +17,11 @@ type Tenant = { id: string; name: string };
 
 const INTERNAL_REVIEW_ROLES = new Set(['admin', 'supervisor']);
 
+function initialTenantFromQuery() {
+  if (typeof window === 'undefined') return '';
+  return String(new URLSearchParams(window.location.search || '').get('tenant_id') || '');
+}
+
 export function useReviewQueue() {
   const { user } = useAuth();
   const [checkingAccess, setCheckingAccess] = useState(true);
@@ -28,7 +33,7 @@ export function useReviewQueue() {
   const [actionBusyId, setActionBusyId] = useState('');
   const [pendingAction, setPendingAction] = useState<ReviewAction | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [tenantId, setTenantId] = useState('');
+  const [tenantId, setTenantId] = useState(initialTenantFromQuery);
   const [dashboard, setDashboard] = useState<ReviewDashboardData>({ tenantId: '', metrics: [], items: [] });
 
   useEffect(() => {
@@ -86,7 +91,10 @@ export function useReviewQueue() {
 
         const next = (data || []) as Tenant[];
         setTenants(next);
-        setTenantId((current) => current || next[0]?.id || '');
+        setTenantId((current) => {
+          if (current && next.some((tenant) => tenant.id === current)) return current;
+          return next[0]?.id || '';
+        });
       } catch (e: any) {
         if (!active) return;
         setError(String(e?.message || e));
@@ -123,6 +131,14 @@ export function useReviewQueue() {
     if (!tenantId || !isAuthorized) return;
     void refresh();
   }, [tenantId, isAuthorized]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !tenantId) return;
+    const params = new URLSearchParams(window.location.search || '');
+    params.set('tenant_id', tenantId);
+    const query = params.toString();
+    window.history.replaceState({}, '', query ? `/admin/content-review?${query}` : '/admin/content-review');
+  }, [tenantId]);
 
   async function decide(queueId: string, decision: 'approved' | 'rejected', notes?: string) {
     if (!tenantId || !queueId) return;

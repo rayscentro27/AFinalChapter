@@ -14,11 +14,37 @@ const CATEGORY_FILTERS: Array<'all' | DocumentCategory> = ['all', 'credit', 'fun
 const STATUS_FILTERS: Array<'all' | DocumentStatus> = ['all', 'draft', 'needs_review', 'approved', 'finalized', 'mailed', 'archived'];
 const SOURCE_FILTERS: Array<'all' | DocumentSourceType> = ['all', 'ai_artifact', 'finalized_letter', 'upload', 'manual'];
 
+function readInitialFilterState() {
+  if (typeof window === 'undefined') {
+    return {
+      tenantFilter: 'all',
+      categoryFilter: 'all' as 'all' | DocumentCategory,
+      statusFilter: 'all' as 'all' | DocumentStatus,
+      sourceFilter: 'all' as 'all' | DocumentSourceType,
+    };
+  }
+
+  const params = new URLSearchParams(window.location.search || '');
+  const tenantFilter = String(params.get('tenant_id') || 'all');
+  const categoryFilter = CATEGORY_FILTERS.includes(String(params.get('category') || '') as 'all' | DocumentCategory)
+    ? (String(params.get('category')) as 'all' | DocumentCategory)
+    : 'all';
+  const statusFilter = STATUS_FILTERS.includes(String(params.get('status') || '') as 'all' | DocumentStatus)
+    ? (String(params.get('status')) as 'all' | DocumentStatus)
+    : 'all';
+  const sourceFilter = SOURCE_FILTERS.includes(String(params.get('source') || '') as 'all' | DocumentSourceType)
+    ? (String(params.get('source')) as 'all' | DocumentSourceType)
+    : 'all';
+
+  return { tenantFilter, categoryFilter, statusFilter, sourceFilter };
+}
+
 function prettyLabel(value: string): string {
   return value.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function AdminDocumentsPage() {
+  const initialFilters = readInitialFilterState();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -31,9 +57,10 @@ export default function AdminDocumentsPage() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const [categoryFilter, setCategoryFilter] = useState<'all' | DocumentCategory>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | DocumentStatus>('all');
-  const [sourceFilter, setSourceFilter] = useState<'all' | DocumentSourceType>('all');
+  const [tenantFilter, setTenantFilter] = useState(initialFilters.tenantFilter);
+  const [categoryFilter, setCategoryFilter] = useState<'all' | DocumentCategory>(initialFilters.categoryFilter);
+  const [statusFilter, setStatusFilter] = useState<'all' | DocumentStatus>(initialFilters.statusFilter);
+  const [sourceFilter, setSourceFilter] = useState<'all' | DocumentSourceType>(initialFilters.sourceFilter);
 
   useEffect(() => {
     let active = true;
@@ -129,17 +156,28 @@ export default function AdminDocumentsPage() {
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
+      if (tenantFilter !== 'all' && doc.tenant_id !== tenantFilter) return false;
       if (categoryFilter !== 'all' && doc.category !== categoryFilter) return false;
       if (statusFilter !== 'all' && doc.status !== statusFilter) return false;
       if (sourceFilter !== 'all' && doc.source_type !== sourceFilter) return false;
       return true;
     });
-  }, [documents, categoryFilter, statusFilter, sourceFilter]);
+  }, [documents, tenantFilter, categoryFilter, statusFilter, sourceFilter]);
+
+  const tenantOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return documents.reduce<Array<{ id: string; label: string }>>((acc, doc) => {
+      if (!doc.tenant_id || seen.has(doc.tenant_id)) return acc;
+      seen.add(doc.tenant_id);
+      acc.push({ id: doc.tenant_id, label: doc.tenant_id });
+      return acc;
+    }, []);
+  }, [documents]);
 
   const selectedDocument = useMemo(() => {
     if (!selectedDocumentId) return null;
-    return documents.find((doc) => doc.id === selectedDocumentId) || null;
-  }, [documents, selectedDocumentId]);
+    return filteredDocuments.find((doc) => doc.id === selectedDocumentId) || null;
+  }, [filteredDocuments, selectedDocumentId]);
 
   const selectedApprovals = useMemo(() => {
     if (!selectedDocument) return [];
@@ -147,6 +185,24 @@ export default function AdminDocumentsPage() {
       .filter((approval) => approval.document_id === selectedDocument.id)
       .sort((a, b) => String(b.approved_at).localeCompare(String(a.approved_at)));
   }, [approvals, selectedDocument]);
+
+  useEffect(() => {
+    setSelectedDocumentId((current) => {
+      if (current && filteredDocuments.some((doc) => doc.id === current)) return current;
+      return filteredDocuments[0]?.id || null;
+    });
+  }, [filteredDocuments]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search || '');
+    if (tenantFilter !== 'all') params.set('tenant_id', tenantFilter); else params.delete('tenant_id');
+    if (categoryFilter !== 'all') params.set('category', categoryFilter); else params.delete('category');
+    if (statusFilter !== 'all') params.set('status', statusFilter); else params.delete('status');
+    if (sourceFilter !== 'all') params.set('source', sourceFilter); else params.delete('source');
+    const query = params.toString();
+    window.history.replaceState({}, '', query ? `/admin/documents?${query}` : '/admin/documents');
+  }, [tenantFilter, categoryFilter, statusFilter, sourceFilter]);
 
   useEffect(() => {
     let active = true;
@@ -198,7 +254,21 @@ export default function AdminDocumentsPage() {
         <p className="text-sm text-slate-400 mt-1">Tenant document inventory with approval proof logs.</p>
       </div>
 
-      <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div>
+          <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Tenant</label>
+          <select
+            className="w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm"
+            value={tenantFilter}
+            onChange={(e) => setTenantFilter(e.target.value)}
+          >
+            <option value="all">All tenants</option>
+            {tenantOptions.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>{tenant.label}</option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Category</label>
           <select

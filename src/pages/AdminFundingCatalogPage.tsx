@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -59,9 +59,24 @@ function parseRequirements(input: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
+function scoreRow(row: DraftRow, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return 0;
+  const name = row.name.toLowerCase();
+  const regions = row.regionsText.toLowerCase();
+  const notes = row.notes_md.toLowerCase();
+  if (name === normalizedQuery) return 100;
+  if (name.startsWith(normalizedQuery)) return 80;
+  if (name.includes(normalizedQuery)) return 60;
+  if (regions.includes(normalizedQuery)) return 40;
+  if (notes.includes(normalizedQuery)) return 20;
+  return 10;
+}
+
 export default function AdminFundingCatalogPage() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'admin';
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('query') || '');
 
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -103,6 +118,22 @@ export default function AdminFundingCatalogPage() {
   useEffect(() => {
     void loadCatalog();
   }, [isSuperAdmin]);
+
+  useEffect(() => {
+    const nextUrl = new URL(window.location.href);
+    if (search.trim()) nextUrl.searchParams.set('query', search.trim());
+    else nextUrl.searchParams.delete('query');
+    window.history.replaceState({}, '', `${nextUrl.pathname}${nextUrl.search}`);
+  }, [search]);
+
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return draftRows;
+    return draftRows
+      .filter((row) => [row.name, row.regionsText, row.productsText, row.requirementsText, row.notes_md].join(' ').toLowerCase().includes(query))
+      .sort((left, right) => scoreRow(right, query) - scoreRow(left, query));
+  }, [draftRows, search]);
+  const highlightedRowId = search.trim() ? filteredRows[0]?.id || '' : '';
 
   function updateDraft(id: string, patch: Partial<DraftRow>) {
     setDraftRows((prev) => prev.map((row) => row.id === id ? { ...row, ...patch } : row));
@@ -229,14 +260,26 @@ export default function AdminFundingCatalogPage() {
         </button>
       </div>
 
+      <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+        <label className="block text-xs font-black uppercase tracking-[0.2em] text-slate-400">Scoped Search</label>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search bank, region, product JSON, requirements, or notes"
+          className="mt-2 w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+        />
+        {search.trim() ? <p className="mt-2 text-xs text-cyan-300">Scoped drill-through active for: {search.trim()}</p> : null}
+      </div>
+
       {error ? <div className="rounded-md border border-rose-500/50 bg-rose-950/30 text-rose-200 text-sm px-4 py-3">{error}</div> : null}
       {success ? <div className="rounded-md border border-emerald-500/50 bg-emerald-950/30 text-emerald-200 text-sm px-4 py-3">{success}</div> : null}
 
-      {draftRows.length === 0 ? <div className="text-sm text-slate-500">No catalog rows.</div> : null}
+      {filteredRows.length === 0 ? <div className="text-sm text-slate-500">No catalog rows match the current filter.</div> : null}
 
       <div className="space-y-4">
-        {draftRows.map((row) => (
-          <div key={row.id} className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-4">
+        {filteredRows.map((row) => (
+          <div key={row.id} className={`rounded-2xl border p-4 space-y-4 ${row.id === highlightedRowId ? 'border-cyan-400 bg-cyan-950/20 shadow-[0_0_0_1px_rgba(34,211,238,0.35)]' : 'border-slate-700 bg-slate-900'}`}>
+            {row.id === highlightedRowId ? <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">Top scoped match</div> : null}
             <div className="flex flex-wrap items-center gap-4">
               <label className="text-sm text-slate-300">
                 Name

@@ -14,6 +14,21 @@ import {
 
 const STATUS_OPTIONS: Array<CommissionStatus | 'all'> = ['all', 'estimated', 'invoiced', 'paid', 'waived', 'disputed'];
 
+function readInitialFilters() {
+  if (typeof window === 'undefined') {
+    return { status: 'all' as CommissionStatus | 'all', tenantId: 'all', dateFrom: '', dateTo: '' };
+  }
+
+  const params = new URLSearchParams(window.location.search || '');
+  const status = String(params.get('status') || 'all');
+  return {
+    status: STATUS_OPTIONS.includes(status as CommissionStatus | 'all') ? (status as CommissionStatus | 'all') : 'all',
+    tenantId: String(params.get('tenant_id') || 'all'),
+    dateFrom: String(params.get('date_from') || ''),
+    dateTo: String(params.get('date_to') || ''),
+  };
+}
+
 function pretty(value: string): string {
   return value.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -30,6 +45,7 @@ function downloadCsv(filename: string, content: string) {
 }
 
 export default function AdminCommissionsPage() {
+  const initialFilters = readInitialFilters();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
@@ -41,10 +57,10 @@ export default function AdminCommissionsPage() {
   const [rows, setRows] = useState<CommissionEventRow[]>([]);
   const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]);
 
-  const [statusFilter, setStatusFilter] = useState<CommissionStatus | 'all'>('all');
-  const [tenantFilter, setTenantFilter] = useState<string>('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [statusFilter, setStatusFilter] = useState<CommissionStatus | 'all'>(initialFilters.status);
+  const [tenantFilter, setTenantFilter] = useState<string>(initialFilters.tenantId);
+  const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom);
+  const [dateTo, setDateTo] = useState(initialFilters.dateTo);
 
   const totals = useMemo(() => {
     return rows.reduce((acc, row) => {
@@ -87,6 +103,17 @@ export default function AdminCommissionsPage() {
   useEffect(() => {
     void loadRows();
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search || '');
+    if (statusFilter !== 'all') params.set('status', statusFilter); else params.delete('status');
+    if (tenantFilter !== 'all') params.set('tenant_id', tenantFilter); else params.delete('tenant_id');
+    if (dateFrom) params.set('date_from', dateFrom); else params.delete('date_from');
+    if (dateTo) params.set('date_to', dateTo); else params.delete('date_to');
+    const query = params.toString();
+    window.history.replaceState({}, '', query ? `/admin/commissions?${query}` : '/admin/commissions');
+  }, [statusFilter, tenantFilter, dateFrom, dateTo]);
 
   async function applyFilters() {
     await loadRows();

@@ -6,7 +6,7 @@ import {
   Store, Shield, ShieldCheck, TrendingUp, Scale, Briefcase, 
   FileText, Fingerprint, Brain, Cpu, List, Box, ShieldAlert,
   ChevronRight, Facebook, Instagram, Linkedin, MessageCircle, 
-  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone
+  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone, Building2, Palette, SlidersHorizontal
 } from 'lucide-react';
 import { ViewMode, AgencyBranding, Contact } from './types';
 
@@ -102,6 +102,15 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.AUTOMATION} label="Sentinel Engine" icon={Zap} currentView={currentView} onViewChange={handleNav} />
             {userRole === 'admin' ? (
               <>
+                <SidebarItem id={ViewMode.ADMIN_CEO_BRIEFING} label="CEO Briefing" icon={LayoutDashboard} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER} label="AI Command Center" icon={BrainCircuit} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_COMMAND_INBOX} label="Command Inbox" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_ORGANIZATION_DASHBOARD} label="Organization Admin" icon={Building2} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_WHITE_LABEL_SETTINGS} label="White-Label Settings" icon={Palette} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_SOURCE_REGISTRY} label="Source Registry" icon={Globe} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_MONETIZATION_OPPORTUNITIES} label="Revenue Opportunities" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_AUTONOMOUS_EXPANSION} label="Autonomous Expansion" icon={Brain} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_FUNNEL_CONTROL_CENTER} label="Funnel Control" icon={SlidersHorizontal} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_WORKFLOWS} label="Workflow Ops" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_FUNNEL_SEQUENCES} label="Funnel Sequences" icon={Megaphone} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_FUNNEL_LEADS} label="Funnel Leads" icon={Users} currentView={currentView} onViewChange={handleNav} />
