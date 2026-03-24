@@ -47,4 +47,4 @@ EOF
 )"
 
 echo "Rolling back gateway from ${REMOTE_BACKUP_ROOT} using release ${ROLLBACK_RELEASE}"
-"$REPO_ROOT/scripts/oracle_quickconnect.sh" "$TARGET_USER" bash -lc "$REMOTE_SCRIPT"
+bash "$REPO_ROOT/scripts/oracle_quickconnect.sh" "$TARGET_USER" bash -lc "$REMOTE_SCRIPT"

@@ -90,4 +90,4 @@ tar -C "$REPO_ROOT" \
   --exclude='gateway/.env.local' \
   --exclude='gateway/.env.*.local' \
   -czf - gateway | \
-  "$REPO_ROOT/scripts/oracle_quickconnect.sh" "$TARGET_USER" bash -lc "$REMOTE_SCRIPT"
+  bash "$REPO_ROOT/scripts/oracle_quickconnect.sh" "$TARGET_USER" bash -lc "$REMOTE_SCRIPT"
