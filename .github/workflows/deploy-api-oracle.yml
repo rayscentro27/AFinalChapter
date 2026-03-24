@@ -2,6 +2,15 @@ name: Deploy API to Oracle VM
 
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner path for the Oracle deploy
+        required: true
+        default: self-hosted
+        type: choice
+        options:
+          - self-hosted
+          - github-hosted
   push:
     branches:
       - main
@@ -13,24 +22,28 @@ on:
       - 'scripts/cleanup_smoke_users.mjs'
       - '.github/workflows/deploy-api-oracle.yml'
 
+env:
+  OCI_PROFILE: goclearonline
+  OCI_CONFIG_CONTENT: ${{ secrets.OCI_CONFIG_CONTENT }}
+  OCI_REGION: ${{ secrets.OCI_REGION }}
+  OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+  OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+  OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+  OCI_API_KEY_CONTENT: ${{ secrets.OCI_API_KEY_CONTENT }}
+  OCI_BASTION_ID: ${{ secrets.OCI_BASTION_ID }}
+  OCI_INSTANCE_ID: ${{ secrets.OCI_INSTANCE_ID }}
+  OCI_TARGET_IP: ${{ secrets.OCI_TARGET_IP }}
+  SMOKE_TENANT_ID: ${{ secrets.SMOKE_TENANT_ID }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  APP_BASE_URL: https://app.goclearonline.cc
+
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    env:
-      OCI_PROFILE: goclearonline
-      OCI_CONFIG_CONTENT: ${{ secrets.OCI_CONFIG_CONTENT }}
-      OCI_REGION: ${{ secrets.OCI_REGION }}
-      OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
-      OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
-      OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
-      OCI_API_KEY_CONTENT: ${{ secrets.OCI_API_KEY_CONTENT }}
-      OCI_BASTION_ID: ${{ secrets.OCI_BASTION_ID }}
-      OCI_INSTANCE_ID: ${{ secrets.OCI_INSTANCE_ID }}
-      OCI_TARGET_IP: ${{ secrets.OCI_TARGET_IP }}
-      SMOKE_TENANT_ID: ${{ secrets.SMOKE_TENANT_ID }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      APP_BASE_URL: https://app.goclearonline.cc
+  deploy-self-hosted:
+    if: ${{ github.event_name == 'push' || github.event.inputs.runner != 'github-hosted' }}
+    runs-on:
+      - self-hosted
+      - oracle-deploy
 
     steps:
       - name: Checkout
@@ -49,8 +62,26 @@ jobs:
       - name: Install OCI CLI
         shell: bash
         run: |
+          PYTHON_USER_BIN="$(python -m site --user-base)/bin"
+          echo "$PYTHON_USER_BIN" >> "$GITHUB_PATH"
           python -m pip install --upgrade pip
-          pip install oci-cli
+          python -m pip install --user --upgrade oci-cli
+
+      - name: Runner preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "runner_name=${RUNNER_NAME}"
+          echo "runner_os=${RUNNER_OS}"
+          echo "runner_arch=${RUNNER_ARCH}"
+          uname -a || true
+          required=(bash ssh tar node npm python oci)
+          for name in "${required[@]}"; do
+            if ! command -v "$name" >/dev/null 2>&1; then
+              echo "Missing required command on runner: ${name}" >&2
+              exit 1
+            fi
+          done
 
       - name: Validate required secrets
         shell: bash
@@ -71,12 +102,15 @@ jobs:
           printf '%s\n' "$OCI_API_KEY_CONTENT" > ~/.oci/oci_api_key.pem
           chmod 600 ~/.oci/oci_api_key.pem
 
+          OCI_KEY_FILE="${HOME}/.oci/oci_api_key.pem"
+
           if [[ -n "${OCI_CONFIG_CONTENT:-}" ]]; then
             printf '%s\n' "$OCI_CONFIG_CONTENT" > ~/.oci/config
             if grep -q '^[[:space:]]*key_file=' ~/.oci/config; then
-              sed -i 's#^[[:space:]]*key_file=.*#key_file=/home/runner/.oci/oci_api_key.pem#' ~/.oci/config
+              sed -i.bak "s#^[[:space:]]*key_file=.*#key_file=${OCI_KEY_FILE}#" ~/.oci/config
+              rm -f ~/.oci/config.bak
             else
-              printf '%s\n' 'key_file=/home/runner/.oci/oci_api_key.pem' >> ~/.oci/config
+              printf '%s\n' "key_file=${OCI_KEY_FILE}" >> ~/.oci/config
             fi
           else
             OCI_REGION_CLEAN="$(printf '%s' "$OCI_REGION" | tr -d '\r[:space:]')"
@@ -89,7 +123,108 @@ jobs:
               "fingerprint=$OCI_FINGERPRINT_CLEAN" \
               "tenancy=$OCI_TENANCY_OCID_CLEAN" \
               "region=$OCI_REGION_CLEAN" \
-              'key_file=/home/runner/.oci/oci_api_key.pem' > ~/.oci/config
+              "key_file=${OCI_KEY_FILE}" > ~/.oci/config
+          fi
+
+          chmod 600 ~/.oci/config
+
+      - name: Install root dependencies for smoke tooling
+        shell: bash
+        run: |
+          npm install
+
+      - name: Deploy gateway over OCI Bastion
+        shell: bash
+        run: |
+          bash scripts/oracle_bastion_deploy.sh
+
+      - name: Protected production smoke
+        shell: bash
+        run: |
+          bash scripts/oracle_protected_smoke.sh "$SMOKE_TENANT_ID"
+
+  deploy-github-hosted:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'github-hosted' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install OCI CLI
+        shell: bash
+        run: |
+          PYTHON_USER_BIN="$(python -m site --user-base)/bin"
+          echo "$PYTHON_USER_BIN" >> "$GITHUB_PATH"
+          python -m pip install --upgrade pip
+          python -m pip install --user --upgrade oci-cli
+
+      - name: Runner preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "runner_name=${RUNNER_NAME}"
+          echo "runner_os=${RUNNER_OS}"
+          echo "runner_arch=${RUNNER_ARCH}"
+          uname -a || true
+          required=(bash ssh tar node npm python oci)
+          for name in "${required[@]}"; do
+            if ! command -v "$name" >/dev/null 2>&1; then
+              echo "Missing required command on runner: ${name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(OCI_REGION OCI_USER_OCID OCI_TENANCY_OCID OCI_FINGERPRINT OCI_API_KEY_CONTENT SMOKE_TENANT_ID SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY)
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required secret: ${name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Build OCI config
+        shell: bash
+        run: |
+          mkdir -p ~/.oci
+          printf '%s\n' "$OCI_API_KEY_CONTENT" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+
+          OCI_KEY_FILE="${HOME}/.oci/oci_api_key.pem"
+
+          if [[ -n "${OCI_CONFIG_CONTENT:-}" ]]; then
+            printf '%s\n' "$OCI_CONFIG_CONTENT" > ~/.oci/config
+            if grep -q '^[[:space:]]*key_file=' ~/.oci/config; then
+              sed -i "s#^[[:space:]]*key_file=.*#key_file=${OCI_KEY_FILE}#" ~/.oci/config
+            else
+              printf '%s\n' "key_file=${OCI_KEY_FILE}" >> ~/.oci/config
+            fi
+          else
+            OCI_REGION_CLEAN="$(printf '%s' "$OCI_REGION" | tr -d '\r[:space:]')"
+            OCI_USER_OCID_CLEAN="$(printf '%s' "$OCI_USER_OCID" | tr -d '\r[:space:]')"
+            OCI_TENANCY_OCID_CLEAN="$(printf '%s' "$OCI_TENANCY_OCID" | tr -d '\r[:space:]')"
+            OCI_FINGERPRINT_CLEAN="$(printf '%s' "$OCI_FINGERPRINT" | tr -d '\r[:space:]')"
+            printf '%s\n' \
+              "[$OCI_PROFILE]" \
+              "user=$OCI_USER_OCID_CLEAN" \
+              "fingerprint=$OCI_FINGERPRINT_CLEAN" \
+              "tenancy=$OCI_TENANCY_OCID_CLEAN" \
+              "region=$OCI_REGION_CLEAN" \
+                "key_file=${OCI_KEY_FILE}" > ~/.oci/config
           fi
 
           chmod 600 ~/.oci/config

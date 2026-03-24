@@ -37,6 +37,26 @@ These are optional because the repo has pinned defaults in `scripts/oracle_quick
 2. `OCI_INSTANCE_ID`
 3. `OCI_TARGET_IP`
 
+## Required Deploy Runner
+
+Normal Oracle deploys should run on a self-hosted GitHub Actions runner labeled:
+
+1. `self-hosted`
+2. `oracle-deploy`
+
+Why:
+- `ubuntu-latest` reached the workflow and built a valid OCI config
+- the OCI CLI then timed out three times while creating the Bastion session
+- that makes the runner network path the remaining blocker, not missing secrets or broken workflow syntax
+
+The self-hosted runner should live on the machine that already has proven OCI connectivity.
+
+Use GitHub-hosted only for manual diagnostics:
+
+```bash
+gh workflow run deploy-api-oracle.yml --repo rayscentro27/AFinalChapter -f runner=github-hosted
+```
+
 ## Recommended Source Of Truth
 
 Use the working local environment that already succeeded in WSL as the source for OCI values.
@@ -115,7 +135,7 @@ bash -n scripts/oracle_quickconnect.sh scripts/oracle_bastion_deploy.sh scripts/
 4. Trigger the workflow manually instead of waiting for a production push
 
 ```bash
-gh workflow run deploy-api-oracle.yml --repo rayscentro27/AFinalChapter
+gh workflow run deploy-api-oracle.yml --repo rayscentro27/AFinalChapter -f runner=self-hosted
 gh run watch --repo rayscentro27/AFinalChapter
 ```
 
@@ -152,7 +172,8 @@ If the workflow fails in:
    - OCI key content or OCI identifiers are malformed
 
 3. `Deploy gateway over OCI Bastion`
-   - Bastion/instance IDs or target IP are wrong, or OCI permissions drifted
+   - on `self-hosted`: Bastion/instance IDs or target IP are wrong, OCI permissions drifted, or the runner lost OCI connectivity
+   - on `github-hosted`: repeated OCI endpoint timeouts are expected until the hosted runner path is proven stable again
 
 4. `Protected production smoke`
    - deploy reached Oracle, but the protected app path is still broken or Supabase smoke credentials are wrong

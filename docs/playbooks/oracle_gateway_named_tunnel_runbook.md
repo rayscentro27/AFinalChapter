@@ -44,6 +44,11 @@ Expected:
 - release marker written to `/opt/nexus-api/gateway/.deploy-release.json`
 - `nexus-api` restarts successfully
 
+For GitHub Actions:
+- normal deploys now target a self-hosted runner labeled `self-hosted, oracle-deploy`
+- manual hosted-runner dispatch remains available only for diagnostics
+- if the hosted runner times out during `oci bastion session create-managed-ssh`, do not keep treating that as an app deploy bug
+
 ## Protected Post-Deploy Smoke
 
 Run from repo root:

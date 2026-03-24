@@ -109,6 +109,29 @@ The GitHub workflow `.github/workflows/deploy-api-oracle.yml` now expects these 
 
 If any required secret is missing, the deploy workflow fails before attempting a production update.
 
+## Oracle Deploy Runner Model
+
+The Oracle deploy workflow now assumes a self-hosted GitHub Actions runner with labels `self-hosted` and `oracle-deploy` for normal deploys.
+
+Why this changed:
+- the OCI Bastion session-create call repeatedly timed out from `ubuntu-latest`
+- the failure happened before OCI returned a request endpoint, so this is treated as a runner-path/network problem rather than an app or secret problem
+- self-hosting the deploy runner on the machine that already has working OCI connectivity is the stable path
+
+Operational rules:
+- `push` to `main` deploys only through the `self-hosted, oracle-deploy` runner path
+- manual `workflow_dispatch` defaults to `self-hosted`
+- `github-hosted` remains available only as a manual diagnostic fallback, not the primary production route
+
+The deploy runner must have:
+- outbound connectivity to OCI Bastion APIs and SSH proxy endpoints
+- `bash`, `ssh`, `tar`, `node`, `npm`, and Python 3.11 available
+- access to the same repo secrets already configured for OCI and Supabase
+
+For runner setup guidance, use [docs/ORACLE_DEPLOY_RUNNER_SETUP.md](docs/ORACLE_DEPLOY_RUNNER_SETUP.md).
+
+Tailscale is not required on the Oracle VM for this deployment model. Use it only if you want private operator access between your admin machines; do not treat it as the primary fix for CI deploy reliability.
+
 For the exact secret inventory, command templates, and first-run CI verification order, use [docs/ORACLE_CI_SECRET_CHECKLIST.md](docs/ORACLE_CI_SECRET_CHECKLIST.md).
 
 ## Oracle VM Operations
