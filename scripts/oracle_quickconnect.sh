@@ -13,6 +13,8 @@ TARGET_USER="${1:-ubuntu}"
 shift || true
 PRINT_ONLY="${PRINT_ONLY:-0}"
 DELETE_ON_EXIT="${DELETE_ON_EXIT:-1}"
+CREATE_RETRIES="${OCI_SESSION_CREATE_RETRIES:-3}"
+CREATE_RETRY_DELAY_SECONDS="${OCI_SESSION_CREATE_RETRY_DELAY_SECONDS:-5}"
 
 if ! command -v oci >/dev/null 2>&1; then
   echo "oci CLI is required" >&2
@@ -38,23 +40,32 @@ trap cleanup EXIT
 
 ssh-keygen -t ed25519 -N '' -f "$KEY_FILE" -C "bastion-${TARGET_USER}-${TS}" >/dev/null
 
-SESSION_CREATE_OUTPUT="$(oci bastion session create-managed-ssh \
-  --bastion-id "$BASTION_ID" \
-  --region "$REGION" \
-  --profile "$PROFILE" \
-  --display-name "$DISPLAY_NAME" \
-  --ssh-public-key-file "$KEY_FILE.pub" \
-  --target-resource-id "$INSTANCE_ID" \
-  --target-os-username "$TARGET_USER" \
-  --target-port 22 \
-  --session-ttl 10800 \
-  --query 'data.id' --raw-output 2>&1)" || {
-    echo "$SESSION_CREATE_OUTPUT" >&2
-    echo "Failed to create bastion session" >&2
-    exit 1
-  }
+SESSION_CREATE_OUTPUT=""
+SESSION_ID=""
 
-SESSION_ID="$SESSION_CREATE_OUTPUT"
+for attempt in $(seq 1 "$CREATE_RETRIES"); do
+  SESSION_CREATE_OUTPUT="$(oci bastion session create-managed-ssh \
+    --bastion-id "$BASTION_ID" \
+    --region "$REGION" \
+    --profile "$PROFILE" \
+    --display-name "$DISPLAY_NAME" \
+    --ssh-public-key-file "$KEY_FILE.pub" \
+    --target-resource-id "$INSTANCE_ID" \
+    --target-os-username "$TARGET_USER" \
+    --target-port 22 \
+    --session-ttl 10800 \
+    --query 'data.id' --raw-output 2>&1)" && {
+      SESSION_ID="$SESSION_CREATE_OUTPUT"
+      break
+    }
+
+  echo "Bastion session create attempt ${attempt}/${CREATE_RETRIES} failed" >&2
+  echo "$SESSION_CREATE_OUTPUT" >&2
+
+  if [[ "$attempt" -lt "$CREATE_RETRIES" ]]; then
+    sleep "$CREATE_RETRY_DELAY_SECONDS"
+  fi
+done
 
 if [[ -z "$SESSION_ID" || "$SESSION_ID" == "null" ]]; then
   echo "$SESSION_CREATE_OUTPUT" >&2
