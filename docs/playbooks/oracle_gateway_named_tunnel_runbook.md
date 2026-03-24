@@ -1,6 +1,6 @@
-# Oracle Gateway Named Tunnel Runbook
+# Oracle Gateway Bastion Deploy Runbook
 
-Last updated: 2026-02-26
+Last updated: 2026-03-24
 
 Quick keywords: see `docs/KEYWORD_RUNBOOKS.md`.
 
@@ -9,16 +9,16 @@ This is the canonical operational process for the current Oracle gateway deploym
 
 Current architecture:
 - Gateway app runs on OCI VM `OpenChatAI` (private IP `10.0.0.70`).
-- Gateway process path: `/home/opc/afinal_gateway`.
+- Gateway process path: `/opt/nexus-api/gateway`.
 - Public endpoint: `https://api.goclearonline.cc`.
-- Public routing: Cloudflare Named Tunnel `afinalchapter-gateway`.
-- Netlify proxies call Oracle with header `x-api-key: ORACLE_API_KEY`.
+- Public routing: Nginx + TLS on the Oracle VM.
+- Netlify proxies call Oracle through the app domain and protected functions.
 
 ## Prerequisites
 - OCI CLI authenticated with profile `goclearonline`.
-- Netlify CLI authenticated and linked to site `afinalchapter`.
 - SSH access to OCI VM via Bastion managed session.
-- Cloudflare tunnel cert present on VM at `/home/opc/.cloudflared/cert.pem`.
+- `gateway/.env` present on the live host at `/opt/nexus-api/gateway/.env`.
+- Local access to `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and a valid smoke tenant UUID for protected smoke.
 
 ## Fast status check
 Run from repo root:
@@ -30,6 +30,48 @@ scripts/oracle_gateway_smoke.sh
 Expected:
 - `https://api.goclearonline.cc/health` returns `{"ok":true,...}`
 - Netlify function preview endpoint returns `missing_authorization` when no bearer JWT is sent.
+
+## Canonical Deploy
+
+Run from repo root:
+
+```bash
+scripts/oracle_bastion_deploy.sh
+```
+
+Expected:
+- backup written to `/home/ubuntu/backups/nexus-api/<release_id>/gateway`
+- release marker written to `/opt/nexus-api/gateway/.deploy-release.json`
+- `nexus-api` restarts successfully
+
+## Protected Post-Deploy Smoke
+
+Run from repo root:
+
+```bash
+SMOKE_TENANT_ID=<tenant_uuid> scripts/oracle_protected_smoke.sh
+```
+
+Expected:
+- temporary smoke user is provisioned as `admin`
+- `/.netlify/functions/admin-credential-readiness` returns HTTP `200`
+- response content-type is `application/json`
+- payload contains `ok: true`
+- smoke user is cleaned up automatically
+
+## Rollback
+
+Restore the latest backup:
+
+```bash
+scripts/oracle_bastion_rollback.sh
+```
+
+Restore a specific backup:
+
+```bash
+scripts/oracle_bastion_rollback.sh <release_id>
+```
 
 ## Update Oracle URL/API key everywhere
 Run from repo root:
@@ -95,12 +137,8 @@ ssh -i /tmp/bastion_session_key \
 ## Service restart on VM
 
 ```bash
-pkill -f 'node src/index.js' || true
-cd /home/opc/afinal_gateway
-nohup /home/opc/.nvm/versions/node/v20.20.0/bin/node src/index.js > /home/opc/afinal_gateway/gateway.log 2>&1 < /dev/null &
-
-pkill -f 'cloudflared tunnel run afinalchapter-gateway' || true
-nohup /home/opc/cloudflared tunnel run afinalchapter-gateway > /home/opc/cloudflared.log 2>&1 < /dev/null &
+sudo systemctl restart nexus-api
+sudo systemctl status nexus-api --no-pager
 ```
 
 ## Rotate internal API key
@@ -110,10 +148,10 @@ nohup /home/opc/cloudflared tunnel run afinalchapter-gateway > /home/opc/cloudfl
 NEW_KEY=$(openssl rand -hex 32)
 ```
 
-2) On VM update `/home/opc/afinal_gateway/.env`:
+2) On VM update `/opt/nexus-api/gateway/.env`:
 
 ```bash
-sed -i "s#^INTERNAL_API_KEY=.*#INTERNAL_API_KEY=${NEW_KEY}#" /home/opc/afinal_gateway/.env
+sed -i "s#^INTERNAL_API_KEY=.*#INTERNAL_API_KEY=${NEW_KEY}#" /opt/nexus-api/gateway/.env
 ```
 
 3) Restart gateway process.
@@ -126,39 +164,6 @@ scripts/oracle_gateway_set_env.sh "https://api.goclearonline.cc" "$NEW_KEY"
 5) Verify:
 - Old key should return `{"ok":false,"error":"unauthorized"}`.
 - New key request without bearer JWT should return `{"ok":false,"error":"missing_authorization"}`.
-
-## Recreate named tunnel (if needed)
-On VM:
-
-```bash
-cloudflared tunnel create afinalchapter-gateway
-cloudflared tunnel route dns afinalchapter-gateway api.goclearonline.cc
-```
-
-Create `/home/opc/.cloudflared/config.yml`:
-
-```yaml
-tunnel: <TUNNEL_UUID>
-credentials-file: /home/opc/.cloudflared/<TUNNEL_UUID>.json
-ingress:
-  - hostname: api.goclearonline.cc
-    service: http://127.0.0.1:3000
-  - service: http_status:404
-```
-
-Run:
-
-```bash
-cloudflared tunnel run afinalchapter-gateway
-```
-
-## Reboot persistence (current strategy)
-User crontab on VM should contain:
-
-```cron
-@reboot /bin/bash -lc 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; cd /home/opc/afinal_gateway && nohup node src/index.js >> /home/opc/afinal_gateway/gateway.log 2>&1 < /dev/null & # afinal_gateway'
-@reboot /bin/bash -lc 'nohup /home/opc/cloudflared tunnel run afinalchapter-gateway >> /home/opc/cloudflared.log 2>&1 < /dev/null &'
-```
 
 ## Cleanup checklist
 - Delete bastion sessions after admin work:
@@ -173,10 +178,11 @@ oci bastion session delete --session-id <SESSION_OCID> --region us-phoenix-1 --p
 rm -f /tmp/bastion_session_key /tmp/bastion_session_key.pub
 ```
 
-- Keep OCI security list ingress minimal (SSH only) if using tunnel.
+- Keep OCI security list ingress minimal and leave Bastion as the admin access path.
 
 ## Security notes
 - Never paste private keys in chat or commits.
 - Rotate OCI API keys that were exposed.
 - Rotate Meta tokens that were shared.
 - Rotate `ORACLE_API_KEY` after major setup/debug sessions.
+- Keep GitHub Actions secrets current so production deploys do not fall back to manual recovery.

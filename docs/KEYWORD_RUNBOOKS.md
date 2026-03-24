@@ -45,6 +45,43 @@ Command:
 scripts/oracle_gateway_smoke.sh
 ```
 
+## `oracle-deploy-gateway`
+Purpose: deploy the current `gateway/` tree to Oracle through the pinned OCI Bastion path, create a backup, preserve `.env`, and restart `nexus-api`.
+
+Command:
+```bash
+scripts/oracle_bastion_deploy.sh
+```
+
+Notes:
+- Writes a release marker to `/opt/nexus-api/gateway/.deploy-release.json`.
+- Stores the previous gateway tree under `/home/ubuntu/backups/nexus-api/<release_id>/gateway`.
+
+## `oracle-deploy-rollback`
+Purpose: restore the latest Oracle gateway backup and restart `nexus-api`.
+
+Command:
+```bash
+scripts/oracle_bastion_rollback.sh
+```
+
+Optional:
+```bash
+scripts/oracle_bastion_rollback.sh <release_id>
+```
+
+## `oracle-credential-smoke`
+Purpose: provision a temporary admin smoke user, call the protected credential-readiness Netlify route, and clean up afterward.
+
+Command:
+```bash
+SMOKE_TENANT_ID=<tenant_uuid> scripts/oracle_protected_smoke.sh
+```
+
+Notes:
+- Requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in env or `gateway/.env`.
+- Fails unless the endpoint returns HTTP 200 with JSON `{ ok: true }`.
+
 ## `oracle-messaging-smoke`
 Purpose: run a modern outbox smoke send using the permission-guarded `/messages/send` path.
 
@@ -95,12 +132,16 @@ Purpose: end-to-end operational path.
 
 Order:
 1. `oracle-connect-fast`
-2. `oracle-scheduler-check`
-3. `oracle-gateway-smoke`
+2. `oracle-deploy-gateway`
+3. `oracle-credential-smoke`
+4. `oracle-scheduler-check`
+5. `oracle-gateway-smoke`
 
 ---
 If infra IDs change, update these files only:
 - `scripts/oracle_quickconnect.sh`
+- `scripts/oracle_bastion_deploy.sh`
+- `scripts/oracle_bastion_rollback.sh`
 - `docs/playbooks/oracle_gateway_named_tunnel_runbook.md`
 - `docs/SCHEDULERS_RUNBOOK.md`
 

@@ -8,16 +8,28 @@ on:
     paths:
       - 'gateway/**'
       - 'deploy/oracle/**'
+      - 'scripts/oracle_*.sh'
+      - 'scripts/provision_smoke_user_token.mjs'
+      - 'scripts/cleanup_smoke_users.mjs'
       - '.github/workflows/deploy-api-oracle.yml'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
-      ORACLE_USER: ${{ secrets.ORACLE_USER }}
-      ORACLE_SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
-      ORACLE_APP_DIR: ${{ secrets.ORACLE_APP_DIR }}
+      OCI_PROFILE: goclearonline
+      OCI_REGION: ${{ secrets.OCI_REGION }}
+      OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+      OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+      OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+      OCI_API_KEY_CONTENT: ${{ secrets.OCI_API_KEY_CONTENT }}
+      OCI_BASTION_ID: ${{ secrets.OCI_BASTION_ID }}
+      OCI_INSTANCE_ID: ${{ secrets.OCI_INSTANCE_ID }}
+      OCI_TARGET_IP: ${{ secrets.OCI_TARGET_IP }}
+      SMOKE_TENANT_ID: ${{ secrets.SMOKE_TENANT_ID }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      APP_BASE_URL: https://app.goclearonline.cc
 
     steps:
       - name: Checkout
@@ -28,47 +40,56 @@ jobs:
         with:
           node-version: 20
 
-      - name: Validate deploy secrets
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install OCI CLI
         shell: bash
         run: |
-          missing=0
-          for name in ORACLE_HOST ORACLE_USER ORACLE_SSH_PRIVATE_KEY ORACLE_APP_DIR; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Missing required GitHub Actions secret: ${name}"
-              missing=1
+          python -m pip install --upgrade pip
+          pip install oci-cli
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(OCI_REGION OCI_USER_OCID OCI_TENANCY_OCID OCI_FINGERPRINT OCI_API_KEY_CONTENT SMOKE_TENANT_ID SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY)
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required secret: ${name}" >&2
+              exit 1
             fi
           done
 
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
-
-      - name: Build SSH key
+      - name: Build OCI config
         shell: bash
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$ORACLE_SSH_PRIVATE_KEY" > ~/.ssh/oracle_key
-          chmod 600 ~/.ssh/oracle_key
-          ssh-keyscan -H "$ORACLE_HOST" >> ~/.ssh/known_hosts
+          mkdir -p ~/.oci
+          printf '%s\n' "$OCI_API_KEY_CONTENT" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+          cat > ~/.oci/config <<EOF
+          [$OCI_PROFILE]
+          user=$OCI_USER_OCID
+          fingerprint=$OCI_FINGERPRINT
+          tenancy=$OCI_TENANCY_OCID
+          region=$OCI_REGION
+          key_file=/home/runner/.oci/oci_api_key.pem
+          EOF
+          chmod 600 ~/.oci/config
 
-      - name: Rsync project
+      - name: Install root dependencies for smoke tooling
         shell: bash
         run: |
-          rsync -az --delete \
-            -e "ssh -i ~/.ssh/oracle_key" \
-            --exclude '.git' \
-            --exclude 'node_modules' \
-            --exclude '.env' \
-            --exclude '.env.local' \
-            ./ "$ORACLE_USER@$ORACLE_HOST:$ORACLE_APP_DIR"
+          npm install
 
-      - name: Install and restart API
+      - name: Deploy gateway over OCI Bastion
         shell: bash
         run: |
-          ssh -i ~/.ssh/oracle_key "$ORACLE_USER@$ORACLE_HOST" <<SSH
-            set -euo pipefail
-            cd "$ORACLE_APP_DIR/gateway"
-            npm ci --omit=dev
-            sudo systemctl restart nexus-api
-            sudo systemctl status nexus-api --no-pager
-          SSH
+          bash scripts/oracle_bastion_deploy.sh
+
+      - name: Protected production smoke
+        shell: bash
+        run: |
+          bash scripts/oracle_protected_smoke.sh "$SMOKE_TENANT_ID"

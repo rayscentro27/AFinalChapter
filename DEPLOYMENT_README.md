@@ -57,6 +57,60 @@ Expected:
 - `/healthz` returns `200` with JSON payload
 - `/api/ai/execute` returns `401` unless correct internal API key is provided
 
+## Canonical Oracle Deploy Path
+
+Use the OCI Bastion path as the single supported deployment route for the gateway.
+
+From repo root:
+
+```bash
+scripts/oracle_bastion_deploy.sh
+```
+
+What it does:
+- opens a managed OCI Bastion SSH session using `scripts/oracle_quickconnect.sh`
+- streams the local `gateway/` tree to `/opt/nexus-api/gateway`
+- preserves the live `.env`
+- stores a backup under `/home/ubuntu/backups/nexus-api/<release_id>/gateway`
+- runs `npm ci --omit=dev` on-host
+- restarts `nexus-api`
+- writes a release marker to `/opt/nexus-api/gateway/.deploy-release.json`
+
+Rollback:
+
+```bash
+scripts/oracle_bastion_rollback.sh
+scripts/oracle_bastion_rollback.sh <release_id>
+```
+
+Protected post-deploy smoke:
+
+```bash
+SMOKE_TENANT_ID=<tenant_uuid> scripts/oracle_protected_smoke.sh
+```
+
+This smoke path provisions a temporary admin user, calls the protected Netlify credential-readiness route, requires HTTP `200` with JSON `{ "ok": true }`, and then cleans up the temporary user.
+
+## CI Secrets For Oracle Deploy
+
+The GitHub workflow `.github/workflows/deploy-api-oracle.yml` now expects these secrets:
+
+- `OCI_REGION`
+- `OCI_USER_OCID`
+- `OCI_TENANCY_OCID`
+- `OCI_FINGERPRINT`
+- `OCI_API_KEY_CONTENT`
+- `OCI_BASTION_ID` (optional if repo defaults are still correct)
+- `OCI_INSTANCE_ID` (optional if repo defaults are still correct)
+- `OCI_TARGET_IP` (optional if repo defaults are still correct)
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SMOKE_TENANT_ID`
+
+If any required secret is missing, the deploy workflow fails before attempting a production update.
+
+For the exact secret inventory, command templates, and first-run CI verification order, use [docs/ORACLE_CI_SECRET_CHECKLIST.md](docs/ORACLE_CI_SECRET_CHECKLIST.md).
+
 ## Oracle VM Operations
 
 ```bash
