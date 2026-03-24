@@ -10,6 +10,7 @@ BASTION_ID="${OCI_BASTION_ID:-ocid1.bastion.oc1.phx.amaaaaaagei26sya7xmdyfexxw3u
 INSTANCE_ID="${OCI_INSTANCE_ID:-ocid1.instance.oc1.phx.anyhqljtgei26sycw3q6j2kj3siwqxylieleq3r76eahyc3eeu5thna2hlaq}"
 TARGET_IP="${OCI_TARGET_IP:-10.0.0.70}"
 TARGET_USER="${1:-ubuntu}"
+shift || true
 PRINT_ONLY="${PRINT_ONLY:-0}"
 DELETE_ON_EXIT="${DELETE_ON_EXIT:-1}"
 
@@ -77,6 +78,10 @@ SSH_CMD=(
   -p 22
   "${TARGET_USER}@${TARGET_IP}"
 )
+
+if [[ "$#" -gt 0 ]]; then
+  SSH_CMD+=("$@")
+fi
 
 echo "session_id=$SESSION_ID"
 echo "target=${TARGET_USER}@${TARGET_IP}"
