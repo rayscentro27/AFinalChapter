@@ -66,15 +66,19 @@ jobs:
       - name: Build OCI config
         shell: bash
         run: |
+          OCI_REGION_CLEAN="$(printf '%s' "$OCI_REGION" | tr -d '\r[:space:]')"
+          OCI_USER_OCID_CLEAN="$(printf '%s' "$OCI_USER_OCID" | tr -d '\r[:space:]')"
+          OCI_TENANCY_OCID_CLEAN="$(printf '%s' "$OCI_TENANCY_OCID" | tr -d '\r[:space:]')"
+          OCI_FINGERPRINT_CLEAN="$(printf '%s' "$OCI_FINGERPRINT" | tr -d '\r[:space:]')"
           mkdir -p ~/.oci
           printf '%s\n' "$OCI_API_KEY_CONTENT" > ~/.oci/oci_api_key.pem
           chmod 600 ~/.oci/oci_api_key.pem
           cat > ~/.oci/config <<EOF
           [$OCI_PROFILE]
-          user=$OCI_USER_OCID
-          fingerprint=$OCI_FINGERPRINT
-          tenancy=$OCI_TENANCY_OCID
-          region=$OCI_REGION
+          user=$OCI_USER_OCID_CLEAN
+          fingerprint=$OCI_FINGERPRINT_CLEAN
+          tenancy=$OCI_TENANCY_OCID_CLEAN
+          region=$OCI_REGION_CLEAN
           key_file=/home/runner/.oci/oci_api_key.pem
           EOF
           chmod 600 ~/.oci/config
