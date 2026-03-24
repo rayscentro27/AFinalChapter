@@ -73,22 +73,11 @@ jobs:
 
           if [[ -n "${OCI_CONFIG_CONTENT:-}" ]]; then
             printf '%s\n' "$OCI_CONFIG_CONTENT" > ~/.oci/config
-            python - <<'PY'
-from pathlib import Path
-config_path = Path.home() / '.oci' / 'config'
-lines = config_path.read_text(encoding='utf-8').splitlines()
-rewritten = []
-replaced = False
-for line in lines:
-    if line.strip().startswith('key_file='):
-        rewritten.append('key_file=/home/runner/.oci/oci_api_key.pem')
-        replaced = True
-    else:
-        rewritten.append(line)
-if not replaced:
-    rewritten.append('key_file=/home/runner/.oci/oci_api_key.pem')
-config_path.write_text('\n'.join(rewritten) + '\n', encoding='utf-8')
-PY
+            if grep -q '^[[:space:]]*key_file=' ~/.oci/config; then
+              sed -i 's#^[[:space:]]*key_file=.*#key_file=/home/runner/.oci/oci_api_key.pem#' ~/.oci/config
+            else
+              printf '%s\n' 'key_file=/home/runner/.oci/oci_api_key.pem' >> ~/.oci/config
+            fi
           else
             OCI_REGION_CLEAN="$(printf '%s' "$OCI_REGION" | tr -d '\r[:space:]')"
             OCI_USER_OCID_CLEAN="$(printf '%s' "$OCI_USER_OCID" | tr -d '\r[:space:]')"
