@@ -83,14 +83,13 @@ jobs:
             OCI_USER_OCID_CLEAN="$(printf '%s' "$OCI_USER_OCID" | tr -d '\r[:space:]')"
             OCI_TENANCY_OCID_CLEAN="$(printf '%s' "$OCI_TENANCY_OCID" | tr -d '\r[:space:]')"
             OCI_FINGERPRINT_CLEAN="$(printf '%s' "$OCI_FINGERPRINT" | tr -d '\r[:space:]')"
-            cat > ~/.oci/config <<EOF
-            [$OCI_PROFILE]
-            user=$OCI_USER_OCID_CLEAN
-            fingerprint=$OCI_FINGERPRINT_CLEAN
-            tenancy=$OCI_TENANCY_OCID_CLEAN
-            region=$OCI_REGION_CLEAN
-            key_file=/home/runner/.oci/oci_api_key.pem
-            EOF
+            printf '%s\n' \
+              "[$OCI_PROFILE]" \
+              "user=$OCI_USER_OCID_CLEAN" \
+              "fingerprint=$OCI_FINGERPRINT_CLEAN" \
+              "tenancy=$OCI_TENANCY_OCID_CLEAN" \
+              "region=$OCI_REGION_CLEAN" \
+              'key_file=/home/runner/.oci/oci_api_key.pem' > ~/.oci/config
           fi
 
           chmod 600 ~/.oci/config
