@@ -38,7 +38,7 @@ trap cleanup EXIT
 
 ssh-keygen -t ed25519 -N '' -f "$KEY_FILE" -C "bastion-${TARGET_USER}-${TS}" >/dev/null
 
-SESSION_ID="$(oci bastion session create-managed-ssh \
+SESSION_CREATE_OUTPUT="$(oci bastion session create-managed-ssh \
   --bastion-id "$BASTION_ID" \
   --region "$REGION" \
   --profile "$PROFILE" \
@@ -48,9 +48,16 @@ SESSION_ID="$(oci bastion session create-managed-ssh \
   --target-os-username "$TARGET_USER" \
   --target-port 22 \
   --session-ttl 10800 \
-  --query 'data.id' --raw-output 2>/dev/null)"
+  --query 'data.id' --raw-output 2>&1)" || {
+    echo "$SESSION_CREATE_OUTPUT" >&2
+    echo "Failed to create bastion session" >&2
+    exit 1
+  }
+
+SESSION_ID="$SESSION_CREATE_OUTPUT"
 
 if [[ -z "$SESSION_ID" || "$SESSION_ID" == "null" ]]; then
+  echo "$SESSION_CREATE_OUTPUT" >&2
   echo "Failed to create bastion session" >&2
   exit 1
 fi
