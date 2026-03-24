@@ -1,0 +1,10 @@
+#!/bin/zsh
+set -euo pipefail
+
+cd /Users/YOUR_USER/nexus-ops/mac-mini-worker
+
+if [ -f ./.env ]; then
+  export $(grep -v '^#' ./.env | xargs)
+fi
+
+exec /opt/homebrew/bin/node src/mac-mini-worker.js

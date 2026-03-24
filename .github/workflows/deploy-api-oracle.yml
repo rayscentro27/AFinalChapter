@@ -13,6 +13,11 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+      ORACLE_USER: ${{ secrets.ORACLE_USER }}
+      ORACLE_SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+      ORACLE_APP_DIR: ${{ secrets.ORACLE_APP_DIR }}
 
     steps:
       - name: Checkout
@@ -23,30 +28,46 @@ jobs:
         with:
           node-version: 20
 
+      - name: Validate deploy secrets
+        shell: bash
+        run: |
+          missing=0
+          for name in ORACLE_HOST ORACLE_USER ORACLE_SSH_PRIVATE_KEY ORACLE_APP_DIR; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required GitHub Actions secret: ${name}"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Build SSH key
         shell: bash
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.ORACLE_SSH_PRIVATE_KEY }}" > ~/.ssh/oracle_key
+          printf '%s\n' "$ORACLE_SSH_PRIVATE_KEY" > ~/.ssh/oracle_key
           chmod 600 ~/.ssh/oracle_key
-          ssh-keyscan -H "${{ secrets.ORACLE_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "$ORACLE_HOST" >> ~/.ssh/known_hosts
 
       - name: Rsync project
         shell: bash
         run: |
           rsync -az --delete \
+            -e "ssh -i ~/.ssh/oracle_key" \
             --exclude '.git' \
             --exclude 'node_modules' \
             --exclude '.env' \
             --exclude '.env.local' \
-            ./ "${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}:${{ secrets.ORACLE_APP_DIR }}"
+            ./ "$ORACLE_USER@$ORACLE_HOST:$ORACLE_APP_DIR"
 
       - name: Install and restart API
         shell: bash
         run: |
-          ssh -i ~/.ssh/oracle_key "${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}" <<'SSH'
+          ssh -i ~/.ssh/oracle_key "$ORACLE_USER@$ORACLE_HOST" <<SSH
             set -euo pipefail
-            cd "${{ secrets.ORACLE_APP_DIR }}/gateway"
+            cd "$ORACLE_APP_DIR/gateway"
             npm ci --omit=dev
             sudo systemctl restart nexus-api
             sudo systemctl status nexus-api --no-pager

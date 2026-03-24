@@ -65,3 +65,31 @@ These legacy SQL files informed naming/semantics, but the exact table set reques
 - Adds migration-managed support for `strategy_library` as a master strategy registry.
 - Uses add-only `alter table ... add column if not exists` to avoid overwriting compatible existing schema.
 - Adds index support for common reporting filters (`asset_type`, `status`, `created_by`, `updated_at`).
+
+5. `20260323233000_nexus_one_activation_setup.sql`
+- Creates the Windows-owned activation and readiness tables:
+  - `setup_domains`
+  - `setup_credentials`
+  - `activation_steps`
+  - `environment_readiness`
+- Adds the `setup_status` view for activation rollups.
+- Adds triggers and RLS policies for master-admin management.
+
+6. `20260324000500_control_plane_command_lifecycle.sql`
+- Extends `admin_commands` with lifecycle state, approval metadata, execution timestamps, and result fields.
+- Creates `admin_command_events` for status-transition history.
+- Extends `executive_briefings` with `recommendations` and `urgency`.
+- Adds lifecycle transition guard and logging triggers.
+
+7. `20260324103000_system_integration_readiness.sql`
+- Creates the secure credential-readiness metadata tables:
+  - `system_integrations`
+  - `system_integration_checks`
+  - `system_integration_events`
+- Adds indexes, triggers, and RLS policies for integration readiness tracking.
+- Seeds integration-readiness rows for all tenants without exposing raw secrets.
+
+## Current Ordering Notes
+
+- Activation and command-lifecycle migrations build on the existing operational tables and should be applied before the newer integration-readiness snapshot layer.
+- The secure credential-readiness migration is intentionally metadata-only; it records readiness state, verification outcomes, and event history without creating a second secret store.

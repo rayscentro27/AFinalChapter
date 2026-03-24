@@ -27,6 +27,8 @@ export default function CommandHistoryList({ items, selectedCommandId, onSelect 
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <CommandStatusBadge label={item.commandType} />
+                  <CommandStatusBadge label={`risk:${item.riskLevel}`} />
+                  <CommandStatusBadge label={item.status} />
                   <CommandStatusBadge label={item.validationStatus} />
                   <CommandApprovalStatus approvalRequired={item.approvalRequired} approvalStatus={item.approvalStatus} />
                 </div>

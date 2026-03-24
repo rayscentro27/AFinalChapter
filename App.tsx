@@ -11,7 +11,6 @@ import ClientLandingPage from './components/ClientLandingPage';
 import UnifiedInbox from './components/UnifiedInbox';
 import CommandPalette from './components/CommandPalette';
 import SystemSitemap from './components/SystemSitemap';
-import AdminSetupWizard from './components/AdminSetupWizard';
 import PhoneNotification from './components/PhoneNotification';
 import VoiceAssistant from './components/VoiceAssistant';
 import AgenticHUD from './components/AgenticHUD';
@@ -72,6 +71,8 @@ const AdminOrganizationDashboardPage = lazy(() => import('./src/pages/AdminOrgan
 const AdminFunnelControlCenterPage = lazy(() => import('./src/pages/AdminFunnelControlCenterPage'));
 const AdminWhiteLabelSettingsPage = lazy(() => import('./src/pages/AdminWhiteLabelSettingsPage'));
 const AdminExecutiveDashboardPage = lazy(() => import('./src/pages/AdminExecutiveDashboardPage'));
+const AdminActivationCenterPage = lazy(() => import('./src/pages/AdminActivationCenterPage'));
+const AdminCredentialManagementPage = lazy(() => import('./src/pages/AdminCredentialManagementPage'));
 const AdminDealEscalationsPage = lazy(() => import('./src/pages/AdminDealEscalationsPage'));
 const LifecycleAutomationPage = lazy(() => import('./src/pages/LifecycleAutomationPage'));
 const AdminReviewAnalyticsPage = lazy(() => import('./src/pages/AdminReviewAnalyticsPage'));
@@ -182,6 +183,8 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/funnel-control': ViewMode.ADMIN_FUNNEL_CONTROL_CENTER,
   '/admin/white-label': ViewMode.ADMIN_WHITE_LABEL_SETTINGS,
   '/admin/executive-dashboard': ViewMode.ADMIN_EXECUTIVE_DASHBOARD,
+  '/admin/nexus-one': ViewMode.ADMIN_NEXUS_ONE,
+  '/admin/credentials': ViewMode.ADMIN_CREDENTIALS,
   '/admin/deal-escalations': ViewMode.ADMIN_DEAL_ESCALATIONS,
   '/admin/lifecycle-automation': ViewMode.ADMIN_LIFECYCLE_AUTOMATION,
   '/admin/review-analytics': ViewMode.ADMIN_REVIEW_ANALYTICS,
@@ -663,7 +666,7 @@ export const App = () => {
     }
 
     if (!isSystemReady && (user.role === 'admin' || user.role === 'super_admin')) {
-      return <AdminSetupWizard onNavigate={navigate} branding={branding} onUpdateBranding={updateBranding} />;
+      return <AdminActivationCenterPage />;
     }
 
     return (
@@ -708,6 +711,8 @@ export const App = () => {
                     case ViewMode.ADMIN_FUNNEL_CONTROL_CENTER: return <AdminFunnelControlCenterPage />;
                     case ViewMode.ADMIN_WHITE_LABEL_SETTINGS: return <AdminWhiteLabelSettingsPage />;
                     case ViewMode.ADMIN_EXECUTIVE_DASHBOARD: return <AdminExecutiveDashboardPage />;
+                    case ViewMode.ADMIN_NEXUS_ONE: return <AdminActivationCenterPage />;
+                    case ViewMode.ADMIN_CREDENTIALS: return <AdminCredentialManagementPage />;
                     case ViewMode.ADMIN_DEAL_ESCALATIONS: return <AdminDealEscalationsPage />;
                     case ViewMode.ADMIN_LIFECYCLE_AUTOMATION: return <LifecycleAutomationPage />;
                     case ViewMode.ADMIN_REVIEW_ANALYTICS: return <AdminReviewAnalyticsPage />;

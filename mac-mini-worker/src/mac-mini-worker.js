@@ -127,7 +127,7 @@ class MacMiniWorkerPool {
 
     try {
       // Mark as processing
-      await this.queueClient.markProcessing(job.id, job.job_type);
+      await this.queueClient.markProcessing(job);
 
       // Execute handler
       const result = await handler(job, {
@@ -146,7 +146,7 @@ class MacMiniWorkerPool {
         error: errorMsg
       }, 'Job execution failed');
 
-      await this.queueClient.markFailed(job.id, err);
+      await this.queueClient.markFailed(job.id, err, Number(job.max_attempts || 1));
     }
   }
 

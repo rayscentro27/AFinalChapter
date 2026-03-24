@@ -250,6 +250,11 @@ export default function ClientDocumentWorkspace({ contact, currentStage, experie
     [contact.documents]
   );
 
+  const openTaskCount = useMemo(
+    () => (contact.clientTasks || []).filter((task) => task.status !== 'completed').length,
+    [contact.clientTasks]
+  );
+
   const approvedCount = useMemo(
     () => documents.filter((document) => ['approved', 'finalized', 'mailed'].includes(document.status)).length,
     [documents]
@@ -360,8 +365,46 @@ export default function ClientDocumentWorkspace({ contact, currentStage, experie
         </div>
 
         {stageGroups.length === 0 ? (
-          <div className="mt-4 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-            No active task attachments are calling for uploads right now. When workflow tasks declare required attachments, they will appear here.
+          <div className="mt-4 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={18} className="mt-0.5 text-amber-600" />
+              <div>
+                <p className="text-sm font-black tracking-tight text-slate-900">No upload requests are assigned yet</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  This workspace only shows document requests when your active workflow tasks declare required uploads. If you expected a document request here, review the Action Center first and ask support to attach the requirement to the active task.
+                </p>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Open Tasks</p>
+                    <p className="mt-2 text-base font-black text-slate-900">{openTaskCount}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Stored Docs</p>
+                    <p className="mt-2 text-base font-black text-slate-900">{documents.length}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Current Stage</p>
+                    <p className="mt-2 text-base font-black text-slate-900">{STAGE_LABELS[currentStage || ''] || prettyLabel(currentStage || 'untracked')}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={openGeneratedSection}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700"
+                  >
+                    Review Generated Docs
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void refresh()}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700"
+                  >
+                    Refresh Document State
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="mt-5 space-y-5">

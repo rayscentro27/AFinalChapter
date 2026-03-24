@@ -32,7 +32,7 @@ export default async (req: any, context: any) => {
     }
 
     // Validate job_type
-    const validJobTypes = ['sentiment_triage', 'neural_scout_batch', 'scenario_runner', 'commission_settler', 'merge_executor'];
+    const validJobTypes = ['sentiment_triage', 'neural_scout_batch', 'scenario_runner', 'commission_settler', 'merge_executor', 'admin_command_execute'];
     if (!validJobTypes.includes(job_type)) {
       return {
         statusCode: 400,

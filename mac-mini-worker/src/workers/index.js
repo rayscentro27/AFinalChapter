@@ -1,4 +1,5 @@
 import { handleSentimentTriage } from './sentiment_triage.js';
+import { handleAdminCommandExecute } from './admin_command_execute.js';
 
 /**
  * Handler Registry
@@ -6,6 +7,7 @@ import { handleSentimentTriage } from './sentiment_triage.js';
  */
 export const handlers = {
   sentiment_triage: handleSentimentTriage,
+  admin_command_execute: handleAdminCommandExecute,
   
   // Placeholder handlers (to be implemented)
   neural_scout_batch: async (job, ctx) => {

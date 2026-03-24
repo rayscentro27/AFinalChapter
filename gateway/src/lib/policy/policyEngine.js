@@ -32,6 +32,46 @@ function asNumber(value, fallback = 0) {
   return parsed;
 }
 
+function normalizeScalar(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  return lower(value);
+}
+
+function matchesGenericCondition(expected, actual) {
+  if (Array.isArray(expected)) {
+    const normalizedExpected = expected.map((item) => normalizeScalar(item));
+    if (Array.isArray(actual)) {
+      return actual.map((item) => normalizeScalar(item)).some((item) => normalizedExpected.includes(item));
+    }
+    return normalizedExpected.includes(normalizeScalar(actual));
+  }
+
+  if (expected && typeof expected === 'object') {
+    const shape = asObject(expected);
+    if (Object.prototype.hasOwnProperty.call(shape, 'in')) {
+      return matchesGenericCondition(asArray(shape.in), actual);
+    }
+    if (Object.prototype.hasOwnProperty.call(shape, 'eq')) {
+      return matchesGenericCondition(shape.eq, actual);
+    }
+    if (Object.prototype.hasOwnProperty.call(shape, 'neq')) {
+      return !matchesGenericCondition(shape.neq, actual);
+    }
+    return true;
+  }
+
+  if (typeof expected === 'boolean') {
+    return asBool(actual, false) === expected;
+  }
+
+  if (typeof expected === 'number') {
+    return asNumber(actual, Number.NaN) === expected;
+  }
+
+  return normalizeScalar(actual) === normalizeScalar(expected);
+}
+
 function isMissingSchema(error) {
   const msg = String(error?.message || '').toLowerCase();
   return (
@@ -128,6 +168,14 @@ export async function loadPolicies({ supabaseAdmin, tenant_id, action }) {
 export function evaluate(action, context = {}, policies = []) {
   const normalizedAction = lower(action);
   const now = context.now instanceof Date ? context.now : new Date();
+  const genericConditionKeys = new Set([
+    'providers_blocked',
+    'ip_cidr',
+    'time_window',
+    'requires_mfa',
+    'max_upload_mb',
+    'max_message_length',
+  ]);
 
   for (const policy of policies) {
     if (lower(policy.action) !== normalizedAction) continue;
@@ -172,6 +220,12 @@ export function evaluate(action, context = {}, policies = []) {
         const len = asNumber(context.message_length, 0);
         matches = matches && (len <= maxLength);
       }
+    }
+
+    for (const [key, expected] of Object.entries(conditions)) {
+      if (genericConditionKeys.has(key)) continue;
+      matches = matches && matchesGenericCondition(expected, context[key]);
+      if (!matches) break;
     }
 
     if (!matches) continue;

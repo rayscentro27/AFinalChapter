@@ -12,6 +12,7 @@ import { healthRoutes } from './routes/health.js';
 import { aiGatewayRoutes } from './routes/ai_gateway.js';
 import { metaRoutes } from './routes/meta.js';
 import { matrixRoutes } from './routes/matrix.js';
+import { telegramRoutes } from './routes/telegram.js';
 import { sendRoutes } from './routes/send.js';
 import { routingRoutes } from './routes/routing.js';
 import { outboxRoutes } from './routes/outbox.js';
@@ -30,6 +31,8 @@ import { researchRoutes } from './routes/research.js';
 import { systemHealthRoutes } from './routes/system_health.js';
 import { adminMembershipRoutes } from './routes/admin_membership.js';
 import { controlPlaneRoutes } from './routes/control_plane.js';
+import { adminCommandRoutes } from './routes/admin_commands.js';
+import { adminCredentialRoutes } from './routes/admin_credentials.js';
 import { recordRequestMetric } from './lib/observability/requestMetrics.js';
 
 function asText(value) {
@@ -51,6 +54,7 @@ function requestProvider(req) {
   const path = asText(req?.routeOptions?.url || req?.routerPath || req?.raw?.url).toLowerCase();
   if (path.includes('/webhooks/meta')) return 'meta';
   if (path.includes('/webhooks/matrix')) return 'matrix';
+  if (path.includes('/webhooks/telegram')) return 'telegram';
   if (path.includes('/webhooks/tradingview')) return 'tradingview';
   return null;
 }
@@ -184,6 +188,7 @@ await fastify.register(systemHealthRoutes);
 await fastify.register(aiGatewayRoutes);
 await fastify.register(metaRoutes);
 await fastify.register(matrixRoutes);
+await fastify.register(telegramRoutes);
 await fastify.register(tradingviewRoutes);
 await fastify.register(sendRoutes);
 await fastify.register(outboxRoutes);
@@ -201,6 +206,8 @@ await fastify.register(enterpriseRoutes);
 await fastify.register(researchRoutes);
 await fastify.register(adminMembershipRoutes);
 await fastify.register(controlPlaneRoutes);
+await fastify.register(adminCommandRoutes);
+await fastify.register(adminCredentialRoutes);
 
 fastify.setErrorHandler((error, req, reply) => {
   req.log.error({

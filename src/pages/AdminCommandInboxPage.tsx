@@ -59,9 +59,13 @@ export default function AdminCommandInboxPage() {
         <div className="mt-6 max-w-xs">
           <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="all">All statuses</option>
+            <option value="requires_approval">Requires approval</option>
+            <option value="approved">Approved</option>
             <option value="queued">Queued</option>
-            <option value="running">Running</option>
+            <option value="executing">Executing</option>
             <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+            <option value="cancelled">Cancelled</option>
             <option value="rejected">Rejected</option>
           </select>
         </div>
@@ -82,6 +86,7 @@ export default function AdminCommandInboxPage() {
                   <div className="text-sm font-semibold">{item.rawCommand}</div>
                   <div className={`mt-2 flex flex-wrap gap-2 ${active ? 'text-slate-200' : ''}`}>
                     <CommandStatusBadge label={item.commandType} />
+                    <CommandStatusBadge label={`risk:${item.riskLevel}`} />
                     <CommandStatusBadge label={item.status} />
                     <CommandStatusBadge label={`approval:${item.approvalStatus}`} />
                     <CommandStatusBadge label={`execution:${item.executionOutcome}`} />

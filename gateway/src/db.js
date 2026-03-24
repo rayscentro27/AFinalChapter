@@ -5,6 +5,10 @@ export async function enqueueJob({
   tenant_id,
   job_type,
   payload,
+  priority = 50,
+  available_at = null,
+  max_attempts = 5,
+  dedupe_key = null,
   logger = console,
 }) {
   if (!tenant_id || !job_type) {
@@ -20,6 +24,10 @@ export async function enqueueJob({
         job_type,
         payload,
         status: 'pending',
+        priority,
+        available_at: available_at || new Date().toISOString(),
+        max_attempts: Math.max(1, Number(max_attempts || 1)),
+        dedupe_key: dedupe_key || null,
       })
       .select('id')
       .single();

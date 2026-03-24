@@ -24,7 +24,7 @@ function openSourceRegistry() {
 }
 
 export default function AdminCeoBriefingPage() {
-  const { user, checkingAccess, isAuthorized, loading, refreshing, error, hours, setHours, limit, setLimit, briefing, recentHighlights, generatedAt, refresh } = useCeoBriefingDashboard();
+  const { user, checkingAccess, isAuthorized, loading, refreshing, error, hours, setHours, limit, setLimit, briefing, briefings, recentHighlights, generatedAt, refresh } = useCeoBriefingDashboard();
   const operations = useExecutiveOperationsRollup();
 
   if (checkingAccess) {
@@ -103,6 +103,25 @@ export default function AdminCeoBriefingPage() {
         <BlockersPanel items={briefing?.blockers || []} />
         <RecommendedActionsPanel items={briefing?.recommendedActions || []} />
       </div>
+
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Executive Briefings Panel</p>
+        <div className="mt-4 grid gap-3 xl:grid-cols-3">
+          {briefings.length === 0 ? <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500 xl:col-span-3">No persisted briefings were returned for this window.</div> : null}
+          {briefings.map((item) => (
+            <article key={item.id} className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">{item.title}</div>
+                  <div className="mt-2 text-xs text-slate-500">{item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Timestamp unavailable'}</div>
+                </div>
+                <div className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${item.urgency === 'critical' ? 'border-rose-200 bg-rose-50 text-rose-700' : item.urgency === 'high' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-200 bg-white text-slate-600'}`}>{item.urgency}</div>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-700">{item.summary}</p>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <ExecutiveOperationsRollup
         loading={operations.loading || operations.checkingAccess}

@@ -86,26 +86,27 @@ export class JobQueueClient {
   /**
    * Mark a job as processing
    */
-  async markProcessing(jobId, jobType) {
-    this.currentJobs.set(jobId, {
-      job_id: jobId,
-      job_type: jobType,
+  async markProcessing(job) {
+    this.currentJobs.set(job.id, {
+      job_id: job.id,
+      tenant_id: job.tenant_id || null,
+      job_type: job.job_type,
       startTime: Date.now()
     });
 
     try {
       await supabaseAdmin
         .from('job_queue')
-        .update({ status: 'processing' })
-        .eq('id', jobId);
+        .update({ status: 'running', updated_at: new Date().toISOString() })
+        .eq('id', job.id);
     } catch (err) {
-      logger.warn({ err, job_id: jobId }, 'failed_to_mark_job_processing');
+      logger.warn({ err, job_id: job.id }, 'failed_to_mark_job_processing');
     }
 
     logger.info({
       event: 'job_started',
-      job_id: jobId,
-      job_type: jobType,
+      job_id: job.id,
+      job_type: job.job_type,
       worker_id: this.workerId
     }, 'job_started');
   }
@@ -121,7 +122,15 @@ export class JobQueueClient {
       // Update job_queue to mark as complete
       await supabaseAdmin
         .from('job_queue')
-        .update({ status: 'complete' })
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          worker_id: null,
+          leased_at: null,
+          lease_expires_at: null,
+          last_error: null,
+        })
         .eq('id', jobId);
     } catch (err) {
       logger.warn({ err, job_id: jobId }, 'failed_to_mark_job_complete');
@@ -135,7 +144,7 @@ export class JobQueueClient {
           job_id: jobId,
           tenant_id: jobData?.tenant_id || null,
           job_type: jobData?.job_type || 'unknown',
-          status: 'complete',
+          status: 'completed',
           result,
           worker_id: this.workerId,
           execution_time_ms: executionTimeMs
@@ -181,7 +190,15 @@ export class JobQueueClient {
       try {
         await supabaseAdmin
           .from('job_queue')
-          .update({ status: 'failed', last_error: errorMessage })
+          .update({
+            status: 'failed',
+            last_error: errorMessage,
+            updated_at: new Date().toISOString(),
+            worker_id: null,
+            leased_at: null,
+            lease_expires_at: null,
+            completed_at: new Date().toISOString(),
+          })
           .eq('id', jobId);
       } catch (err) {
         logger.warn({ err, job_id: jobId }, 'failed_to_mark_job_failed');
@@ -221,7 +238,12 @@ export class JobQueueClient {
           .update({
             status: 'retry_wait',
             available_at: retryAt,
-            last_error: errorMessage
+            last_error: errorMessage,
+            updated_at: new Date().toISOString(),
+            worker_id: null,
+            leased_at: null,
+            lease_expires_at: null,
+            attempt_count: attemptCount + 1,
           })
           .eq('id', jobId);
       } catch (err) {

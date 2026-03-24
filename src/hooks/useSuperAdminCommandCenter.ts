@@ -12,18 +12,26 @@ export type ParsedIntent = {
 
 export type AdminCommandRecord = {
   id: string;
+  tenantId: string | null;
   rawCommand: string;
   commandType: string;
+  riskLevel: string;
   status: string;
   validationStatus: string;
   queueStatus: string;
   createdAt: string;
+  updatedAt: string;
   parsedIntent: ParsedIntent | null;
   approvalRequired: boolean;
   approvalStatus: string;
   queueHandoffState: string;
   executionOutcome: string;
   executionSummary: string;
+  resultSummary: string;
+  errorMessage: string;
+  approvedAt: string;
+  executedAt: string;
+  completedAt: string;
 };
 
 type CommandCenterResponse = {
@@ -38,6 +46,9 @@ type CommandCenterResponse = {
 type CommandActionResponse = {
   ok?: boolean;
   error?: string;
+  command?: unknown;
+  approved?: unknown;
+  queued?: unknown;
 };
 
 function asString(value: unknown, fallback = '') {
@@ -68,18 +79,26 @@ export function normalizeCommandRecord(input: unknown, index: number): AdminComm
   const record = input as Record<string, unknown>;
   return {
     id: asString(record.id, `command-${index}`),
+    tenantId: asString(record.tenant_id) || null,
     rawCommand: asString(record.raw_command || record.command || record.prompt),
     commandType: asString(record.command_type || record.type, 'unknown'),
+    riskLevel: asString(record.risk_level || record.priority || 'medium'),
     status: asString(record.status, 'unknown'),
     validationStatus: asString(record.validation_status || record.validation, 'unknown'),
     queueStatus: asString(record.queue_status || record.job_status || record.execution_status, 'unqueued'),
     createdAt: asString(record.created_at || record.submitted_at),
+    updatedAt: asString(record.updated_at),
     parsedIntent: normalizeParsedIntent(record.parsed_intent || record.intent_preview || record.preview),
     approvalRequired: Boolean(record.approval_required ?? record.requires_approval ?? record.high_risk),
     approvalStatus: asString(record.approval_status || record.approval?.status, 'not_requested'),
     queueHandoffState: asString(record.queue_handoff_state || record.handoff_status || record.queue_status, 'unknown'),
     executionOutcome: asString(record.execution_outcome || record.outcome || record.execution_status, 'unknown'),
     executionSummary: asString(record.execution_summary || record.outcome_summary || record.result_summary),
+    resultSummary: asString(record.result_summary || record.execution_summary || record.outcome_summary),
+    errorMessage: asString(record.error_message),
+    approvedAt: asString(record.approved_at),
+    executedAt: asString(record.executed_at),
+    completedAt: asString(record.completed_at),
   };
 }
 
@@ -164,18 +183,18 @@ export function useSuperAdminCommandCenter() {
     }
   }
 
-  async function requestApproval(commandId: string) {
+  async function applyAction(commandId: string, action: 'approve' | 'reject' | 'cancel', reason?: string) {
     try {
       setSubmitting(true);
       setSubmitError('');
       await authFetchJson<CommandActionResponse>('/.netlify/functions/admin-super-admin-commands', {
         method: 'PATCH',
-        body: { command_id: commandId, action: 'request_approval' },
+        body: { command_id: commandId, action, reason },
       });
       await refresh();
       return true;
     } catch (requestError: any) {
-      setSubmitError(String(requestError?.message || 'Unable to request command approval.'));
+      setSubmitError(String(requestError?.message || `Unable to ${action} command.`));
       return false;
     } finally {
       setSubmitting(false);
@@ -219,6 +238,8 @@ export function useSuperAdminCommandCenter() {
     setSelectedCommandId,
     refresh,
     submitCommand,
-    requestApproval,
+    approveCommand: (commandId: string, reason?: string) => applyAction(commandId, 'approve', reason),
+    rejectCommand: (commandId: string, reason?: string) => applyAction(commandId, 'reject', reason),
+    cancelCommand: (commandId: string, reason?: string) => applyAction(commandId, 'cancel', reason),
   }), [user, checkingAccess, isAuthorized, loading, refreshing, submitting, error, submitError, history, draft, selectedCommand, selectedCommandId]);
 }

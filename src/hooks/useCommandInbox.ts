@@ -6,6 +6,7 @@ export type CommandInboxListItem = {
   id: string;
   rawCommand: string;
   commandType: string;
+  riskLevel: string;
   status: string;
   queueStatus: string;
   createdAt: string;
@@ -37,21 +38,38 @@ export type QueueStatusEvent = {
   detail: string;
 };
 
+export type CommandApprovalEvent = {
+  id: string;
+  decision: string;
+  reason: string;
+  approvedAt: string;
+  approverUserId: string;
+};
+
 export type CommandInboxDetail = {
   id: string;
   rawCommand: string;
   parsedIntentLabel: string;
+  riskLevel: string;
+  status: string;
   validationStatus: string;
   queueStatus: string;
   createdAt: string;
+  updatedAt: string;
   approvalRequired: boolean;
   approvalStatus: string;
   queueHandoffState: string;
   executionOutcome: string;
   executionSummary: string;
+  resultSummary: string;
+  errorMessage: string;
+  approvedAt: string;
+  executedAt: string;
+  completedAt: string;
   relatedSource: RelatedSource | null;
   relatedAgentSummaries: RelatedAgentSummary[];
   timeline: QueueStatusEvent[];
+  approvals: CommandApprovalEvent[];
 };
 
 type CommandInboxResponse = {
@@ -77,6 +95,7 @@ function normalizeListItem(input: unknown, index: number): CommandInboxListItem 
     id: asString(record.id, `command-inbox-${index}`),
     rawCommand: asString(record.raw_command || record.command || record.prompt),
     commandType: asString(record.command_type || record.type, 'unknown'),
+    riskLevel: asString(record.risk_level || record.priority || 'medium'),
     status: asString(record.status, 'unknown'),
     queueStatus: asString(record.queue_status || record.job_status || record.execution_status, 'unqueued'),
     createdAt: asString(record.created_at || record.submitted_at),
@@ -128,14 +147,22 @@ function normalizeDetail(input: unknown): CommandInboxDetail | null {
     id: asString(record.id, 'selected-command'),
     rawCommand: asString(record.raw_command || record.command || record.prompt),
     parsedIntentLabel: asString(record.parsed_intent_label || (record.parsed_intent as Record<string, unknown> | undefined)?.type || record.command_type, 'Not parsed yet'),
+    riskLevel: asString(record.risk_level || record.priority || 'medium'),
+    status: asString(record.status, 'unknown'),
     validationStatus: asString(record.validation_status || record.validation, 'unknown'),
     queueStatus: asString(record.queue_status || record.job_status || record.execution_status, 'unqueued'),
     createdAt: asString(record.created_at || record.submitted_at),
+    updatedAt: asString(record.updated_at),
     approvalRequired: Boolean(record.approval_required ?? record.requires_approval ?? record.high_risk),
     approvalStatus: asString(record.approval_status || record.approval?.status, 'not_requested'),
     queueHandoffState: asString(record.queue_handoff_state || record.handoff_status || record.queue_status, 'unknown'),
     executionOutcome: asString(record.execution_outcome || record.outcome || record.execution_status, 'unknown'),
     executionSummary: asString(record.execution_summary || record.outcome_summary || record.result_summary),
+    resultSummary: asString(record.result_summary || record.execution_summary || record.outcome_summary),
+    errorMessage: asString(record.error_message),
+    approvedAt: asString(record.approved_at),
+    executedAt: asString(record.executed_at),
+    completedAt: asString(record.completed_at),
     relatedSource: normalizeRelatedSource(record.related_source || record.source),
     relatedAgentSummaries: asArray(record.related_agent_summaries || record.agent_summaries)
       .map((entry, index) => normalizeAgentSummary(entry, index))
@@ -143,6 +170,17 @@ function normalizeDetail(input: unknown): CommandInboxDetail | null {
     timeline: asArray(record.timeline || record.queue_timeline || record.events)
       .map((entry, index) => normalizeTimelineEvent(entry, index))
       .filter((entry): entry is QueueStatusEvent => Boolean(entry)),
+    approvals: asArray(record.approvals).map((entry, index) => {
+      if (!entry || typeof entry !== 'object') return null;
+      const approval = entry as Record<string, unknown>;
+      return {
+        id: asString(approval.id, `approval-${index}`),
+        decision: asString(approval.decision),
+        reason: asString(approval.reason),
+        approvedAt: asString(approval.approved_at),
+        approverUserId: asString(approval.approver_user_id),
+      };
+    }).filter((entry): entry is CommandApprovalEvent => Boolean(entry)),
   };
 }
 

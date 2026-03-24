@@ -6,7 +6,7 @@ import {
   Store, Shield, ShieldCheck, TrendingUp, Scale, Briefcase, 
   FileText, Fingerprint, Brain, Cpu, List, Box, ShieldAlert,
   ChevronRight, Facebook, Instagram, Linkedin, MessageCircle, 
-  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone, FlaskConical, CreditCard
+  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone, FlaskConical, CreditCard, Rocket, KeyRound
 } from 'lucide-react';
 import { ViewMode, AgencyBranding, Contact } from '../types';
 
@@ -144,6 +144,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarItem id={ViewMode.BILLING_COMMISSIONS} label="Commission Billing" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
             {userRole === 'admin' && (
               <>
+                <SidebarItem id={ViewMode.ADMIN_NEXUS_ONE} label="Nexus One" icon={Rocket} currentView={currentView} onViewChange={handleNav} />
+                <SidebarItem id={ViewMode.ADMIN_CREDENTIALS} label="Credentials" icon={KeyRound} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_CONTROL_PLANE} label="Control Plane" icon={ShieldAlert} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_SUBSCRIPTIONS} label="Subscriptions" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
                 <SidebarItem id={ViewMode.ADMIN_CONSENTS} label="Consent Ledger" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />

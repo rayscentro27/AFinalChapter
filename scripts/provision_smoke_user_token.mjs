@@ -41,8 +41,50 @@ function tokenPreview(token) {
   return `${t.slice(0, 12)}...${t.slice(-10)}`;
 }
 
+async function resolveRoleRecord({ sb, tenantId, role }) {
+  const requestedRole = String(role || '').trim().toLowerCase();
+  if (!requestedRole) return null;
+
+  const { data, error } = await sb
+    .from('tenant_roles')
+    .select('id,key,name')
+    .eq('tenant_id', tenantId)
+    .eq('key', requestedRole)
+    .maybeSingle();
+
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes("Could not find the table 'public.tenant_roles'")) return null;
+    throw new Error(`tenant_roles lookup failed: ${error.message}`);
+  }
+
+  return data || null;
+}
+
+async function normalizeMembershipRole({ sb, table, tenantId, userId, role, roleRecord }) {
+  const updatePayload = {
+    role,
+    ...(roleRecord?.id ? { role_id: roleRecord.id } : {}),
+  };
+
+  const normalized = await sb
+    .from(table)
+    .update(updatePayload)
+    .eq('tenant_id', tenantId)
+    .eq('user_id', userId)
+    .select('tenant_id,user_id,role,role_id')
+    .maybeSingle();
+
+  if (normalized.error) {
+    throw new Error(`${table} role normalization failed: ${normalized.error.message}`);
+  }
+
+  return normalized.data || null;
+}
+
 async function upsertMembership({ sb, tenantId, userId, role }) {
   const payload = { tenant_id: tenantId, user_id: userId, role };
+  const roleRecord = await resolveRoleRecord({ sb, tenantId, role });
 
   const first = await sb
     .from('tenant_memberships')
@@ -51,9 +93,17 @@ async function upsertMembership({ sb, tenantId, userId, role }) {
     .maybeSingle();
 
   if (!first.error) {
+    const row = first.data || null;
+    const needsNormalization = row && (
+      String(row.role || '').toLowerCase() !== String(role || '').toLowerCase()
+      || (roleRecord?.id && String(row.role_id || '') !== String(roleRecord.id))
+    );
+
     return {
       table: 'tenant_memberships',
-      row: first.data || null,
+      row: needsNormalization
+        ? await normalizeMembershipRole({ sb, table: 'tenant_memberships', tenantId, userId, role, roleRecord })
+        : row,
     };
   }
 
@@ -72,9 +122,17 @@ async function upsertMembership({ sb, tenantId, userId, role }) {
     throw new Error(`tenant_members upsert failed: ${fallback.error.message}`);
   }
 
+  const row = fallback.data || null;
+  const needsNormalization = row && (
+    String(row.role || '').toLowerCase() !== String(role || '').toLowerCase()
+    || (roleRecord?.id && String(row.role_id || '') !== String(roleRecord.id))
+  );
+
   return {
     table: 'tenant_members',
-    row: fallback.data || null,
+    row: needsNormalization
+      ? await normalizeMembershipRole({ sb, table: 'tenant_members', tenantId, userId, role, roleRecord })
+      : row,
   };
 }
 

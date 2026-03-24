@@ -69,3 +69,14 @@ export function extractMetaExternalEventId(payload, rawBody = '') {
 
   return makeHashed('meta', ids, rawBody || JSON.stringify(payload || {}));
 }
+
+export function extractTelegramExternalEventId(payload, rawBody = '') {
+  return makeHashed('telegram', [
+    payload?.update_id,
+    payload?.message?.message_id,
+    payload?.edited_message?.message_id,
+    payload?.channel_post?.message_id,
+    payload?.edited_channel_post?.message_id,
+    payload?.callback_query?.id,
+  ], rawBody || JSON.stringify(payload || {}));
+}

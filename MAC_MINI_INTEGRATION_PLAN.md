@@ -50,3 +50,6 @@ Treat OpenClaw as an external operator node that integrates with existing Nexus 
 - Oracle API remains stable and unchanged in role (API only).
 - Netlify UI continues operating with the same backend boundaries.
 - No live execution path is enabled.
+
+## Detailed Follow-Up
+- For the remaining implementation sequence, current gaps, and workstream order, use `docs/MAC_MINI_REMAINING_INFRA_IMPLEMENTATION_PLAN_2026-03-23.md`.

@@ -10,7 +10,9 @@ export type ExecutiveBriefing = {
   topUpdates: string[];
   blockers: string[];
   recommendedActions: string[];
+  recommendations: string[];
   criticalAlerts: string[];
+  urgency: string;
 };
 
 export type AgentSummaryHighlight = {
@@ -29,6 +31,7 @@ type BriefingResponse = {
   latest_briefing?: unknown;
   briefing?: unknown;
   executive_briefing?: unknown;
+  briefings?: unknown;
   recent_agent_highlights?: unknown;
   agent_summary_highlights?: unknown;
   generated_at?: string;
@@ -64,7 +67,9 @@ function normalizeBriefing(input: unknown): ExecutiveBriefing | null {
     topUpdates: normalizeStringList(record.top_updates || record.updates),
     blockers: normalizeStringList(record.blockers),
     recommendedActions: normalizeStringList(record.recommended_actions || record.actions),
+    recommendations: normalizeStringList(record.recommendations || record.recommended_actions || record.actions),
     criticalAlerts: normalizeStringList(record.critical_alerts || record.alerts),
+    urgency: asString(record.urgency, 'normal'),
   };
 }
 
@@ -92,6 +97,7 @@ export function useCeoBriefingDashboard() {
   const [hours, setHours] = useState(72);
   const [limit, setLimit] = useState(8);
   const [briefing, setBriefing] = useState<ExecutiveBriefing | null>(null);
+  const [briefings, setBriefings] = useState<ExecutiveBriefing[]>([]);
   const [recentHighlights, setRecentHighlights] = useState<AgentSummaryHighlight[]>([]);
   const [generatedAt, setGeneratedAt] = useState('');
 
@@ -128,16 +134,21 @@ export function useCeoBriefingDashboard() {
       params.set('limit', String(limit));
       const body = await authFetchJson<BriefingResponse>(`/.netlify/functions/admin-ceo-briefing?${params.toString()}`);
       const nextBriefing = normalizeBriefing(body.latest_briefing || body.briefing || body.executive_briefing);
+      const nextBriefings = asArray(body.briefings)
+        .map((entry) => normalizeBriefing(entry))
+        .filter((entry): entry is ExecutiveBriefing => Boolean(entry));
       const nextHighlights = asArray(body.recent_agent_highlights || body.agent_summary_highlights)
         .map((entry, index) => normalizeHighlight(entry, index))
         .filter((entry): entry is AgentSummaryHighlight => Boolean(entry));
 
       setBriefing(nextBriefing);
+      setBriefings(nextBriefings);
       setRecentHighlights(nextHighlights);
       setGeneratedAt(asString(body.generated_at));
     } catch (refreshError: any) {
       setError(String(refreshError?.message || 'Unable to load CEO briefing dashboard.'));
       setBriefing(null);
+      setBriefings([]);
       setRecentHighlights([]);
       setGeneratedAt('');
     } finally {
@@ -164,8 +175,9 @@ export function useCeoBriefingDashboard() {
     limit,
     setLimit,
     briefing,
+    briefings,
     recentHighlights,
     generatedAt,
     refresh,
-  }), [user, checkingAccess, isAuthorized, loading, refreshing, error, hours, limit, briefing, recentHighlights, generatedAt]);
+  }), [user, checkingAccess, isAuthorized, loading, refreshing, error, hours, limit, briefing, briefings, recentHighlights, generatedAt]);
 }

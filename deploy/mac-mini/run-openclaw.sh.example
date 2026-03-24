@@ -1,0 +1,11 @@
+#!/bin/zsh
+set -euo pipefail
+
+cd /Users/YOUR_USER/nexus-ops/openclaw
+
+if [ -f ./.env ]; then
+  export $(grep -v '^#' ./.env | xargs)
+fi
+
+# Replace the command below with the real long-running OpenClaw entrypoint used on the Mac Mini.
+exec /opt/homebrew/bin/openclaw --help

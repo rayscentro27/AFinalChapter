@@ -33,12 +33,14 @@ Use these together:
 2. `docs/INTERNAL_10_USER_PILOT_SMOKE_PLAN.md`
 3. `docs/INTERNAL_10_USER_PILOT_ISSUE_TRACKER_TEMPLATE.md`
 4. `docs/INTERNAL_10_USER_PILOT_OPERATOR_CHECKLIST.md`
+5. `docs/INTERNAL_10_USER_PILOT_DAY0_EXECUTION_CHECKLIST.md`
 
 Recommended usage:
 
 1. Use the readiness pass to confirm go or no-go before pilot day 1.
-2. Use the smoke plan before pilot start and once per day during the pilot.
-3. Use the issue tracker as the system of record for all pilot defects and stop conditions.
+2. Use the day-0 execution checklist as the operator run sheet before pilot start approval.
+3. Use the smoke plan before pilot start and once per day during the pilot.
+4. Use the issue tracker as the system of record for all pilot defects and stop conditions.
 
 ## Pilot Owner Assignments
 

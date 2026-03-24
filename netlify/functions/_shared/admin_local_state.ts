@@ -48,33 +48,48 @@ export function inferCommandTarget(command: string) {
 }
 
 export function deriveCommandStatus(record: Record<string, unknown>) {
+  const directStatus = asText(record.status || '').toLowerCase();
+  if (directStatus) return directStatus;
+
   const validationStatus = asText(record.validation_status || 'pending');
   const approvalStatus = asText(record.approval_status || 'pending');
   const executionOutcome = asText(record.execution_outcome || 'pending');
   const queueHandoffState = asText(record.queue_handoff_state || 'not_queued');
 
-  if (executionOutcome === 'failed' || approvalStatus === 'rejected' || validationStatus === 'rejected') return 'rejected';
+  if (executionOutcome === 'failed' || queueHandoffState === 'failed') return 'failed';
+  if (approvalStatus === 'rejected' || validationStatus === 'rejected') return 'rejected';
   if (executionOutcome === 'completed' || queueHandoffState === 'completed') return 'completed';
-  if (queueHandoffState === 'running') return 'running';
+  if (queueHandoffState === 'running') return 'executing';
   if (queueHandoffState === 'queued') return 'queued';
+  if (approvalStatus === 'approved') return 'approved';
+  if (Boolean(record.requires_approval ?? record.approval_required ?? false)) return 'requires_approval';
   return 'pending';
 }
 
 export function commandResponseRow(record: Record<string, unknown>) {
   return {
     id: asText(record.id),
+    tenant_id: asText(record.tenant_id) || null,
     raw_command: asText(record.command_text),
     command_type: asText(record.command_type || 'general'),
     status: deriveCommandStatus(record),
+    risk_level: asText(record.risk_level || 'medium'),
     validation_status: asText(record.validation_status || 'pending'),
     queue_status: asText(record.queue_handoff_state || 'not_queued'),
     created_at: asText(record.created_at),
+    updated_at: asText(record.updated_at),
     parsed_intent: (record.parsed_intent && typeof record.parsed_intent === 'object') ? record.parsed_intent : {},
-    approval_required: Boolean(record.approval_required ?? true),
+    approval_required: Boolean(record.requires_approval ?? record.approval_required ?? true),
     approval_status: asText(record.approval_status || 'pending'),
     queue_handoff_state: asText(record.queue_handoff_state || 'not_queued'),
     execution_outcome: asText(record.execution_outcome || 'pending'),
-    execution_summary: asText(record.execution_summary),
+    execution_summary: asText(record.result_summary || record.execution_summary),
+    result_summary: asText(record.result_summary || record.execution_summary),
+    error_message: asText(record.error_message) || null,
+    approved_by: asText(record.approved_by) || null,
+    approved_at: asText(record.approved_at) || null,
+    executed_at: asText(record.executed_at) || null,
+    completed_at: asText(record.completed_at) || null,
     related_source_id: asText(record.related_source_id) || null,
   };
 }
