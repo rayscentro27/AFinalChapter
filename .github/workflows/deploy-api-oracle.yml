@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OCI_PROFILE: goclearonline
+      OCI_CONFIG_CONTENT: ${{ secrets.OCI_CONFIG_CONTENT }}
       OCI_REGION: ${{ secrets.OCI_REGION }}
       OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
       OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
@@ -66,21 +67,43 @@ jobs:
       - name: Build OCI config
         shell: bash
         run: |
-          OCI_REGION_CLEAN="$(printf '%s' "$OCI_REGION" | tr -d '\r[:space:]')"
-          OCI_USER_OCID_CLEAN="$(printf '%s' "$OCI_USER_OCID" | tr -d '\r[:space:]')"
-          OCI_TENANCY_OCID_CLEAN="$(printf '%s' "$OCI_TENANCY_OCID" | tr -d '\r[:space:]')"
-          OCI_FINGERPRINT_CLEAN="$(printf '%s' "$OCI_FINGERPRINT" | tr -d '\r[:space:]')"
           mkdir -p ~/.oci
           printf '%s\n' "$OCI_API_KEY_CONTENT" > ~/.oci/oci_api_key.pem
           chmod 600 ~/.oci/oci_api_key.pem
-          cat > ~/.oci/config <<EOF
-          [$OCI_PROFILE]
-          user=$OCI_USER_OCID_CLEAN
-          fingerprint=$OCI_FINGERPRINT_CLEAN
-          tenancy=$OCI_TENANCY_OCID_CLEAN
-          region=$OCI_REGION_CLEAN
-          key_file=/home/runner/.oci/oci_api_key.pem
-          EOF
+
+          if [[ -n "${OCI_CONFIG_CONTENT:-}" ]]; then
+            printf '%s\n' "$OCI_CONFIG_CONTENT" > ~/.oci/config
+            python - <<'PY'
+from pathlib import Path
+config_path = Path.home() / '.oci' / 'config'
+lines = config_path.read_text(encoding='utf-8').splitlines()
+rewritten = []
+replaced = False
+for line in lines:
+    if line.strip().startswith('key_file='):
+        rewritten.append('key_file=/home/runner/.oci/oci_api_key.pem')
+        replaced = True
+    else:
+        rewritten.append(line)
+if not replaced:
+    rewritten.append('key_file=/home/runner/.oci/oci_api_key.pem')
+config_path.write_text('\n'.join(rewritten) + '\n', encoding='utf-8')
+PY
+          else
+            OCI_REGION_CLEAN="$(printf '%s' "$OCI_REGION" | tr -d '\r[:space:]')"
+            OCI_USER_OCID_CLEAN="$(printf '%s' "$OCI_USER_OCID" | tr -d '\r[:space:]')"
+            OCI_TENANCY_OCID_CLEAN="$(printf '%s' "$OCI_TENANCY_OCID" | tr -d '\r[:space:]')"
+            OCI_FINGERPRINT_CLEAN="$(printf '%s' "$OCI_FINGERPRINT" | tr -d '\r[:space:]')"
+            cat > ~/.oci/config <<EOF
+            [$OCI_PROFILE]
+            user=$OCI_USER_OCID_CLEAN
+            fingerprint=$OCI_FINGERPRINT_CLEAN
+            tenancy=$OCI_TENANCY_OCID_CLEAN
+            region=$OCI_REGION_CLEAN
+            key_file=/home/runner/.oci/oci_api_key.pem
+            EOF
+          fi
+
           chmod 600 ~/.oci/config
 
       - name: Install root dependencies for smoke tooling
