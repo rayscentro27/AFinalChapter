@@ -24,7 +24,7 @@ The workflow `.github/workflows/deploy-api-oracle.yml` now targets those labels 
 Use the machine that already proves the Bastion path works locally.
 
 Good candidates:
-- the Windows or WSL environment already using the working `goclearonline` OCI profile
+- the Ubuntu WSL environment already using the working `goclearonline` OCI profile
 - a dedicated admin box with stable outbound access to OCI Bastion
 
 Avoid using a runner host that depends on the same failing network path as GitHub-hosted runners.
@@ -33,14 +33,16 @@ Avoid using a runner host that depends on the same failing network path as GitHu
 
 The runner host must provide:
 
-1. `bash`
-2. `ssh`
-3. `tar`
-4. Node.js 20+
-5. `npm`
-6. Python 3.11+
+1. Windows with `wsl.exe`
+2. Ubuntu WSL with `bash`
+3. Ubuntu WSL with `ssh`
+4. Ubuntu WSL with `tar`
+5. Ubuntu WSL with Node.js 20+
+6. Ubuntu WSL with `npm`
+7. Ubuntu WSL with Python 3.11+
+8. Ubuntu WSL with a working `oci` CLI and `~/.oci/config`
 
-The workflow installs `oci-cli`, but the host still needs a working Python and package install path.
+The self-hosted workflow now shells into Ubuntu WSL for OCI access, deploy, and smoke. Do not rely on the Windows service account to build OCI config or call OCI APIs directly.
 
 ## Runner Registration Notes
 
@@ -65,7 +67,8 @@ gh run watch --repo rayscentro27/AFinalChapter
 ```
 
 4. Confirm the job logs show the self-hosted runner name in `Runner preflight`.
-5. Confirm the deploy reaches protected smoke.
+5. Confirm the `WSL preflight` step reports the Ubuntu environment and toolchain.
+6. Confirm the deploy reaches protected smoke.
 
 ## Hosted Fallback
 

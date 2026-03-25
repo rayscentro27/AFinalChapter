@@ -127,6 +127,13 @@ The deploy runner must have:
 - outbound connectivity to OCI Bastion APIs and SSH proxy endpoints
 - `bash`, `ssh`, `tar`, `node`, `npm`, and Python 3.11 available
 - access to the same repo secrets already configured for OCI and Supabase
+- outbound connectivity to OCI Bastion APIs and SSH proxy endpoints from Ubuntu WSL
+- `wsl.exe` available on the Windows runner host
+- Ubuntu WSL with `bash`, `ssh`, `tar`, `node`, `npm`, Python 3.11, and `oci`
+- an existing working OCI profile in Ubuntu WSL at `~/.oci/config`
+- access to the same repo secrets already configured for Supabase smoke validation
+
+On this machine, the supported Oracle deploy path is the Ubuntu WSL environment. The Windows runner remains the GitHub Actions entrypoint, but OCI access, deploy, and smoke now execute inside WSL because the Windows service context timed out on plain OCI API calls while WSL successfully created Bastion sessions and reached the Oracle VM.
 
 For runner setup guidance, use [docs/ORACLE_DEPLOY_RUNNER_SETUP.md](docs/ORACLE_DEPLOY_RUNNER_SETUP.md).
 

@@ -37,9 +37,7 @@ env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   APP_BASE_URL: https://app.goclearonline.cc
-  GIT_BASH_PATH: C:\Program Files\Git\bin\bash.exe
-  OCI_CLI_VENV_DIR: C:\o1
-  OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: 'True'
+  WSL_DISTRO: Ubuntu
 
 jobs:
   deploy-self-hosted:
@@ -52,32 +50,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install OCI CLI
-        shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $ociPython = Join-Path $env:OCI_CLI_VENV_DIR 'Scripts\python.exe'
-          $ociExe = Join-Path $env:OCI_CLI_VENV_DIR 'Scripts\oci.exe'
-          if (-not (Test-Path $ociExe)) {
-            if (-not (Test-Path $ociPython)) {
-              python -m venv $env:OCI_CLI_VENV_DIR
-            }
-            & $ociPython -m pip install --upgrade pip
-            & $ociPython -m pip install --upgrade oci-cli
-          }
-          $ociScripts = Join-Path $env:OCI_CLI_VENV_DIR 'Scripts'
-          $ociScripts | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
       - name: Runner preflight
         shell: powershell
         run: |
@@ -86,82 +58,47 @@ jobs:
           Write-Host "runner_os=$env:RUNNER_OS"
           Write-Host "runner_arch=$env:RUNNER_ARCH"
           cmd /c ver
-          $required = @('git', 'ssh', 'tar', 'node', 'npm', 'python', 'oci')
+          $required = @('git', 'wsl')
           foreach ($name in $required) {
             if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
               throw "Missing required command on runner: $name"
             }
           }
-          if (-not (Test-Path $env:GIT_BASH_PATH)) {
-            throw "Missing Git Bash at $env:GIT_BASH_PATH"
-          }
+          wsl.exe -d $env:WSL_DISTRO -- bash -lc 'set -euo pipefail; whoami; command -v node npm python3 oci ssh tar >/dev/null; test -f ~/.oci/config; test -d /mnt/c/Users/raysc/AFinalChapter'
 
       - name: Validate required secrets
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          $required = @('OCI_REGION', 'OCI_USER_OCID', 'OCI_TENANCY_OCID', 'OCI_FINGERPRINT', 'OCI_API_KEY_CONTENT', 'SMOKE_TENANT_ID', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY')
+          $required = @('SMOKE_TENANT_ID', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY')
           foreach ($name in $required) {
             if ([string]::IsNullOrWhiteSpace((Get-Item -Path "Env:$name").Value)) {
               throw "Missing required secret: $name"
             }
           }
 
-      - name: Build OCI config
+      - name: WSL preflight
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          $ociDir = Join-Path $env:RUNNER_TEMP 'oci'
-          New-Item -ItemType Directory -Path $ociDir -Force | Out-Null
-          $ociKeyFile = Join-Path $ociDir 'oci_api_key.pem'
-          [System.IO.File]::WriteAllText($ociKeyFile, $env:OCI_API_KEY_CONTENT + [Environment]::NewLine)
-          $ociConfigPath = Join-Path $ociDir 'config'
-
-          if (-not [string]::IsNullOrWhiteSpace($env:OCI_CONFIG_CONTENT)) {
-            $configContent = $env:OCI_CONFIG_CONTENT
-            if ($configContent -match '(?m)^[\s]*key_file=') {
-              $configContent = [System.Text.RegularExpressions.Regex]::Replace($configContent, '(?m)^[\s]*key_file=.*$', "key_file=$ociKeyFile")
-            } else {
-              $configContent = ($configContent.TrimEnd() + [Environment]::NewLine + "key_file=$ociKeyFile")
-            }
-          } else {
-            $ociRegionClean = ($env:OCI_REGION -replace '[\r\n\s]', '')
-            $ociUserOcidClean = ($env:OCI_USER_OCID -replace '[\r\n\s]', '')
-            $ociTenancyOcidClean = ($env:OCI_TENANCY_OCID -replace '[\r\n\s]', '')
-            $ociFingerprintClean = ($env:OCI_FINGERPRINT -replace '[\r\n\s]', '')
-            $configContent = @(
-              "[$env:OCI_PROFILE]",
-              "user=$ociUserOcidClean",
-              "fingerprint=$ociFingerprintClean",
-              "tenancy=$ociTenancyOcidClean",
-              "region=$ociRegionClean",
-              "key_file=$ociKeyFile"
-            ) -join [Environment]::NewLine
-          }
-
-          [System.IO.File]::WriteAllText($ociConfigPath, $configContent + [Environment]::NewLine)
-          "OCI_CLI_CONFIG_FILE=$ociConfigPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: OCI API preflight
-        shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-          & oci iam region-subscription list --tenancy-id "$env:OCI_TENANCY_OCID" --profile "$env:OCI_PROFILE" --region "$env:OCI_REGION" --query 'data[0]."region-name"' --raw-output | Write-Host
+          wsl.exe -d $env:WSL_DISTRO -- bash -lc 'set -euo pipefail; cd /mnt/c/Users/raysc/AFinalChapter; pwd; oci --version; node --version; npm --version; python3 --version'
 
       - name: Install root dependencies for smoke tooling
         shell: powershell
         run: |
-          npm install
+          wsl.exe -d $env:WSL_DISTRO -- bash -lc 'set -euo pipefail; cd /mnt/c/Users/raysc/AFinalChapter; npm install'
 
       - name: Deploy gateway over OCI Bastion
         shell: powershell
         run: |
-          & "$env:GIT_BASH_PATH" --noprofile --norc -eo pipefail -c "./scripts/oracle_bastion_deploy.sh"
+          wsl.exe -d $env:WSL_DISTRO -- bash -lc 'set -euo pipefail; cd /mnt/c/Users/raysc/AFinalChapter; ./scripts/oracle_bastion_deploy.sh'
 
       - name: Protected production smoke
         shell: powershell
         run: |
-          & "$env:GIT_BASH_PATH" --noprofile --norc -eo pipefail -c "./scripts/oracle_protected_smoke.sh \"$env:SMOKE_TENANT_ID\""
+          $ErrorActionPreference = 'Stop'
+          $env:WSLENV = 'SMOKE_TENANT_ID:SUPABASE_URL:SUPABASE_SERVICE_ROLE_KEY:APP_BASE_URL:GITHUB_SHA'
+          wsl.exe -d $env:WSL_DISTRO -- bash -lc 'set -euo pipefail; cd /mnt/c/Users/raysc/AFinalChapter; ./scripts/oracle_protected_smoke.sh "$SMOKE_TENANT_ID"'
 
   deploy-github-hosted:
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'github-hosted' }}
