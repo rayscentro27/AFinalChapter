@@ -39,6 +39,7 @@ env:
   APP_BASE_URL: https://app.goclearonline.cc
   GIT_BASH_PATH: C:\Program Files\Git\bin\bash.exe
   OCI_CLI_VENV_DIR: C:\o1
+  OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: 'True'
 
 jobs:
   deploy-self-hosted:
@@ -110,7 +111,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          $ociDir = Join-Path $HOME '.oci'
+          $ociDir = Join-Path $env:RUNNER_TEMP 'oci'
           New-Item -ItemType Directory -Path $ociDir -Force | Out-Null
           $ociKeyFile = Join-Path $ociDir 'oci_api_key.pem'
           [System.IO.File]::WriteAllText($ociKeyFile, $env:OCI_API_KEY_CONTENT + [Environment]::NewLine)
@@ -139,6 +140,13 @@ jobs:
           }
 
           [System.IO.File]::WriteAllText($ociConfigPath, $configContent + [Environment]::NewLine)
+          "OCI_CLI_CONFIG_FILE=$ociConfigPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: OCI API preflight
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & oci iam region-subscription list --tenancy-id "$env:OCI_TENANCY_OCID" --profile "$env:OCI_PROFILE" --region "$env:OCI_REGION" --query 'data[0]."region-name"' --raw-output | Write-Host
 
       - name: Install root dependencies for smoke tooling
         shell: powershell
