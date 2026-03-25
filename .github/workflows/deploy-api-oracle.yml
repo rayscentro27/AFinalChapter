@@ -37,6 +37,7 @@ env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   APP_BASE_URL: https://app.goclearonline.cc
+  GIT_BASH_PATH: C:\Program Files\Git\bin\bash.exe
 
 jobs:
   deploy-self-hosted:
@@ -60,88 +61,91 @@ jobs:
           python-version: '3.11'
 
       - name: Install OCI CLI
-        shell: bash
+        shell: pwsh
         run: |
-          PYTHON_USER_BIN="$(python -m site --user-base)/bin"
-          echo "$PYTHON_USER_BIN" >> "$GITHUB_PATH"
+          $pythonUserBin = python -m site --user-base
+          $pythonUserBin = Join-Path $pythonUserBin 'Scripts'
+          $pythonUserBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           python -m pip install --upgrade pip
           python -m pip install --user --upgrade oci-cli
 
       - name: Runner preflight
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          echo "runner_name=${RUNNER_NAME}"
-          echo "runner_os=${RUNNER_OS}"
-          echo "runner_arch=${RUNNER_ARCH}"
-          uname -a || true
-          required=(bash ssh tar node npm python oci)
-          for name in "${required[@]}"; do
-            if ! command -v "$name" >/dev/null 2>&1; then
-              echo "Missing required command on runner: ${name}" >&2
-              exit 1
-            fi
-          done
+          $ErrorActionPreference = 'Stop'
+          Write-Host "runner_name=$env:RUNNER_NAME"
+          Write-Host "runner_os=$env:RUNNER_OS"
+          Write-Host "runner_arch=$env:RUNNER_ARCH"
+          cmd /c ver
+          $required = @('git', 'ssh', 'tar', 'node', 'npm', 'python', 'oci')
+          foreach ($name in $required) {
+            if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
+              throw "Missing required command on runner: $name"
+            }
+          }
+          if (-not (Test-Path $env:GIT_BASH_PATH)) {
+            throw "Missing Git Bash at $env:GIT_BASH_PATH"
+          }
 
       - name: Validate required secrets
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          required=(OCI_REGION OCI_USER_OCID OCI_TENANCY_OCID OCI_FINGERPRINT OCI_API_KEY_CONTENT SMOKE_TENANT_ID SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY)
-          for name in "${required[@]}"; do
-            if [[ -z "${!name:-}" ]]; then
-              echo "Missing required secret: ${name}" >&2
-              exit 1
-            fi
-          done
+          $ErrorActionPreference = 'Stop'
+          $required = @('OCI_REGION', 'OCI_USER_OCID', 'OCI_TENANCY_OCID', 'OCI_FINGERPRINT', 'OCI_API_KEY_CONTENT', 'SMOKE_TENANT_ID', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY')
+          foreach ($name in $required) {
+            if ([string]::IsNullOrWhiteSpace((Get-Item -Path "Env:$name").Value)) {
+              throw "Missing required secret: $name"
+            }
+          }
 
       - name: Build OCI config
-        shell: bash
+        shell: pwsh
         run: |
-          mkdir -p ~/.oci
-          printf '%s\n' "$OCI_API_KEY_CONTENT" > ~/.oci/oci_api_key.pem
-          chmod 600 ~/.oci/oci_api_key.pem
+          $ErrorActionPreference = 'Stop'
+          $ociDir = Join-Path $HOME '.oci'
+          New-Item -ItemType Directory -Path $ociDir -Force | Out-Null
+          $ociKeyFile = Join-Path $ociDir 'oci_api_key.pem'
+          [System.IO.File]::WriteAllText($ociKeyFile, $env:OCI_API_KEY_CONTENT + [Environment]::NewLine)
+          $ociConfigPath = Join-Path $ociDir 'config'
 
-          OCI_KEY_FILE="${HOME}/.oci/oci_api_key.pem"
+          if (-not [string]::IsNullOrWhiteSpace($env:OCI_CONFIG_CONTENT)) {
+            $configContent = $env:OCI_CONFIG_CONTENT
+            if ($configContent -match '(?m)^[\s]*key_file=') {
+              $configContent = [System.Text.RegularExpressions.Regex]::Replace($configContent, '(?m)^[\s]*key_file=.*$', "key_file=$ociKeyFile")
+            } else {
+              $configContent = ($configContent.TrimEnd() + [Environment]::NewLine + "key_file=$ociKeyFile")
+            }
+          } else {
+            $ociRegionClean = ($env:OCI_REGION -replace '[\r\n\s]', '')
+            $ociUserOcidClean = ($env:OCI_USER_OCID -replace '[\r\n\s]', '')
+            $ociTenancyOcidClean = ($env:OCI_TENANCY_OCID -replace '[\r\n\s]', '')
+            $ociFingerprintClean = ($env:OCI_FINGERPRINT -replace '[\r\n\s]', '')
+            $configContent = @(
+              "[$env:OCI_PROFILE]",
+              "user=$ociUserOcidClean",
+              "fingerprint=$ociFingerprintClean",
+              "tenancy=$ociTenancyOcidClean",
+              "region=$ociRegionClean",
+              "key_file=$ociKeyFile"
+            ) -join [Environment]::NewLine
+          }
 
-          if [[ -n "${OCI_CONFIG_CONTENT:-}" ]]; then
-            printf '%s\n' "$OCI_CONFIG_CONTENT" > ~/.oci/config
-            if grep -q '^[[:space:]]*key_file=' ~/.oci/config; then
-              sed -i.bak "s#^[[:space:]]*key_file=.*#key_file=${OCI_KEY_FILE}#" ~/.oci/config
-              rm -f ~/.oci/config.bak
-            else
-              printf '%s\n' "key_file=${OCI_KEY_FILE}" >> ~/.oci/config
-            fi
-          else
-            OCI_REGION_CLEAN="$(printf '%s' "$OCI_REGION" | tr -d '\r[:space:]')"
-            OCI_USER_OCID_CLEAN="$(printf '%s' "$OCI_USER_OCID" | tr -d '\r[:space:]')"
-            OCI_TENANCY_OCID_CLEAN="$(printf '%s' "$OCI_TENANCY_OCID" | tr -d '\r[:space:]')"
-            OCI_FINGERPRINT_CLEAN="$(printf '%s' "$OCI_FINGERPRINT" | tr -d '\r[:space:]')"
-            printf '%s\n' \
-              "[$OCI_PROFILE]" \
-              "user=$OCI_USER_OCID_CLEAN" \
-              "fingerprint=$OCI_FINGERPRINT_CLEAN" \
-              "tenancy=$OCI_TENANCY_OCID_CLEAN" \
-              "region=$OCI_REGION_CLEAN" \
-              "key_file=${OCI_KEY_FILE}" > ~/.oci/config
-          fi
-
-          chmod 600 ~/.oci/config
+          [System.IO.File]::WriteAllText($ociConfigPath, $configContent + [Environment]::NewLine)
 
       - name: Install root dependencies for smoke tooling
-        shell: bash
+        shell: pwsh
         run: |
           npm install
 
       - name: Deploy gateway over OCI Bastion
-        shell: bash
+        shell: pwsh
         run: |
-          bash scripts/oracle_bastion_deploy.sh
+          & "$env:GIT_BASH_PATH" --noprofile --norc -eo pipefail -c "./scripts/oracle_bastion_deploy.sh"
 
       - name: Protected production smoke
-        shell: bash
+        shell: pwsh
         run: |
-          bash scripts/oracle_protected_smoke.sh "$SMOKE_TENANT_ID"
+          & "$env:GIT_BASH_PATH" --noprofile --norc -eo pipefail -c "./scripts/oracle_protected_smoke.sh \"$env:SMOKE_TENANT_ID\""
 
   deploy-github-hosted:
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'github-hosted' }}
