@@ -38,7 +38,7 @@ env:
   SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   APP_BASE_URL: https://app.goclearonline.cc
   GIT_BASH_PATH: C:\Program Files\Git\bin\bash.exe
-  OCI_CLI_VENV_DIR: C:\actions-runner-oracle-deploy\oci-cli-venv
+  OCI_CLI_VENV_DIR: C:\o1
 
 jobs:
   deploy-self-hosted:
@@ -65,14 +65,16 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          if (Test-Path $env:OCI_CLI_VENV_DIR) {
-            Remove-Item -Recurse -Force $env:OCI_CLI_VENV_DIR
-          }
-          python -m venv $env:OCI_CLI_VENV_DIR
           $ociPython = Join-Path $env:OCI_CLI_VENV_DIR 'Scripts\python.exe'
+          $ociExe = Join-Path $env:OCI_CLI_VENV_DIR 'Scripts\oci.exe'
+          if (-not (Test-Path $ociExe)) {
+            if (-not (Test-Path $ociPython)) {
+              python -m venv $env:OCI_CLI_VENV_DIR
+            }
+            & $ociPython -m pip install --upgrade pip
+            & $ociPython -m pip install --upgrade oci-cli
+          }
           $ociScripts = Join-Path $env:OCI_CLI_VENV_DIR 'Scripts'
-          & $ociPython -m pip install --upgrade pip
-          & $ociPython -m pip install --upgrade oci-cli
           $ociScripts | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Runner preflight
