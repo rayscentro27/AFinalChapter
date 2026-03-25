@@ -38,6 +38,7 @@ env:
   SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   APP_BASE_URL: https://app.goclearonline.cc
   GIT_BASH_PATH: C:\Program Files\Git\bin\bash.exe
+  OCI_CLI_VENV_DIR: C:\actions-runner-oracle-deploy\oci-cli-venv
 
 jobs:
   deploy-self-hosted:
@@ -63,11 +64,16 @@ jobs:
       - name: Install OCI CLI
         shell: powershell
         run: |
-          $pythonUserBin = python -m site --user-base
-          $pythonUserBin = Join-Path $pythonUserBin 'Scripts'
-          $pythonUserBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          python -m pip install --upgrade pip
-          python -m pip install --user --upgrade oci-cli
+          $ErrorActionPreference = 'Stop'
+          if (Test-Path $env:OCI_CLI_VENV_DIR) {
+            Remove-Item -Recurse -Force $env:OCI_CLI_VENV_DIR
+          }
+          python -m venv $env:OCI_CLI_VENV_DIR
+          $ociPython = Join-Path $env:OCI_CLI_VENV_DIR 'Scripts\python.exe'
+          $ociScripts = Join-Path $env:OCI_CLI_VENV_DIR 'Scripts'
+          & $ociPython -m pip install --upgrade pip
+          & $ociPython -m pip install --upgrade oci-cli
+          $ociScripts | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Runner preflight
         shell: powershell
