@@ -13,7 +13,7 @@ Run the Oracle Bastion deploy workflow from a machine that already has stable OC
 Register the runner with both labels:
 
 1. `self-hosted`
-2. `oracle-deploy`
+2. `oracle-deploy-wsl`
 
 The workflow `.github/workflows/deploy-api-oracle.yml` now targets those labels for:
 - `push` deploys on `main`
@@ -50,7 +50,7 @@ Register the runner at the repository level for `rayscentro27/AFinalChapter`.
 
 During registration:
 - keep the default `self-hosted` label
-- add `oracle-deploy`
+- add `oracle-deploy-wsl`
 - keep the runner online during production deploy windows
 
 ## First Validation

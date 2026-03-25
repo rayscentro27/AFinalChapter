@@ -44,7 +44,7 @@ jobs:
     if: ${{ github.event_name == 'push' || github.event.inputs.runner != 'github-hosted' }}
     runs-on:
       - self-hosted
-      - oracle-deploy
+      - oracle-deploy-wsl
 
     steps:
       - name: Checkout

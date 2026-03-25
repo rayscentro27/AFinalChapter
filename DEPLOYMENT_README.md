@@ -111,7 +111,7 @@ If any required secret is missing, the deploy workflow fails before attempting a
 
 ## Oracle Deploy Runner Model
 
-The Oracle deploy workflow now assumes a self-hosted GitHub Actions runner with labels `self-hosted` and `oracle-deploy` for normal deploys.
+The Oracle deploy workflow now assumes a self-hosted GitHub Actions runner with labels `self-hosted` and `oracle-deploy-wsl` for normal deploys.
 
 Why this changed:
 - the OCI Bastion session-create call repeatedly timed out from `ubuntu-latest`
@@ -119,7 +119,7 @@ Why this changed:
 - self-hosting the deploy runner on the machine that already has working OCI connectivity is the stable path
 
 Operational rules:
-- `push` to `main` deploys only through the `self-hosted, oracle-deploy` runner path
+- `push` to `main` deploys only through the `self-hosted, oracle-deploy-wsl` runner path
 - manual `workflow_dispatch` defaults to `self-hosted`
 - `github-hosted` remains available only as a manual diagnostic fallback, not the primary production route
 
