@@ -4,6 +4,8 @@ Last updated: 2026-03-24
 
 This document defines the expected GitHub Actions runner for Oracle gateway deploys.
 
+For the canonical supported execution path and recovery order, use [docs/ORACLE_CANONICAL_DEPLOY_PATH.md](docs/ORACLE_CANONICAL_DEPLOY_PATH.md).
+
 ## Goal
 
 Run the Oracle Bastion deploy workflow from a machine that already has stable OCI connectivity instead of relying on `ubuntu-latest`.
