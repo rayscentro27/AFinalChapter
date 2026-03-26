@@ -37,6 +37,8 @@ interface UseTurnstileCaptchaOptions {
 const MAX_TOKEN_AGE_MS = 4 * 60 * 1000;
 
 export function useTurnstileCaptcha(options: UseTurnstileCaptchaOptions) {
+  const hostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
+  const isNetlifyReviewHost = hostname.endsWith('.netlify.app');
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaIssuedAt, setCaptchaIssuedAt] = useState<number | null>(null);
   const [captchaRuntimeFailed, setCaptchaRuntimeFailed] = useState(false);
@@ -52,7 +54,9 @@ export function useTurnstileCaptcha(options: UseTurnstileCaptchaOptions) {
   if (captchaSiteKeyMissing) {
     captchaBlockedReason = 'Captcha is enabled for authentication, but the Turnstile site key is missing.';
   } else if (captchaRequired && captchaRuntimeFailed) {
-    captchaBlockedReason = 'Captcha verification is required, but the Turnstile widget failed to load.';
+    captchaBlockedReason = isNetlifyReviewHost
+      ? 'Captcha is required, but this Netlify review hostname is not allowed by the current Turnstile widget. Use the primary domain or add this review hostname to the Cloudflare Turnstile allowlist.'
+      : 'Captcha verification is required, but the Turnstile widget failed to load.';
   }
 
   useEffect(() => {
