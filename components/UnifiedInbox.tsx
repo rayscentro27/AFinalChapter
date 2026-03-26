@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Contact, InboxThread, UnifiedMessage, Message, InboxRouting, MessageAttachment } from '../types';
-import { MessageSquare, Archive, Send, Zap, Bot, Eye, Ghost, Sparkles, FileText, Route, Loader2, Paperclip, X, Building2, Phone, Mail, ShieldCheck } from 'lucide-react';
+import { Contact, InboxThread, UnifiedMessage, Message, InboxRouting, MessageAttachment, ViewMode } from '../types';
+import { MessageSquare, Archive, Send, Zap, Bot, Eye, Ghost, Sparkles, FileText, Route, Loader2, Paperclip, X, Building2, Phone, Mail, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import { sendInboxMessage, SendProvider } from '../lib/inboxSendClient';
 import { claimConversation } from '../lib/claimConversation';
 import { supabase } from '../lib/supabaseClient';
@@ -182,6 +182,7 @@ function normalizeProviderForFilter(provider: SendProvider | null): string {
 const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }) => {
   const [threads, setThreads] = useState<InboxThread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'bot' | 'human'>('all');
   const [inputText, setInputText] = useState('');
   const [channelPreference, setChannelPreference] = useState<'auto' | SendProvider>('auto');
@@ -1059,7 +1060,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
 
   return (
     <div className="flex h-[calc(100vh-100px)] animate-fade-in overflow-hidden rounded-[2.6rem] border border-[#DDE7F4] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] shadow-[0_24px_72px_rgba(36,58,114,0.08)]">
-      <div className="w-[360px] border-r border-[#E7EDF7] bg-white flex flex-col flex-shrink-0">
+      <div className="w-[300px] border-r border-[#E7EDF7] bg-white flex flex-col flex-shrink-0 xl:w-[320px]">
         <div className="p-8 border-b border-[#EEF2FA] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)]">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -1069,10 +1070,27 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
             <div className="p-2 bg-[#EEF4FF] text-[#4677E6] rounded-xl"><MessageSquare size={20} /></div>
           </div>
           <div className="mb-4">
-            <InboxFiltersBar
-              meUserId={meUserId}
-              onChange={setInboxFilters}
-            />
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((prev) => !prev)}
+              className="flex w-full items-center justify-between rounded-2xl border border-[#D6E3F7] bg-white px-4 py-3 text-left shadow-sm"
+            >
+              <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#4677E6]">
+                <SlidersHorizontal size={14} />
+                Filters
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#91A1BC]">{filtersOpen ? 'Hide' : 'Open'}</span>
+            </button>
+            <div className={`grid transition-all duration-300 ${filtersOpen ? 'mt-4 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+              <div className="overflow-hidden">
+                <div className="rounded-[1.35rem] border border-[#E4ECF8] bg-white p-3 shadow-sm">
+                  <InboxFiltersBar
+                    meUserId={meUserId}
+                    onChange={setInboxFilters}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
           <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200">
             {(['all', 'bot', 'human'] as const).map((f) => (
@@ -1174,7 +1192,10 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                 <h3 className="font-black text-[1.8rem] tracking-tight text-[#17233D]">{selectedThread.contactName}</h3>
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-sm font-semibold text-[#5E7096]">{selectedContact?.company || 'Client account'}</span>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Since 2023</span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-700">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    System Active • AI Monitoring Conversations
+                  </span>
                   <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
                     {selectedAssignmentLabel}
                   </span>
@@ -1543,10 +1564,51 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-slate-300 bg-slate-50/50 relative overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center text-slate-300 bg-slate-50/50 relative overflow-hidden px-6">
           <div className="absolute top-0 right-0 p-20 opacity-10 rotate-12"><MessageSquare size={320} /></div>
           <div className="w-32 h-32 rounded-[3.5rem] bg-white shadow-2xl flex items-center justify-center mb-8 border border-slate-100 transform rotate-3"><Archive size={48} className="opacity-10" /></div>
-          <p className="text-sm font-black uppercase tracking-[0.3em] opacity-30">Select a Secure Pipeline</p>
+          <div className="rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
+            System Active • AI Monitoring Conversations
+          </div>
+          <h3 className="mt-6 text-center text-3xl font-black tracking-tight text-[#17233D]">No conversation selected</h3>
+          <div className="mt-4 space-y-2 text-center text-sm font-medium text-[#5E7096]">
+            <p>Select a conversation from the left</p>
+            <p>Or start a new action</p>
+          </div>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (filteredThreads[0]) {
+                  handleSelectThread(filteredThreads[0]);
+                  return;
+                }
+
+                window.location.hash = ViewMode.CRM.toLowerCase();
+              }}
+              className="rounded-2xl bg-[#203669] px-5 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-white shadow-lg transition-colors hover:bg-[#182a58]"
+            >
+              + New Message
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.hash = ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER.toLowerCase();
+              }}
+              className="rounded-2xl border border-[#D6E3F7] bg-white px-5 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-[#304673] shadow-sm transition-colors hover:bg-[#F8FBFF]"
+            >
+              Assign AI Task
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.hash = ViewMode.REVIEW_QUEUE.toLowerCase();
+              }}
+              className="rounded-2xl border border-[#D6E3F7] bg-white px-5 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-[#304673] shadow-sm transition-colors hover:bg-[#F8FBFF]"
+            >
+              View Pending Approvals
+            </button>
+          </div>
         </div>
       )}
 

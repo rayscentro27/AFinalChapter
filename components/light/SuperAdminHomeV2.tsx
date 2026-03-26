@@ -43,14 +43,16 @@ export default function SuperAdminHomeV2(props: SuperAdminHomeV2Props) {
   const overview = useMemo(() => {
     const totalClients = contacts.length || 392;
     const pendingApplications = contacts.filter((contact) => contact.status === 'Negotiation' || contact.status === 'Lead').length || 128;
-    const approvalRate = totalClients > 0 ? Math.round(((contacts.filter((contact) => contact.status === 'Closed').length || 288) / Math.max(totalClients, 1)) * 100) : 73.5;
+    const totalSubmissions = contacts.reduce((count, contact) => count + (contact.submissions?.length || 0), 0);
+    const approvedSubmissions = contacts.reduce((count, contact) => count + ((contact.submissions || []).filter((submission) => submission.status === 'Approved').length), 0);
+    const approvalRate = totalSubmissions > 0 ? Math.round((approvedSubmissions / totalSubmissions) * 100) : 73;
     const successfulGrants = Math.max(54, Math.round(totalClients * 0.14));
     const supportRequests = Math.max(21, contacts.filter((contact) => contact.status === 'Triage').length || 21);
 
     return {
       totalClients,
       pendingApplications,
-      approvalRate: contacts.length ? Number(approvalRate.toFixed(1)) : 73.5,
+      approvalRate,
       successfulGrants,
       supportRequests,
     };
@@ -115,36 +117,57 @@ export default function SuperAdminHomeV2(props: SuperAdminHomeV2Props) {
 
   return (
     <div className="mx-auto max-w-[1380px] space-y-6 pb-10 subpixel-antialiased">
-      <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className="grid gap-5 xl:grid-cols-[1.18fr_0.82fr]">
         <div className="space-y-3 rounded-[2rem] border border-[#E6ECF7] bg-white p-6 shadow-[0_14px_40px_rgba(36,58,114,0.06)]">
           <p className="text-[0.72rem] font-black uppercase tracking-[0.22em] text-[#607CC1]">Admin command view</p>
-          <h1 className="text-[2.65rem] font-black tracking-tight text-[#1B2C61] sm:text-[3.15rem]">Welcome to the SuperAdmin Portal!</h1>
+          <h1 className="text-[2rem] font-black tracking-tight text-[#1B2C61] sm:text-[2.35rem]">Command Overview</h1>
           <p className="max-w-[52rem] text-base text-[#5E7096]">Monitor client growth, clear application bottlenecks, and keep the AI workforce aligned from one operating surface.</p>
-        </div>
-
-        <div className="rounded-[2rem] border border-[#E6ECF7] bg-white p-6 shadow-[0_14px_40px_rgba(36,58,114,0.06)]">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Operator state</p>
-              <h2 className="mt-2 text-[1.45rem] font-black tracking-tight text-[#1C2E63]">Control plane is healthy</h2>
-            </div>
-            <span className="rounded-full border border-[#D6E7FF] bg-[#EEF4FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#4578E6]">
-              Live overview
-            </span>
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="flex flex-wrap gap-3 pt-2">
             {commandSummary.map((item) => (
-              <div key={item.label} className="rounded-[1.15rem] border border-[#EEF2FA] bg-[#FBFDFF] px-4 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">{item.label}</p>
-                <p className="mt-2 text-[1.4rem] font-black tracking-tight text-[#17233D]">{item.value}</p>
+              <div key={item.label} className="rounded-full border border-[#DCE6F7] bg-[#F8FBFF] px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#5E7096]">
+                {item.label} {item.value}
               </div>
             ))}
           </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => props.onNavigate?.(ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER)}
+          className="rounded-[2rem] border border-[#E6ECF7] bg-white p-6 text-left shadow-[0_14px_40px_rgba(36,58,114,0.06)] transition-all hover:-translate-y-0.5"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">AI workforce</p>
+              <h2 className="mt-2 text-[1.45rem] font-black tracking-tight text-[#1C2E63]">System active</h2>
+              <p className="mt-2 text-sm text-[#5E7096]">AI monitoring conversations, approvals, and agent exceptions.</p>
+            </div>
+            <span className="rounded-full border border-[#D6E7FF] bg-[#EEF4FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#4578E6]">
+              Open full page
+            </span>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {[
+              { name: 'Founder', status: 'Active', tone: 'bg-emerald-500' },
+              { name: 'Analyst', status: overview.pendingApplications > 0 ? 'Reviewing' : 'Ready', tone: overview.pendingApplications > 0 ? 'bg-amber-400' : 'bg-emerald-500' },
+              { name: 'Sentinel', status: workforceCounts.attention > 0 ? 'Monitoring' : 'Active', tone: workforceCounts.attention > 0 ? 'bg-amber-400' : 'bg-emerald-500' },
+            ].map((agent) => (
+              <div key={agent.name} className="flex items-center justify-between rounded-[1.15rem] border border-[#EEF2FA] bg-[#FBFDFF] px-4 py-3">
+                <span className="text-sm font-black uppercase tracking-[0.08em] text-[#24386B]">{agent.name}</span>
+                <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#5E7096]">
+                  <span className={`h-2.5 w-2.5 rounded-full ${agent.tone}`} />
+                  {agent.status}
+                </span>
+              </div>
+            ))}
+          </div>
+
           <div className="mt-4 rounded-[1.3rem] border border-[#FFF0DA] bg-[#FFF9EF] px-4 py-3">
             <p className="text-sm font-black tracking-tight text-[#1C2E63]">Primary focus</p>
             <p className="mt-1 text-sm text-[#5E7096]">Clear pending approvals first, then review AI workforce exceptions before moving into outbound growth work.</p>
           </div>
-        </div>
+        </button>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
