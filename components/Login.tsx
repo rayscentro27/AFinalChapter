@@ -14,6 +14,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onBack }) => {
   const { signIn, signInWithGoogle } = useAuth();
+  const isPortalTheme = window.location.pathname.toLowerCase().startsWith('/portal');
   const [isSystemEmpty, setIsSystemEmpty] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -146,34 +147,34 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className={isPortalTheme ? 'min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)] flex items-center justify-center p-4 relative overflow-hidden' : 'min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden'}>
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-500 rounded-full blur-[120px] opacity-10"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-500 rounded-full blur-[120px] opacity-10"></div>
+        <div className={isPortalTheme ? 'absolute top-[-10%] left-[-10%] h-[50%] w-[50%] rounded-full bg-sky-200 blur-[120px] opacity-30' : 'absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-500 rounded-full blur-[120px] opacity-10'}></div>
+        <div className={isPortalTheme ? 'absolute bottom-[-10%] right-[-10%] h-[50%] w-[50%] rounded-full bg-emerald-100 blur-[120px] opacity-35' : 'absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-500 rounded-full blur-[120px] opacity-10'}></div>
       </div>
 
-      <div className="bg-white/5 backdrop-blur-3xl w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden z-10 flex flex-col animate-fade-in border border-white/10 relative">
+      <div className={isPortalTheme ? 'relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)] animate-fade-in' : 'bg-white/5 backdrop-blur-3xl w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden z-10 flex flex-col animate-fade-in border border-white/10 relative'}>
         {!isSupabaseConfigured && (
-          <div className="bg-emerald-500 text-slate-950 text-[10px] font-black uppercase tracking-[0.2em] py-2 text-center flex items-center justify-center gap-2">
+          <div className={isPortalTheme ? 'flex items-center justify-center gap-2 bg-emerald-100 py-2 text-center text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700' : 'bg-emerald-500 text-slate-950 text-[10px] font-black uppercase tracking-[0.2em] py-2 text-center flex items-center justify-center gap-2'}>
             <Sparkles size={12} /> Emerald Intelligence Core Active
           </div>
         )}
 
         <div className="p-10 pb-6 text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500 rounded-3xl mb-6 shadow-2xl shadow-emerald-500/20 transform rotate-3 transition-transform hover:rotate-0 cursor-pointer">
+          <div className={isPortalTheme ? 'mb-6 inline-flex h-20 w-20 cursor-pointer items-center justify-center rounded-3xl bg-emerald-500 shadow-2xl shadow-emerald-500/10 transition-transform hover:rotate-0' : 'inline-flex items-center justify-center w-20 h-20 bg-emerald-500 rounded-3xl mb-6 shadow-2xl shadow-emerald-500/20 transform rotate-3 transition-transform hover:rotate-0 cursor-pointer'}>
             <Hexagon className="text-slate-950 fill-slate-950/10" size={40} />
           </div>
-          <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">Nexus<span className="text-emerald-500">OS</span></h1>
-          <p className="text-slate-500 mt-3 text-xs font-black uppercase tracking-[0.3em]">
+          <h1 className={isPortalTheme ? 'text-4xl font-black uppercase leading-none tracking-tighter text-slate-900' : 'text-4xl font-black text-white tracking-tighter uppercase leading-none'}>Nexus<span className="text-emerald-500">OS</span></h1>
+          <p className={isPortalTheme ? 'mt-3 text-xs font-black uppercase tracking-[0.3em] text-slate-500' : 'text-slate-500 mt-3 text-xs font-black uppercase tracking-[0.3em]'}>
             Secure Operating System
           </p>
         </div>
 
         <div className="px-10 pb-10">
           {error && (
-            <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3 animate-fade-in">
+            <div className={isPortalTheme ? 'mb-8 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 animate-fade-in' : 'mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3 animate-fade-in'}>
               <AlertCircle className="text-red-400 shrink-0 mt-0.5" size={16} />
-              <p className="text-xs text-red-200 font-bold leading-relaxed">{error}</p>
+              <p className={isPortalTheme ? 'text-xs font-bold leading-relaxed text-red-600' : 'text-xs text-red-200 font-bold leading-relaxed'}>{error}</p>
             </div>
           )}
 
@@ -206,7 +207,7 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
                   required
-                  className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-white text-sm font-medium"
+                  className={isPortalTheme ? 'w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30' : 'w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-white text-sm font-medium'}
                 />
               </div>
 
@@ -218,17 +219,17 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Access Cipher"
                   required
-                  className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-white text-sm font-medium"
+                  className={isPortalTheme ? 'w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30' : 'w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-white text-sm font-medium'}
                 />
               </div>
 
               {captchaRequired && (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className={isPortalTheme ? 'rounded-2xl border border-slate-200 bg-slate-50 p-4' : 'rounded-2xl border border-white/10 bg-white/5 p-4'}>
                   {captchaReady ? (
                     <>
                       <div ref={turnstileContainerRef} className="min-h-[65px]" />
                       {!captchaToken && (
-                        <p className="mt-2 text-[10px] text-slate-400 font-black uppercase tracking-[0.12em]">
+                        <p className={isPortalTheme ? 'mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500' : 'mt-2 text-[10px] text-slate-400 font-black uppercase tracking-[0.12em]'}>
                           Complete captcha verification to continue.
                         </p>
                       )}
@@ -241,7 +242,7 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                 </div>
               )}
 
-              <button type="submit" disabled={loading || (captchaRequired && !captchaReady)} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-[2rem] transition-all flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/10 disabled:opacity-70 mt-8 uppercase tracking-[0.2em] text-xs transform active:scale-95">
+              <button type="submit" disabled={loading || (captchaRequired && !captchaReady)} className={isPortalTheme ? 'mt-8 flex w-full items-center justify-center gap-3 rounded-[2rem] bg-emerald-500 py-5 text-xs font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_40px_rgba(16,185,129,0.18)] transition-all hover:bg-emerald-400 disabled:opacity-70' : 'w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-[2rem] transition-all flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/10 disabled:opacity-70 mt-8 uppercase tracking-[0.2em] text-xs transform active:scale-95'}>
                 {loading ? <RefreshCw className="animate-spin" size={18}/> : <>Resume Session <ArrowRight size={18} /></>}
               </button>
 
@@ -249,16 +250,16 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                 type="button"
                 disabled={loading || !isSupabaseConfigured || (captchaRequired && !captchaReady)}
                 onClick={() => void handleGoogleSignIn()}
-                className="w-full bg-white/10 hover:bg-white/20 text-white font-black py-4 rounded-2xl transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-xs"
+                className={isPortalTheme ? 'w-full rounded-2xl border border-slate-200 bg-white py-4 text-xs font-black uppercase tracking-[0.2em] text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50' : 'w-full bg-white/10 hover:bg-white/20 text-white font-black py-4 rounded-2xl transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-xs'}
               >
                 Continue with Google
               </button>
 
               <div className="mt-10 text-center flex flex-col gap-4">
-                <button type="button" onClick={() => window.location.hash = 'signup'} className="text-[10px] text-slate-400 hover:text-emerald-400 font-black uppercase tracking-[0.2em] transition-colors">
+                <button type="button" onClick={() => window.location.hash = 'signup'} className={isPortalTheme ? 'text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 transition-colors hover:text-emerald-600' : 'text-[10px] text-slate-400 hover:text-emerald-400 font-black uppercase tracking-[0.2em] transition-colors'}>
                   New Client Application
                 </button>
-                <button type="button" onClick={onBack} className="text-[9px] text-slate-600 hover:text-slate-400 font-black uppercase tracking-widest transition-colors">
+                <button type="button" onClick={onBack} className={isPortalTheme ? 'text-[9px] font-black uppercase tracking-widest text-slate-400 transition-colors hover:text-slate-600' : 'text-[9px] text-slate-600 hover:text-slate-400 font-black uppercase tracking-widest transition-colors'}>
                   Return to Landing Page
                 </button>
               </div>

@@ -32,7 +32,7 @@ function TagChip({
   return (
     <span
       title={title}
-      className="inline-flex items-center gap-2 rounded-full border border-black/15 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700"
+      className="inline-flex items-center gap-2 rounded-full border border-[#DCE7FA] bg-white px-2.5 py-1 text-xs font-semibold text-[#315FD0] shadow-sm"
     >
       <span>{children}</span>
       {onRemove ? (
@@ -149,14 +149,14 @@ export default function TagsPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+    <div className="rounded-2xl border border-[#E2EAF7] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h4 className="text-xs font-black uppercase tracking-widest text-slate-700">Tags</h4>
+        <h4 className="text-xs font-black uppercase tracking-widest text-[#60739A]">Tags</h4>
         {enableRoutingButton ? (
           <button
             onClick={() => void runRouting()}
             disabled={busy || !tenantId || !conversationId}
-            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
+            className="rounded-lg border border-[#D6E5FF] bg-[#EEF4FF] px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0] disabled:opacity-50"
           >
             {busy ? 'Working...' : 'Run routing'}
           </button>
@@ -185,7 +185,7 @@ export default function TagsPanel({
               key={quickTag}
               onClick={() => void addTag(quickTag)}
               disabled={busy || exists}
-              className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-700 disabled:opacity-40"
+              className="rounded-lg border border-[#DCE7FA] bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-[#315FD0] disabled:opacity-40"
               title={exists ? 'Already added' : 'Add tag'}
             >
               + {quickTag}
@@ -206,12 +206,12 @@ export default function TagsPanel({
           }}
           disabled={busy}
           placeholder="Add a tag..."
-          className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500"
+          className="flex-1 rounded-lg border border-[#DCE7FA] bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-[#4A7AE8]"
         />
         <button
           onClick={() => void addTag(newTag)}
           disabled={busy}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
+          className="rounded-lg bg-[linear-gradient(135deg,#2E58E6,#4D8BFF)] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-50 shadow-[0_10px_20px_rgba(46,88,230,0.16)]"
         >
           Add
         </button>

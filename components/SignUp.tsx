@@ -14,6 +14,7 @@ interface SignUpProps {
 }
 
 const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
+  const isPortalTheme = window.location.pathname.toLowerCase().startsWith('/portal');
   const { refreshUser } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
@@ -180,21 +181,21 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0C10] flex flex-col md:flex-row font-sans">
-      <div className="md:w-1/2 bg-[#1F2833] text-white p-12 flex flex-col justify-between relative overflow-hidden">
+    <div className={isPortalTheme ? 'min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f7faf8_100%)] flex flex-col md:flex-row font-sans' : 'min-h-screen bg-[#0B0C10] flex flex-col md:flex-row font-sans'}>
+      <div className={isPortalTheme ? 'relative flex flex-col justify-between overflow-hidden bg-white p-12 text-slate-900 md:w-1/2 border-r border-slate-200' : 'md:w-1/2 bg-[#1F2833] text-white p-12 flex flex-col justify-between relative overflow-hidden'}>
         <div className="absolute top-0 right-0 p-12 opacity-5"><Hexagon size={400} /></div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-12">
             <div className="bg-[#66FCF1] p-2 rounded-xl shadow-lg shadow-[#66FCF1]/20">
               <Hexagon className="text-slate-950" size={24} />
             </div>
-            <span className="text-2xl font-black tracking-tight uppercase text-white">Nexus<span className="text-[#66FCF1]">OS</span></span>
+            <span className={isPortalTheme ? 'text-2xl font-black tracking-tight uppercase text-slate-900' : 'text-2xl font-black tracking-tight uppercase text-white'}>Nexus<span className="text-[#66FCF1]">OS</span></span>
           </div>
-          <h1 className="text-6xl md:text-8xl font-black leading-[0.85] mb-8 tracking-tighter uppercase">
+          <h1 className={isPortalTheme ? 'mb-8 text-6xl font-black uppercase leading-[0.85] tracking-tighter text-slate-900 md:text-8xl' : 'text-6xl md:text-8xl font-black leading-[0.85] mb-8 tracking-tighter uppercase'}>
             Manifest <br/>
             <span className="text-[#66FCF1] drop-shadow-[0_0_20px_rgba(102,252,241,0.2)]">Magnitude.</span>
           </h1>
-          <p className="text-[#C5C6C7] text-lg mb-12 leading-relaxed max-w-md font-medium italic">
+          <p className={isPortalTheme ? 'mb-12 max-w-md text-lg font-medium italic leading-relaxed text-slate-500' : 'text-[#C5C6C7] text-lg mb-12 leading-relaxed max-w-md font-medium italic'}>
             "Provision your sovereign institutional funding node."
           </p>
         </div>
@@ -203,15 +204,15 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
         </div>
       </div>
 
-      <div className="md:w-1/2 p-8 md:p-16 overflow-y-auto bg-[#0B0C10] flex flex-col items-center justify-center border-l border-white/5 relative">
+      <div className={isPortalTheme ? 'relative flex flex-col items-center justify-center overflow-y-auto bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f7faf8_100%)] p-8 md:w-1/2 md:p-16' : 'md:w-1/2 p-8 md:p-16 overflow-y-auto bg-[#0B0C10] flex flex-col items-center justify-center border-l border-white/5 relative'}>
         <div className="animate-laser-scan opacity-10"></div>
         
-        <div className="max-w-md w-full bg-[#1F2833]/50 backdrop-blur-xl p-10 rounded-[3rem] border border-[#45A29E]/20 shadow-2xl relative z-10">
-          <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tighter">Initialize Node</h2>
+        <div className={isPortalTheme ? 'relative z-10 w-full max-w-md rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-[0_24px_80px_rgba(15,23,42,0.08)]' : 'max-w-md w-full bg-[#1F2833]/50 backdrop-blur-xl p-10 rounded-[3rem] border border-[#45A29E]/20 shadow-2xl relative z-10'}>
+          <h2 className={isPortalTheme ? 'mb-2 text-3xl font-black uppercase tracking-tighter text-slate-900' : 'text-3xl font-black text-white mb-2 uppercase tracking-tighter'}>Initialize Node</h2>
           <p className="text-[#45A29E] mb-10 font-medium uppercase text-[10px] tracking-widest">Begin the genesis registration sequence.</p>
 
           {error && (
-            <div className="mb-8 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-xs font-bold flex items-start gap-3 animate-fade-in">
+            <div className={isPortalTheme ? 'mb-8 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-bold text-red-600 animate-fade-in' : 'mb-8 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-xs font-bold flex items-start gap-3 animate-fade-in'}>
               <AlertCircle size={18} className="shrink-0" /> {error}
             </div>
           )}
@@ -232,28 +233,28 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-[10px] font-black text-[#45A29E] uppercase tracking-widest mb-2 ml-1">Legal Name</label>
-              <input required type="text" className="w-full px-4 py-4 bg-[#0B0C10] border border-[#45A29E]/30 rounded-xl focus:ring-2 focus:ring-[#66FCF1]/50 outline-none transition-all text-[#C5C6C7] text-sm font-bold" placeholder="Operator Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              <input required type="text" className={isPortalTheme ? 'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-900 outline-none transition-all focus:ring-2 focus:ring-[#66FCF1]/40' : 'w-full px-4 py-4 bg-[#0B0C10] border border-[#45A29E]/30 rounded-xl focus:ring-2 focus:ring-[#66FCF1]/50 outline-none transition-all text-[#C5C6C7] text-sm font-bold'} placeholder="Operator Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
             </div>
             <div>
               <label className="block text-[10px] font-black text-[#45A29E] uppercase tracking-widest mb-2 ml-1">Merchant Identity</label>
-              <input required type="text" className="w-full px-4 py-4 bg-[#0B0C10] border border-[#45A29E]/30 rounded-xl focus:ring-2 focus:ring-[#66FCF1]/50 outline-none transition-all text-[#C5C6C7] text-sm font-bold" placeholder="Company Name" value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})} />
+              <input required type="text" className={isPortalTheme ? 'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-900 outline-none transition-all focus:ring-2 focus:ring-[#66FCF1]/40' : 'w-full px-4 py-4 bg-[#0B0C10] border border-[#45A29E]/30 rounded-xl focus:ring-2 focus:ring-[#66FCF1]/50 outline-none transition-all text-[#C5C6C7] text-sm font-bold'} placeholder="Company Name" value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})} />
             </div>
             <div>
               <label className="block text-[10px] font-black text-[#45A29E] uppercase tracking-widest mb-2 ml-1">Secure Email</label>
-              <input required type="email" className="w-full px-4 py-4 bg-[#0B0C10] border border-[#45A29E]/30 rounded-xl focus:ring-2 focus:ring-[#66FCF1]/50 outline-none transition-all text-[#C5C6C7] text-sm font-bold" placeholder="admin@nexus.os" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+              <input required type="email" className={isPortalTheme ? 'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-900 outline-none transition-all focus:ring-2 focus:ring-[#66FCF1]/40' : 'w-full px-4 py-4 bg-[#0B0C10] border border-[#45A29E]/30 rounded-xl focus:ring-2 focus:ring-[#66FCF1]/50 outline-none transition-all text-[#C5C6C7] text-sm font-bold'} placeholder="admin@nexus.os" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
             </div>
             <div>
               <label className="block text-[10px] font-black text-[#45A29E] uppercase tracking-widest mb-2 ml-1">Access Cipher</label>
-              <input required type="password" minLength={8} className="w-full px-4 py-4 bg-[#0B0C10] border border-[#45A29E]/30 rounded-xl focus:ring-2 focus:ring-[#66FCF1]/50 outline-none transition-all text-[#C5C6C7] text-sm font-bold" placeholder="••••••••" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+              <input required type="password" minLength={8} className={isPortalTheme ? 'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-900 outline-none transition-all focus:ring-2 focus:ring-[#66FCF1]/40' : 'w-full px-4 py-4 bg-[#0B0C10] border border-[#45A29E]/30 rounded-xl focus:ring-2 focus:ring-[#66FCF1]/50 outline-none transition-all text-[#C5C6C7] text-sm font-bold'} placeholder="••••••••" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
             </div>
 
             {captchaRequired && (
-              <div className="rounded-2xl border border-[#45A29E]/20 bg-[#0B0C10] p-4">
+              <div className={isPortalTheme ? 'rounded-2xl border border-slate-200 bg-slate-50 p-4' : 'rounded-2xl border border-[#45A29E]/20 bg-[#0B0C10] p-4'}>
                 {captchaReady ? (
                   <>
                     <div ref={turnstileContainerRef} className="min-h-[65px]" />
                     {!captchaToken && (
-                      <p className="mt-2 text-[10px] text-[#C5C6C7] font-black uppercase tracking-[0.12em]">
+                      <p className={isPortalTheme ? 'mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500' : 'mt-2 text-[10px] text-[#C5C6C7] font-black uppercase tracking-[0.12em]'}>
                         Complete captcha verification to continue.
                       </p>
                     )}
@@ -268,14 +269,14 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate, onRegister }) => {
 
             <RequiredDisclaimers title="Educational Use Disclaimers" />
 
-            <p className="text-[10px] text-slate-400 leading-relaxed">
+            <p className={isPortalTheme ? 'text-[10px] leading-relaxed text-slate-500' : 'text-[10px] text-slate-400 leading-relaxed'}>
               By creating an account, you acknowledge educational-only use and can review
               <a href="/terms" className="text-cyan-300 hover:text-cyan-200"> Terms</a>,
               <a href="/privacy" className="text-cyan-300 hover:text-cyan-200"> Privacy</a>, and
               <a href="/ai-disclosure" className="text-cyan-300 hover:text-cyan-200"> AI Disclosure</a>.
             </p>
 
-            <button disabled={loading || (captchaRequired && !captchaReady)} type="submit" className="w-full bg-[#45A29E] text-white font-black py-5 rounded-2xl hover:bg-[#66FCF1] hover:text-slate-950 transition-all shadow-xl flex items-center justify-center gap-3 mt-10 uppercase tracking-[0.2em] text-xs disabled:opacity-50 transform active:scale-95">
+            <button disabled={loading || (captchaRequired && !captchaReady)} type="submit" className={isPortalTheme ? 'mt-10 flex w-full items-center justify-center gap-3 rounded-2xl bg-[#45A29E] py-5 text-xs font-black uppercase tracking-[0.2em] text-white shadow-[0_18px_40px_rgba(69,162,158,0.18)] transition-all hover:bg-[#66FCF1] hover:text-slate-950 disabled:opacity-50' : 'w-full bg-[#45A29E] text-white font-black py-5 rounded-2xl hover:bg-[#66FCF1] hover:text-slate-950 transition-all shadow-xl flex items-center justify-center gap-3 mt-10 uppercase tracking-[0.2em] text-xs disabled:opacity-50 transform active:scale-95'}>
               {loading ? <RefreshCw className="animate-spin" size={20} /> : <>Execute Registration <ArrowRight size={20} /></>}
             </button>
           </form>

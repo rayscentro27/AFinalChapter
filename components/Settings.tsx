@@ -144,7 +144,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
         </div>
         <button 
           onClick={handleGlobalSave}
-          className="bg-slate-950 text-white px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest hover:bg-[#66FCF1] hover:text-slate-950 shadow-2xl transition-all transform active:scale-95 flex items-center gap-3 border border-white/10"
+          className="flex items-center gap-3 rounded-[2rem] bg-[linear-gradient(135deg,#2E58E6,#4D8BFF)] px-10 py-5 text-xs font-black uppercase tracking-widest text-white shadow-[0_18px_36px_rgba(46,88,230,0.24)] transition-all transform active:scale-95"
         >
           <Save size={18} /> Push Global Config
         </button>
@@ -167,7 +167,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
               <button 
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)} 
-                className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-slate-900 text-[#66FCF1] shadow-xl ring-1 ring-[#66FCF1]/30' : 'text-slate-400 hover:bg-white hover:text-slate-900'}`}
+                className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] text-[#315FD0] shadow-[0_16px_30px_rgba(41,72,138,0.10)] ring-1 ring-[#DCE7FA]' : 'text-slate-400 hover:bg-white hover:text-slate-900'}`}
               >
                 <div className="flex items-center gap-3">
                     <tab.icon size={18} /> {tab.label}
@@ -178,22 +178,22 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
         </div>
 
         <div className="flex-1">
-          {successMsg && <div className="mb-6 bg-emerald-950 text-[#66FCF1] px-6 py-4 rounded-2xl flex items-center gap-3 text-sm font-black border border-[#66FCF1]/20 animate-fade-in shadow-xl shadow-[#66FCF1]/10"><CheckCircle size={18} /> {successMsg}</div>}
+          {successMsg && <div className="mb-6 flex items-center gap-3 rounded-2xl border border-[#D6E5FF] bg-[#F4F8FF] px-6 py-4 text-sm font-black text-[#315FD0] animate-fade-in shadow-sm"><CheckCircle size={18} /> {successMsg}</div>}
 
           <div className="bg-white rounded-[3rem] shadow-sm border border-slate-200 overflow-hidden min-h-[700px] flex flex-col">
             
             {activeTab === 'connectivity' && (
                 <div className="p-10 space-y-10 animate-fade-in">
-                    <div className="bg-[#0B0C10] p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">
+                    <div className="relative overflow-hidden rounded-[3rem] border border-[#DCE7FA] bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] p-12 text-[#203266] shadow-[0_18px_44px_rgba(41,72,138,0.10)] group">
                         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><Database size={300}/></div>
                         <div className="relative z-10">
-                            <div className="inline-flex items-center gap-2 bg-[#66FCF1]/10 text-[#66FCF1] px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest mb-8 border border-[#66FCF1]/20">
+                            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#D6E5FF] bg-[#EEF4FF] px-4 py-1.5 text-[9px] font-black uppercase tracking-widest text-[#315FD0]">
                                 <Lock size={12}/> Secure Gateway v2.5
                             </div>
                             <h3 className="text-4xl font-black uppercase tracking-tighter flex items-center gap-4 mb-4">
                                 API Matrix HUD
                             </h3>
-                            <p className="text-slate-400 text-sm leading-relaxed max-w-lg font-medium">
+                            <p className="max-w-lg text-sm font-medium leading-relaxed text-[#5F74A0]">
                                 Configure the neural handshakes that power your autonomous ecosystem. Overrides set here are prioritized over environment defaults.
                             </p>
                         </div>
@@ -242,36 +242,36 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
             )}
             {activeTab === 'marketing_nodes' && (
                 <div className="p-10 space-y-10 animate-fade-in">
-                    <div className="bg-[#0B0C10] p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">
+                    <div className="relative overflow-hidden rounded-[3rem] border border-[#DCE7FA] bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] p-12 text-[#203266] shadow-[0_18px_44px_rgba(41,72,138,0.10)] group">
                         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><MailIcon size={300}/></div>
                         <div className="relative z-10">
-                            <div className="inline-flex items-center gap-2 bg-[#66FCF1]/10 text-[#66FCF1] px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest mb-8 border border-[#66FCF1]/20">
+                            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#D6E5FF] bg-[#EEF4FF] px-4 py-1.5 text-[9px] font-black uppercase tracking-widest text-[#315FD0]">
                                 <Smartphone size={12}/> Comms Architecture
                             </div>
                             <h3 className="text-4xl font-black uppercase tracking-tighter flex items-center gap-4 mb-4">
                                 Marketing Node Sync
                             </h3>
-                            <p className="text-slate-400 text-sm leading-relaxed max-w-lg font-medium">
+                            <p className="max-w-lg text-sm font-medium leading-relaxed text-[#5F74A0]">
                                 Link your MailerLite account to synchronize CRM leads directly into your marketing funnels.
                             </p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#66FCF1] transition-all shadow-sm">
+                        <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#4A7AE8]/40 transition-all shadow-sm">
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-1">MailerLite API Key (Server)</label>
                             <div className="w-full p-4 bg-white border border-slate-200 rounded-xl text-xs text-slate-600 leading-relaxed">
                                 Set <span className="font-mono">MAILERLITE_API_KEY</span> in Netlify environment variables. This key stays server-side and is never stored in browser settings.
                             </div>
                         </div>
-                        <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#66FCF1] transition-all shadow-sm">
+                        <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#4A7AE8]/40 transition-all shadow-sm">
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-1">MailerLite Group ID</label>
                             <input 
                                 type="text" 
                                 value={localBranding.mailerLite?.groupId || ''}
                                 onChange={e => setLocalBranding({ ...localBranding, mailerLite: { ...localBranding.mailerLite, groupId: e.target.value, autoSync: localBranding.mailerLite?.autoSync || false } })}
                                 placeholder="e.g. 11042942"
-                                className="w-full p-4 bg-white border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-[#66FCF1] outline-none"
+                                className="w-full rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold outline-none focus:ring-2 focus:ring-[#4A7AE8]/20"
                             />
                         </div>
                     </div>
@@ -294,16 +294,16 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
 
             {activeTab === 'social' && (
                 <div className="p-10 space-y-10 animate-fade-in">
-                    <div className="bg-[#0B0C10] p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">
+                    <div className="relative overflow-hidden rounded-[3rem] border border-[#DCE7FA] bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] p-12 text-[#203266] shadow-[0_18px_44px_rgba(41,72,138,0.10)] group">
                         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><Share2 size={300}/></div>
                         <div className="relative z-10">
-                            <div className="inline-flex items-center gap-2 bg-[#66FCF1]/10 text-[#66FCF1] px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest mb-8 border border-[#66FCF1]/20">
+                            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#D6E5FF] bg-[#EEF4FF] px-4 py-1.5 text-[9px] font-black uppercase tracking-widest text-[#315FD0]">
                                 <Link2 size={12}/> Social Graph
                             </div>
                             <h3 className="text-4xl font-black uppercase tracking-tighter flex items-center gap-4 mb-4">
                                 Social Link
                             </h3>
-                            <p className="text-slate-400 text-sm leading-relaxed max-w-lg font-medium">
+                            <p className="max-w-lg text-sm font-medium leading-relaxed text-[#5F74A0]">
                                 Store your social handles and profile URLs for quick access. This does not yet sync data from platforms; it only links your identity layer.
                             </p>
                         </div>
@@ -315,10 +315,10 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
                           const Icon = p.icon;
                           const syncing = isSyncingSocial === p.id;
                           return (
-                            <div key={p.id} className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#66FCF1] transition-all shadow-sm">
+                            <div key={p.id} className="bg-slate-50 border border-slate-200 p-8 rounded-[2.5rem] group hover:border-[#4A7AE8]/40 transition-all shadow-sm">
                                 <div className="flex items-center justify-between gap-4 mb-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2.5 bg-white border border-slate-200 rounded-2xl shadow-sm text-slate-500 group-hover:text-[#66FCF1] transition-colors">
+                                        <div className="p-2.5 bg-white border border-slate-200 rounded-2xl shadow-sm text-slate-500 group-hover:text-[#315FD0] transition-colors">
                                             <Icon size={18} />
                                         </div>
                                         <div>
@@ -341,7 +341,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
                                         className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
                                           conn.connected
                                             ? 'bg-white text-slate-700 border-slate-200 hover:border-red-200 hover:text-red-600'
-                                            : 'bg-slate-950 text-white border-white/10 hover:bg-[#66FCF1] hover:text-slate-950'
+                                            : 'bg-[linear-gradient(135deg,#2E58E6,#4D8BFF)] text-white border-transparent hover:brightness-105'
                                         } ${syncing ? 'opacity-70 cursor-wait' : ''}`}
                                     >
                                         {syncing ? 'Syncing...' : conn.connected ? 'Disconnect' : 'Connect'}
@@ -354,7 +354,7 @@ const Settings: React.FC<SettingsProps> = ({ branding, onUpdateBranding, onNavig
                                     value={conn.handle || ''}
                                     onChange={e => upsertSocialConnection(p.id, { handle: e.target.value })}
                                     placeholder={p.hint}
-                                    className="w-full p-4 bg-white border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-[#66FCF1] outline-none"
+                                    className="w-full rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold outline-none focus:ring-2 focus:ring-[#4A7AE8]/20"
                                 />
                             </div>
                           );

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Bot, Route, UserRound, X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { runInboxRouting } from '../lib/inboxRoutingClient';
 
@@ -40,18 +41,10 @@ const AI_KEYS = [
 
 const ASSIGNABLE_MEMBER_ROLES = new Set(['owner', 'admin', 'agent', 'sales', 'supervisor', 'member']);
 
-const drawerContainerStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  zIndex: 50,
-  display: 'grid',
-  gridTemplateColumns: '1fr min(420px, 92vw)',
-};
-
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label style={{ display: 'grid', gap: 6 }}>
-      <span style={{ fontSize: 12, opacity: 0.75 }}>{label}</span>
+    <label className="grid gap-2">
+      <span className="text-[11px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">{label}</span>
       {children}
     </label>
   );
@@ -280,79 +273,62 @@ export default function AssignmentDrawer({
   if (!open || !conversation) return null;
 
   return (
-    <div style={drawerContainerStyle}>
-      <div onClick={onClose} style={{ background: 'rgba(0,0,0,0.35)' }} />
+    <div className="fixed inset-0 z-50 grid grid-cols-[1fr_min(420px,92vw)]">
+      <div onClick={onClose} className="bg-[#203266]/18 backdrop-blur-md" />
       <div
-        style={{
-          background: '#fff',
-          height: '100%',
-          boxShadow: '-10px 0 30px rgba(0,0,0,0.2)',
-          display: 'grid',
-          gridTemplateRows: 'auto 1fr auto',
-        }}
+        className="grid h-full grid-rows-[auto_1fr_auto] border-l border-[#DCE7FA] bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] shadow-[0_24px_64px_rgba(41,72,138,0.16)]"
       >
         <div
-          style={{
-            padding: 14,
-            borderBottom: '1px solid rgba(0,0,0,0.10)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
+          className="flex items-center justify-between border-b border-[#E4ECF8] bg-white/80 px-5 py-5 backdrop-blur-md"
         >
-          <div style={{ display: 'grid', gap: 4 }}>
-            <div style={{ fontWeight: 800 }}>Assignment</div>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>Conversation: {conversation.id.slice(0, 8)}</div>
+          <div className="grid gap-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6C82AE]">Routing workspace</p>
+            <div className="text-[1.65rem] font-black tracking-tight text-[#203266]">Assignment</div>
+            <div className="text-xs text-[#6C82AE]">Conversation: {conversation.id.slice(0, 8)}</div>
           </div>
-          <button onClick={onClose} style={{ padding: '8px 10px' }}>Close</button>
+          <button onClick={onClose} className="inline-flex items-center gap-2 rounded-xl border border-[#DCE7FA] bg-[#F4F8FF] px-3 py-2 text-xs font-black uppercase tracking-widest text-[#315FD0]">
+            <X size={14} /> Close
+          </button>
         </div>
 
-        <div style={{ padding: 14, display: 'grid', gap: 14, overflow: 'auto' }}>
+        <div className="grid gap-4 overflow-auto p-5">
           {error ? (
-            <div
-              style={{
-                border: '1px solid rgba(200,0,0,0.35)',
-                background: 'rgba(200,0,0,0.08)',
-                padding: 12,
-                borderRadius: 10,
-              }}
-            >
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               <strong>Error:</strong> {error}
             </div>
           ) : null}
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-100 p-1 shadow-inner">
             <button
               onClick={() => setTab('assign')}
-              style={{
-                padding: '8px 10px',
-                borderRadius: 10,
-                border: '1px solid rgba(0,0,0,0.15)',
-                background: tab === 'assign' ? 'rgba(0,0,0,0.06)' : 'white',
-              }}
+              className={`rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] transition-all ${tab === 'assign' ? 'bg-white text-[#315FD0] shadow-sm' : 'text-slate-500'}`}
             >
               Manual Assign
             </button>
             <button
               onClick={() => setTab('routing')}
-              style={{
-                padding: '8px 10px',
-                borderRadius: 10,
-                border: '1px solid rgba(0,0,0,0.15)',
-                background: tab === 'routing' ? 'rgba(0,0,0,0.06)' : 'white',
-              }}
+              className={`rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] transition-all ${tab === 'routing' ? 'bg-white text-[#315FD0] shadow-sm' : 'text-slate-500'}`}
             >
               Run Routing
             </button>
           </div>
 
           {tab === 'assign' ? (
-            <div style={{ display: 'grid', gap: 12 }}>
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-[#E4ECF8] bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#6C82AE]">
+                  {mode === 'ai' ? <Bot size={13} /> : <UserRound size={13} />} Current assignment mode
+                </div>
+                <p className="mt-2 text-sm font-semibold text-[#203266]">
+                  {mode === 'ai' ? 'AI employee routing is active.' : mode === 'agent' ? 'Human agent assignment is active.' : 'Conversation is currently unassigned.'}
+                </p>
+              </div>
+
               <Field label="Assignment Type">
                 <select
                   value={mode}
                   onChange={(e) => setMode(e.target.value as AssignmentMode)}
-                  style={{ padding: '10px 12px' }}
+                  className="rounded-xl border border-slate-200 bg-[#F8FBFF] px-3 py-3 text-sm text-[#203266]"
                 >
                   <option value="ai">AI Employee</option>
                   <option value="agent">Human Agent</option>
@@ -362,7 +338,7 @@ export default function AssignmentDrawer({
 
               {mode === 'ai' ? (
                 <Field label="AI Key">
-                  <select value={aiKey} onChange={(e) => setAiKey(e.target.value)} style={{ padding: '10px 12px' }}>
+                  <select value={aiKey} onChange={(e) => setAiKey(e.target.value)} className="rounded-xl border border-slate-200 bg-[#F8FBFF] px-3 py-3 text-sm text-[#203266]">
                     {AI_KEYS.map((key) => (
                       <option key={key} value={key}>{key}</option>
                     ))}
@@ -376,7 +352,7 @@ export default function AssignmentDrawer({
                     <select
                       value={agentUserId}
                       onChange={(e) => setAgentUserId(e.target.value)}
-                      style={{ padding: '10px 12px' }}
+                      className="rounded-xl border border-slate-200 bg-[#F8FBFF] px-3 py-3 text-sm text-[#203266]"
                       disabled={loadingAgents}
                     >
                       <option value="">{loadingAgents ? 'Loading...' : 'Select an agent'}</option>
@@ -393,43 +369,41 @@ export default function AssignmentDrawer({
                       value={agentUserId}
                       onChange={(e) => setAgentUserId(e.target.value)}
                       placeholder="auth.users UUID"
-                      style={{ padding: '10px 12px' }}
+                      className="rounded-xl border border-slate-200 bg-[#F8FBFF] px-3 py-3 text-sm text-[#203266]"
                     />
                   </Field>
                 </>
               ) : null}
 
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={saveAssignment} disabled={!canSave || saving} style={{ padding: '10px 12px', flex: 1 }}>
+              <div className="flex gap-3">
+                <button onClick={saveAssignment} disabled={!canSave || saving} className="flex-1 rounded-xl bg-[linear-gradient(135deg,#2E58E6,#4D8BFF)] px-4 py-3 text-xs font-black uppercase tracking-widest text-white shadow-[0_14px_28px_rgba(46,88,230,0.20)] disabled:opacity-50">
                   {saving ? 'Saving...' : 'Save Assignment'}
                 </button>
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: 12 }}>
-              <div style={{ fontSize: 13, opacity: 0.85 }}>
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-[#E4ECF8] bg-white p-4 shadow-sm">
+                <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#6C82AE]"><Route size={13} /> Routing engine</div>
+                <div className="mt-2 text-sm text-[#203266]">
                 Force-run active routing rules and re-evaluate assignment for this conversation.
+                </div>
               </div>
-              <button onClick={forceRunRouting} disabled={routing} style={{ padding: '10px 12px' }}>
+              <div className="text-sm text-slate-600">
+                Current conversation will be re-scored against the active queue and assignment rules.
+              </div>
+              <button onClick={forceRunRouting} disabled={routing} className="rounded-xl border border-[#D5E4FF] bg-[#EEF4FF] px-4 py-3 text-xs font-black uppercase tracking-widest text-[#315FD0] disabled:opacity-50">
                 {routing ? 'Routing...' : 'Force Run Routing'}
               </button>
             </div>
           )}
         </div>
 
-        <div
-          style={{
-            padding: 14,
-            borderTop: '1px solid rgba(0,0,0,0.10)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 10,
-          }}
-        >
-          <div style={{ fontSize: 12, opacity: 0.7 }}>
+        <div className="flex items-center justify-between gap-3 border-t border-[#E4ECF8] bg-white/80 px-5 py-4 text-xs text-[#6C82AE]">
+          <div>
             Tenant: {tenantId ? tenantId.slice(0, 8) : 'n/a'}
           </div>
-          <button onClick={onClose} style={{ padding: '8px 10px' }}>Done</button>
+          <button onClick={onClose} className="rounded-xl border border-[#DCE7FA] bg-[#F4F8FF] px-3 py-2 text-xs font-black uppercase tracking-widest text-[#315FD0]">Done</button>
         </div>
       </div>
     </div>

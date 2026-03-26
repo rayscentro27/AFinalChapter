@@ -1,0 +1,28 @@
+NEXUS CODEX EXECUTION PROMPTS
+
+PROMPT 1 — UI SHELL + ROUTING
+Build the new homepage and /portal route group without breaking existing flows. Add /portal/overview, /portal/credit, /portal/funding, /portal/business, /portal/grants. Use a shared portal shell and keep the old shell intact until verified.
+
+PROMPT 2 — EXECUTIVE OVERVIEW AGGREGATION
+Create GET /api/portal/overview in Fastify. Aggregate credit summary, funding summary, business setup summary, grants summary, and next priority actions from Supabase with stable fallbacks.
+
+PROMPT 3 — CREDIT MODULE INTEGRATION
+Wire score cards, negative items, utilization, action plan, key items, and uploads to real data. Define endpoint contracts and table mapping.
+
+PROMPT 4 — FUNDING MODULE INTEGRATION
+Wire matched offers, readiness, capital range, gaps, lender table, and funding uploads. Keep it low-cost and production-safe.
+
+PROMPT 5 — BUSINESS SETUP INTEGRATION
+Wire entity status, compliance items, profile strength, roadmap, key setup tasks, and records upload. Propose phased delivery.
+
+PROMPT 6 — GRANTS MODULE INTEGRATION
+Wire matched grants, deadlines, value, readiness, roadmap, opportunities table, and grant packet uploads. Keep AI optional for v1.
+
+PROMPT 7 — SHARED UPLOAD PIPELINE
+Design one upload model for phone and desktop across credit, funding, business, and grants using Supabase Storage + metadata rows.
+
+PROMPT 8 — PERMISSIONS + MULTI-TENANT ENFORCEMENT
+Enforce tenant boundaries and role rules for client, staff, and admin at Fastify and Supabase layers.
+
+PROMPT 9 — SAFE ROLLOUT PLAN
+Roll out in order: homepage refresh, portal shell, overview, credit, funding, business, grants. Preserve old flows until smoke tests pass.

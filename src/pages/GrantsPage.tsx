@@ -181,14 +181,14 @@ function buildGrantGuide(input: {
 function MetricCard(props: { label: string; value: string; tone?: 'default' | 'good' | 'warn' }) {
   const toneClass =
     props.tone === 'good'
-      ? 'border-emerald-500/30 bg-emerald-950/20 text-emerald-200'
+      ? 'border-[#DCEEDB] bg-[#EFFAF1] text-[#178D5B]'
       : props.tone === 'warn'
-      ? 'border-amber-500/30 bg-amber-950/20 text-amber-200'
-      : 'border-slate-700 bg-slate-900 text-slate-100';
+      ? 'border-[#F1E5BF] bg-[#FFF8E8] text-[#B7791F]'
+      : 'border-[#E4ECF8] bg-white text-[#17233D]';
 
   return (
     <div className={`rounded-2xl border p-4 ${toneClass}`}>
-      <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">{props.label}</div>
+      <div className="text-[10px] uppercase tracking-[0.2em] text-[#91A1BC]">{props.label}</div>
       <div className="mt-2 text-2xl font-black">{props.value}</div>
     </div>
   );
@@ -576,21 +576,22 @@ export default function GrantsPage() {
 
   if (!user) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 text-slate-100">
-        <div className="rounded-xl border border-amber-500/40 bg-amber-950/30 p-4 text-sm">Sign in required.</div>
+      <div className="max-w-4xl mx-auto px-4 py-8 text-slate-900">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Sign in required.</div>
       </div>
     );
   }
 
   if (loading) {
-    return <div className="min-h-[50vh] flex items-center justify-center text-slate-300">Loading grants engine...</div>;
+    return <div className="min-h-[50vh] flex items-center justify-center text-slate-500">Loading grants engine...</div>;
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 text-slate-100 space-y-5">
+    <div className="max-w-7xl mx-auto px-4 py-6 text-slate-900 space-y-5">
       <div>
-        <h1 className="text-3xl font-black text-white">Grants Engine</h1>
-        <p className="text-sm text-slate-400 mt-2 max-w-3xl">
+        <p className="text-[0.72rem] font-black uppercase tracking-[0.22em] text-[#607CC1]">Grants workspace</p>
+        <h1 className="mt-2 text-[2.4rem] font-black tracking-tight text-[#17233D]">Grant Discovery Insights</h1>
+        <p className="text-sm text-[#61769D] mt-2 max-w-3xl">
           Educational grant matching, prep, and submission-tracking workflow. Business Growth remains the primary post-funding path; grants are an optional research branch that still requires client review and sponsor approval.
         </p>
       </div>
@@ -606,16 +607,16 @@ export default function GrantsPage() {
         <MetricCard label="Submissions Logged" value={String(submissions.length)} tone={submissions.length ? 'good' : 'default'} />
       </div>
 
-      <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="rounded-[1.8rem] border border-[#E4ECF8] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] p-4 grid grid-cols-1 md:grid-cols-2 gap-3 shadow-sm">
         <div>
-          <div className="text-xs uppercase tracking-widest text-slate-400">Access</div>
-          <div className={`mt-1 text-sm font-semibold ${isPremium ? 'text-emerald-300' : 'text-amber-300'}`}>
+          <div className="text-xs uppercase tracking-widest text-[#91A1BC]">Access</div>
+          <div className={`mt-1 text-sm font-semibold ${isPremium ? 'text-emerald-700' : 'text-amber-700'}`}>
             {isPremium ? 'PREMIUM Grants Engine enabled' : 'Educational lessons only (upgrade for shortlist + drafts)'}
           </div>
         </div>
         <div>
-          <div className="text-xs uppercase tracking-widest text-slate-400">Workflow Guardrails</div>
-          <ul className="mt-1 text-xs text-slate-300 list-disc pl-4 space-y-1">
+          <div className="text-xs uppercase tracking-widest text-[#91A1BC]">Workflow Guardrails</div>
+          <ul className="mt-1 text-xs text-[#61769D] list-disc pl-4 space-y-1">
             <li>Opportunities are guidance, not award guarantees.</li>
             <li>Drafts must be reviewed against client-provided evidence.</li>
             <li>Assisted submit remains blocked until authorize-submit approval is recorded.</li>
@@ -623,13 +624,13 @@ export default function GrantsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 space-y-3">
+      <div className="rounded-[1.6rem] border border-[#E4ECF8] bg-white p-4 space-y-3 shadow-sm">
         <div className="flex flex-wrap gap-2">
           {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`rounded-md px-3 py-1.5 text-xs font-black uppercase tracking-wider ${activeTab === tab.key ? 'bg-cyan-500 text-slate-950' : 'border border-slate-600 text-slate-200 hover:bg-slate-800'}`}
+              className={`rounded-lg px-3 py-2 text-xs font-black uppercase tracking-wider ${activeTab === tab.key ? 'bg-[#4677E6] text-white' : 'border border-[#DDE7F4] bg-[#F8FBFF] text-[#5E7096] hover:bg-white'}`}
             >
               {tab.label}
             </button>
@@ -637,27 +638,27 @@ export default function GrantsPage() {
         </div>
       </div>
 
-      {error ? <div className="rounded-md border border-rose-500/50 bg-rose-950/30 text-rose-200 text-sm px-4 py-3">{error}</div> : null}
-      {success ? <div className="rounded-md border border-emerald-500/50 bg-emerald-950/30 text-emerald-200 text-sm px-4 py-3">{success}</div> : null}
+      {error ? <div className="rounded-md border border-rose-200 bg-rose-50 text-rose-700 text-sm px-4 py-3">{error}</div> : null}
+      {success ? <div className="rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm px-4 py-3">{success}</div> : null}
 
       {activeTab === 'catalog' ? (
         <div className="grid grid-cols-1 xl:grid-cols-[1.1fr,0.9fr] gap-4">
-          <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-3">
+          <div className="rounded-[1.8rem] border border-[#E4ECF8] bg-white p-4 space-y-3 shadow-sm">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <h2 className="text-lg font-semibold text-white">Opportunity Catalog</h2>
-                <p className="text-xs text-slate-400">Search the catalog, then open the matching workflow only when the opportunity genuinely fits.</p>
+                <h2 className="text-lg font-semibold text-[#17233D]">Opportunity Catalog</h2>
+                <p className="text-xs text-[#61769D]">Search the catalog, then open the matching workflow only when the opportunity genuinely fits.</p>
               </div>
               <input
                 value={catalogSearch}
                 onChange={(e) => setCatalogSearch(e.target.value)}
                 placeholder="Search sponsor, grant, geography, tags"
-                className="w-full md:w-80 rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm"
+                className="w-full md:w-80 rounded-xl border border-[#DDE7F4] bg-[#F8FBFF] px-3 py-2.5 text-sm text-[#17233D]"
               />
             </div>
 
             <div className="space-y-2 max-h-[40rem] overflow-y-auto pr-1">
-              {filteredCatalog.length === 0 ? <div className="text-sm text-slate-500">No catalog opportunities match this search.</div> : null}
+              {filteredCatalog.length === 0 ? <div className="text-sm text-[#61769D]">No catalog opportunities match this search.</div> : null}
               {filteredCatalog.map((grant) => {
                 const isSelected = grant.id === selectedCatalogGrant?.id;
                 const linkedMatch = matchByGrantId.get(grant.id);
@@ -666,72 +667,72 @@ export default function GrantsPage() {
                     key={grant.id}
                     type="button"
                     onClick={() => setSelectedCatalogId(grant.id)}
-                    className={`w-full rounded-2xl border p-4 text-left transition ${isSelected ? 'border-cyan-400 bg-cyan-500/10' : 'border-slate-700 bg-slate-950/40 hover:bg-slate-800/80'}`}
+                    className={`w-full rounded-[1.45rem] border p-4 text-left transition ${isSelected ? 'border-[#4A83F4] bg-[linear-gradient(180deg,#FFFFFF_0%,#F4F8FF_100%)]' : 'border-[#EEF2FA] bg-[#FBFDFF] hover:border-[#D7E3F5]'}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-white">{grant.name}</div>
-                        <div className="text-xs text-slate-400 mt-1">{grant.sponsor}</div>
+                        <div className="text-sm font-semibold text-[#17233D]">{grant.name}</div>
+                        <div className="text-xs text-[#61769D] mt-1">{grant.sponsor}</div>
                       </div>
                       {linkedMatch ? (
-                        <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+                        <span className="rounded-full border border-[#CBEFD9] bg-[#E8FAEF] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[#178D5B]">
                           Shortlisted
                         </span>
                       ) : null}
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-400">
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[#61769D]">
                       <span>Deadline: {grant.deadline_date || '-'}</span>
                       <span>{daysUntil(grant.deadline_date)}</span>
                     </div>
-                    <div className="mt-2 text-xs text-slate-500 line-clamp-2">{(grant.industry_tags || []).join(', ') || 'No industry tags'}</div>
+                    <div className="mt-2 text-xs text-[#91A1BC] line-clamp-2">{(grant.industry_tags || []).join(', ') || 'No industry tags'}</div>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-4">
+          <div className="rounded-[1.8rem] border border-[#E4ECF8] bg-white p-4 space-y-4 shadow-sm">
             {selectedCatalogGrant ? (
               <>
                 <div>
-                  <div className="text-xs uppercase tracking-widest text-slate-400">Selected Opportunity</div>
-                  <h2 className="mt-2 text-2xl font-black text-white">{selectedCatalogGrant.name}</h2>
-                  <div className="mt-2 text-sm text-slate-400">{selectedCatalogGrant.sponsor}</div>
+                  <div className="text-xs uppercase tracking-widest text-[#91A1BC]">Selected Opportunity</div>
+                  <h2 className="mt-2 text-2xl font-black text-[#17233D]">{selectedCatalogGrant.name}</h2>
+                  <div className="mt-2 text-sm text-[#61769D]">{selectedCatalogGrant.sponsor}</div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-xl border border-slate-700 bg-slate-950/40 p-3">
-                    <div className="text-[10px] uppercase tracking-widest text-slate-500">Award Range</div>
-                    <div className="mt-1 text-slate-200">{selectedCatalogGrant.award_range_md || 'Not listed'}</div>
+                  <div className="rounded-xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                    <div className="text-[10px] uppercase tracking-widest text-[#91A1BC]">Award Range</div>
+                    <div className="mt-1 text-[#17233D]">{selectedCatalogGrant.award_range_md || 'Not listed'}</div>
                   </div>
-                  <div className="rounded-xl border border-slate-700 bg-slate-950/40 p-3">
-                    <div className="text-[10px] uppercase tracking-widest text-slate-500">Deadline</div>
-                    <div className="mt-1 text-slate-200">{selectedCatalogGrant.deadline_date || 'Not listed'}</div>
-                    <div className="text-xs text-slate-500 mt-1">{daysUntil(selectedCatalogGrant.deadline_date)}</div>
+                  <div className="rounded-xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                    <div className="text-[10px] uppercase tracking-widest text-[#91A1BC]">Deadline</div>
+                    <div className="mt-1 text-[#17233D]">{selectedCatalogGrant.deadline_date || 'Not listed'}</div>
+                    <div className="text-xs text-[#61769D] mt-1">{daysUntil(selectedCatalogGrant.deadline_date)}</div>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-700 bg-slate-950/40 p-3">
-                  <div className="text-[10px] uppercase tracking-widest text-slate-500">Geography + Tags</div>
-                  <div className="mt-2 text-sm text-slate-300">{(selectedCatalogGrant.geography || []).join(', ') || 'No geography listed'}</div>
-                  <div className="mt-1 text-sm text-slate-400">{(selectedCatalogGrant.industry_tags || []).join(', ') || 'No industry tags listed'}</div>
+                <div className="rounded-xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                  <div className="text-[10px] uppercase tracking-widest text-[#91A1BC]">Geography + Tags</div>
+                  <div className="mt-2 text-sm text-[#17233D]">{(selectedCatalogGrant.geography || []).join(', ') || 'No geography listed'}</div>
+                  <div className="mt-1 text-sm text-[#61769D]">{(selectedCatalogGrant.industry_tags || []).join(', ') || 'No industry tags listed'}</div>
                 </div>
 
-                <div className="rounded-xl border border-slate-700 bg-slate-950/40 p-3">
-                  <div className="text-[10px] uppercase tracking-widest text-slate-500">Eligibility Snapshot</div>
-                  <p className="mt-2 text-sm text-slate-300 whitespace-pre-wrap">{selectedCatalogGrant.eligibility_md || 'No eligibility notes provided.'}</p>
+                <div className="rounded-xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                  <div className="text-[10px] uppercase tracking-widest text-[#91A1BC]">Eligibility Snapshot</div>
+                  <p className="mt-2 text-sm text-[#61769D] whitespace-pre-wrap">{selectedCatalogGrant.eligibility_md || 'No eligibility notes provided.'}</p>
                 </div>
 
-                <div className="rounded-xl border border-slate-700 bg-slate-950/40 p-3 space-y-2">
-                  <div className="text-[10px] uppercase tracking-widest text-slate-500">Workflow State</div>
+                <div className="rounded-xl border border-[#EEF2FA] bg-[#FBFDFF] p-3 space-y-2">
+                  <div className="text-[10px] uppercase tracking-widest text-[#91A1BC]">Workflow State</div>
                   {selectedCatalogMatch ? (
                     <>
-                      <div className="text-sm text-emerald-200">Shortlisted with score {formatPercent(selectedCatalogMatch.match_score)}</div>
-                      <div className="text-xs text-slate-400">Draft: {selectedCatalogDraft ? pretty(selectedCatalogDraft.status) : 'Not started'}</div>
-                      <div className="text-xs text-slate-400">Submission: {selectedCatalogSubmission ? pretty(selectedCatalogSubmission.status) : 'Not recorded'}</div>
+                      <div className="text-sm text-emerald-700">Shortlisted with score {formatPercent(selectedCatalogMatch.match_score)}</div>
+                      <div className="text-xs text-[#61769D]">Draft: {selectedCatalogDraft ? pretty(selectedCatalogDraft.status) : 'Not started'}</div>
+                      <div className="text-xs text-[#61769D]">Submission: {selectedCatalogSubmission ? pretty(selectedCatalogSubmission.status) : 'Not recorded'}</div>
                     </>
                   ) : (
-                    <div className="text-sm text-slate-400">This opportunity has not been shortlisted yet.</div>
+                    <div className="text-sm text-[#61769D]">This opportunity has not been shortlisted yet.</div>
                   )}
                 </div>
 
@@ -743,7 +744,7 @@ export default function GrantsPage() {
                         setSelectedMatchId(selectedCatalogMatch.id);
                         setActiveTab('shortlist');
                       }}
-                      className="rounded-lg border border-cyan-500/50 px-4 py-2 text-xs font-black uppercase tracking-wider text-cyan-200 hover:bg-cyan-500/10"
+                      className="rounded-lg border border-[#D5E4FF] bg-[#EEF4FF] px-4 py-2 text-xs font-black uppercase tracking-wider text-[#4677E6] hover:bg-[#E8F0FF]"
                     >
                       Open Workflow
                     </button>
@@ -754,7 +755,7 @@ export default function GrantsPage() {
                       type="button"
                       onClick={() => void handleCreateDraft(selectedCatalogMatch.id)}
                       disabled={busy || !isPremium}
-                      className="rounded-lg bg-cyan-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-950 disabled:opacity-50"
+                      className="rounded-lg bg-[#4677E6] px-4 py-2 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50"
                     >
                       {busy ? 'Working...' : 'Create Draft'}
                     </button>
@@ -762,7 +763,7 @@ export default function GrantsPage() {
                     <button
                       type="button"
                       onClick={() => setActiveTab('shortlist')}
-                      className="rounded-lg border border-slate-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-200 hover:bg-slate-800"
+                      className="rounded-lg border border-[#DDE7F4] bg-[#F8FBFF] px-4 py-2 text-xs font-black uppercase tracking-wider text-[#5E7096] hover:bg-white"
                     >
                       Go To Shortlist Builder
                     </button>
@@ -778,48 +779,48 @@ export default function GrantsPage() {
 
       {activeTab === 'shortlist' ? (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-3">
-            <h2 className="text-lg font-semibold text-white">Generate Shortlist</h2>
-            <p className="text-xs text-slate-400">Premium-only action. Uses sanitized profile snapshot and educational ranking logic.</p>
+          <div className="rounded-[1.8rem] border border-[#E4ECF8] bg-white p-4 space-y-3 shadow-sm">
+            <h2 className="text-lg font-semibold text-[#17233D]">Generate Shortlist</h2>
+            <p className="text-xs text-[#61769D]">Premium-only action. Uses sanitized profile snapshot and educational ranking logic.</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input
                 value={clientFileId}
                 onChange={(e) => setClientFileId(e.target.value)}
                 placeholder="client_file_id (uuid)"
-                className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm"
+                className="rounded-xl border border-[#DDE7F4] bg-[#F8FBFF] px-3 py-2.5 text-sm text-[#17233D]"
               />
               <input
                 value={geoFilter}
                 onChange={(e) => setGeoFilter(e.target.value)}
                 placeholder="geography filter (CSV, optional)"
-                className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm"
+                className="rounded-xl border border-[#DDE7F4] bg-[#F8FBFF] px-3 py-2.5 text-sm text-[#17233D]"
               />
               <input
                 value={tagFilter}
                 onChange={(e) => setTagFilter(e.target.value)}
                 placeholder="industry tags (CSV, optional)"
-                className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm"
+                className="rounded-xl border border-[#DDE7F4] bg-[#F8FBFF] px-3 py-2.5 text-sm text-[#17233D]"
               />
             </div>
             <button
               onClick={() => void handleShortlist()}
               disabled={busy || !isPremium || !clientFileId.trim()}
-              className="rounded-lg bg-cyan-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-950 disabled:opacity-50"
+              className="rounded-lg bg-[#4677E6] px-4 py-2 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50"
             >
               {busy ? 'Working...' : 'Create Shortlist'}
             </button>
           </div>
 
           {matches.length === 0 ? (
-            <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6 text-sm text-slate-400">
+            <div className="rounded-[1.8rem] border border-[#E4ECF8] bg-white p-6 text-sm text-[#61769D] shadow-sm">
               No shortlist matches yet. Generate one after you have a client file and optional geography/tag filters.
             </div>
           ) : (
             <div className="grid grid-cols-1 xl:grid-cols-[0.9fr,1.1fr] gap-4">
-              <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-3">
+              <div className="rounded-[1.8rem] border border-[#E4ECF8] bg-white p-4 space-y-3 shadow-sm">
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Shortlisted Opportunities</h2>
-                  <p className="text-xs text-slate-400">Pick one to review prep state, draft readiness, and submission controls.</p>
+                  <h2 className="text-lg font-semibold text-[#17233D]">Shortlisted Opportunities</h2>
+                  <p className="text-xs text-[#61769D]">Pick one to review prep state, draft readiness, and submission controls.</p>
                 </div>
 
                 <div className="space-y-2 max-h-[44rem] overflow-y-auto pr-1">
@@ -833,19 +834,19 @@ export default function GrantsPage() {
                         key={match.id}
                         type="button"
                         onClick={() => setSelectedMatchId(match.id)}
-                        className={`w-full rounded-2xl border p-4 text-left transition ${isSelected ? 'border-cyan-400 bg-cyan-500/10' : 'border-slate-700 bg-slate-950/40 hover:bg-slate-800/80'}`}
+                        className={`w-full rounded-[1.45rem] border p-4 text-left transition ${isSelected ? 'border-[#4A83F4] bg-[linear-gradient(180deg,#FFFFFF_0%,#F4F8FF_100%)]' : 'border-[#EEF2FA] bg-[#FBFDFF] hover:border-[#D7E3F5]'}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <div className="text-sm font-semibold text-white">{grant?.name || match.grant_id}</div>
-                            <div className="text-xs text-slate-400 mt-1">{grant?.sponsor || '-'}</div>
+                            <div className="text-sm font-semibold text-[#17233D]">{grant?.name || match.grant_id}</div>
+                            <div className="text-xs text-[#61769D] mt-1">{grant?.sponsor || '-'}</div>
                           </div>
                           <div className="text-right">
-                            <div className="text-sm font-black text-cyan-300">{formatPercent(match.match_score)}</div>
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">Fit</div>
+                            <div className="text-sm font-black text-[#4677E6]">{formatPercent(match.match_score)}</div>
+                            <div className="text-[10px] uppercase tracking-wider text-[#91A1BC]">Fit</div>
                           </div>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-400">
+                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[#61769D]">
                           <span>{pretty(match.status)}</span>
                           <span>Draft: {draft ? pretty(draft.status) : 'Not started'}</span>
                           <span>Submission: {submission ? pretty(submission.status) : 'Not recorded'}</span>
@@ -857,19 +858,19 @@ export default function GrantsPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-4">
+                <div className="rounded-[1.8rem] border border-[#E4ECF8] bg-white p-4 space-y-4 shadow-sm">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <div className="text-xs uppercase tracking-widest text-slate-400">Opportunity Workflow</div>
-                      <h2 className="mt-2 text-2xl font-black text-white">{selectedGrantForWorkflow?.name || 'Select a shortlist item'}</h2>
-                      <div className="mt-1 text-sm text-slate-400">{selectedGrantForWorkflow?.sponsor || 'No sponsor selected'}</div>
+                      <div className="text-xs uppercase tracking-widest text-[#91A1BC]">Opportunity Workflow</div>
+                      <h2 className="mt-2 text-2xl font-black text-[#17233D]">{selectedGrantForWorkflow?.name || 'Select a shortlist item'}</h2>
+                      <div className="mt-1 text-sm text-[#61769D]">{selectedGrantForWorkflow?.sponsor || 'No sponsor selected'}</div>
                     </div>
                     {selectedMatch ? (
                       <button
                         type="button"
                         onClick={() => void handleCreateDraft(selectedMatch.id)}
                         disabled={busy || !isPremium}
-                        className="rounded-lg bg-cyan-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-950 disabled:opacity-50"
+                        className="rounded-lg bg-[#4677E6] px-4 py-2 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50"
                       >
                         {busy ? 'Working...' : selectedDraft ? 'Refresh Draft' : 'Create Draft'}
                       </button>

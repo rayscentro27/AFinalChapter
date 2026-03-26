@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Contact, ExperienceConfig, Message, TrainingPair } from '../types';
 // Added Zap to imports
 import { Send, User, Bot, CheckCheck, Sparkles, Upload, PenTool, Smartphone, RefreshCw, MessageSquare, Shield, Gavel, X, Zap } from 'lucide-react';
@@ -73,6 +73,13 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messages = contact.messageHistory || [];
+  const pendingTasks = useMemo(() => (contact.clientTasks || []).filter((task) => task.status === 'pending'), [contact.clientTasks]);
+  const missingDocuments = useMemo(() => (contact.documents || []).filter((document) => document.required && document.status === 'Missing').length, [contact.documents]);
+  const unreadUpdates = useMemo(() => messages.filter((message) => message.sender !== currentUserRole && !message.read).length, [messages, currentUserRole]);
+  const nextDestination = useMemo(() => {
+    const latestRoutedMessage = [...messages].reverse().find((message) => message.destination);
+    return latestRoutedMessage?.destination || experienceConfig?.taskPriority.targetOrder?.[0] || null;
+  }, [messages, experienceConfig]);
   const toneLabel = experienceConfig?.messaging.toneLabel || 'Specialist Grounding Active';
   const toneSummary = experienceConfig?.messaging.summary || 'Threading stays grounded in the current workflow so guidance remains client-safe and operational.';
   const composePlaceholder = currentUserRole === 'client'
@@ -276,21 +283,52 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ contact, onUpdateContact,
 
   return (
     <div className="flex flex-col h-full bg-white rounded-[2rem] shadow-2xl border border-slate-200 overflow-hidden animate-fade-in font-sans">
-      <div className="p-6 border-b border-slate-100 bg-slate-900 text-white flex justify-between items-center shrink-0">
+      <div className="p-6 border-b border-[#E6ECF7] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] flex justify-between items-center shrink-0">
         <div className="flex items-center gap-4">
            <div className="relative">
-              <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 transform rotate-3">
+              <div className="w-14 h-14 bg-[linear-gradient(135deg,#315FD0,#72A3FF)] rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 transform rotate-3 text-white">
                  <Bot size={32} />
               </div>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-4 border-slate-900 animate-pulse"></div>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-4 border-white animate-pulse"></div>
            </div>
            <div>
-              <h3 className="font-black text-lg uppercase tracking-tighter leading-none">Nexus Concierge</h3>
-              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
+              <h3 className="font-black text-lg tracking-tight text-[#17233D] leading-none">Messaging Hub</h3>
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
                 <Sparkles size={10} /> {toneLabel}
               </p>
-              <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-300">{toneSummary}</p>
+              <p className="mt-2 max-w-2xl text-xs leading-5 text-[#61769D]">{toneSummary}</p>
            </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 border-b border-[#E6ECF7] bg-white p-4 md:grid-cols-3">
+        <div className="rounded-[1.2rem] border border-[#E4ECF8] bg-[#FBFDFF] px-4 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Next action</p>
+          <p className="mt-2 text-sm font-black tracking-tight text-[#17233D]">{pendingTasks[0]?.title || 'Respond to the latest workflow update'}</p>
+          <p className="mt-1 text-xs text-[#61769D]">{pendingTasks[0]?.description || 'Use messages to confirm requirements, updates, and requested clarifications.'}</p>
+        </div>
+        <div className="rounded-[1.2rem] border border-[#E4ECF8] bg-[#FBFDFF] px-4 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Attention</p>
+          <p className="mt-2 text-sm font-black tracking-tight text-[#17233D]">{unreadUpdates} unread updates</p>
+          <p className="mt-1 text-xs text-[#61769D]">{missingDocuments} required document blockers still open.</p>
+        </div>
+        <div className="rounded-[1.2rem] border border-[#E4ECF8] bg-[#FBFDFF] px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Workflow shortcut</p>
+              <p className="mt-2 text-sm font-black tracking-tight text-[#17233D]">Open the related step from messages</p>
+            </div>
+            {onNavigateToAction && nextDestination ? (
+              <button
+                type="button"
+                onClick={() => onNavigateToAction(String(nextDestination))}
+                className="rounded-xl bg-[#EEF4FF] px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#4677E6]"
+              >
+                Open
+              </button>
+            ) : null}
+          </div>
+          <p className="mt-1 text-xs text-[#61769D]">Messaging should keep the next milestone obvious instead of making the user hunt for it.</p>
         </div>
       </div>
 

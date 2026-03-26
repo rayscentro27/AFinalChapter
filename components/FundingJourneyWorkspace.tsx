@@ -98,8 +98,8 @@ function toLabel(step: string): string {
 function PrimaryCard(props: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section className={`${shellClass} p-6`}>
-      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{props.title}</p>
-      {props.subtitle ? <h3 className="mt-2 text-[1.85rem] font-black tracking-tight text-slate-900 leading-tight">{props.subtitle}</h3> : null}
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#607CC1]">{props.title}</p>
+      {props.subtitle ? <h3 className="mt-2 text-[2rem] font-black tracking-tight text-[#17233D] leading-tight">{props.subtitle}</h3> : null}
       <div className="mt-4">{props.children}</div>
     </section>
   );
@@ -108,10 +108,10 @@ function PrimaryCard(props: { title: string; subtitle?: string; children: React.
 function ExecutiveStat(props: { label: string; value: string; tone?: 'default' | 'success' | 'info' }) {
   const toneClass =
     props.tone === 'success'
-      ? 'text-emerald-700 border-emerald-200 bg-emerald-50/80'
+      ? 'text-emerald-700 border-[#DCEEDB] bg-[#EFFAF1]'
       : props.tone === 'info'
-      ? 'text-blue-700 border-blue-200 bg-blue-50/80'
-      : 'text-slate-900 border-slate-200 bg-white';
+      ? 'text-blue-700 border-[#D9EDF2] bg-[#ECFAFD]'
+      : 'text-slate-900 border-[#E6DFF4] bg-[#F3F0FF]';
 
   return (
     <div className={`${fintechMetric} ${toneClass}`}>
@@ -480,6 +480,37 @@ export default function FundingJourneyWorkspace(props: {
                       </button>
                     ) : null}
                   </div>
+
+                  <div className="mt-6 grid gap-4 xl:grid-cols-[1.3fr_1fr]">
+                    <div className="rounded-[1.7rem] border border-[#E4ECF8] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] p-5 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Current funding posture</p>
+                      <div className="mt-4 space-y-3">
+                        {(roadmap.data?.readiness.blockers || []).slice(0, 3).map((blocker: string) => (
+                          <div key={blocker} className="rounded-[1.1rem] border border-[#F5E3BE] bg-[#FFF4E2] px-4 py-3 text-sm font-medium text-[#8F641B]">
+                            {blocker}
+                          </div>
+                        ))}
+                        {!(roadmap.data?.readiness.blockers || []).length ? (
+                          <div className="rounded-[1.1rem] border border-[#CBEFD9] bg-[#E8FAEF] px-4 py-3 text-sm font-medium text-[#178D5B]">
+                            No blockers are currently stopping the funding sequence.
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[1.7rem] border border-[#E4ECF8] bg-white p-5 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Recent application activity</p>
+                      <div className="mt-4 space-y-3">
+                        {(history?.applications || []).slice(0, 3).map((row: any) => (
+                          <div key={row.id} className="rounded-[1.1rem] border border-[#EEF2FA] bg-[#FBFDFF] px-4 py-3">
+                            <p className="text-sm font-black text-[#17233D]">{row.provider_name || 'Provider pending'} · {row.product_name || 'Product'}</p>
+                            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[#9AA9C3]">{row.decision_status || 'submitted'}</p>
+                          </div>
+                        ))}
+                        {!(history?.applications || []).length ? <p className="text-sm text-[#61769D]">No application activity logged yet.</p> : null}
+                      </div>
+                    </div>
+                  </div>
                 </>
               )}
             </PrimaryCard>
@@ -686,7 +717,7 @@ export default function FundingJourneyWorkspace(props: {
                 <p className="mt-4 text-sm font-medium text-red-600">{roadmap.error}</p>
               ) : (
                 <>
-                  <div className={`mt-4 ${softPanelClass} p-4`}>
+                  <div className={`mt-4 ${softPanelClass} p-5`}>
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Next Recommendation</p>
                     <p className="mt-1 text-lg font-black text-slate-900">{roadmap.data?.recommendation.top_recommendation?.title || 'No recommendation yet'}</p>
                     <p className="mt-1 text-sm text-slate-600">{roadmap.data?.recommendation.top_recommendation?.action || 'Log activity to continue sequencing.'}</p>
@@ -707,30 +738,68 @@ export default function FundingJourneyWorkspace(props: {
                   ) : null}
 
                   <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Recent Applications</p>
-                      <div className="mt-2 space-y-2">
+                    <div className="rounded-[1.8rem] border border-[#E4ECF8] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] p-5 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#91A1BC]">Recent Applications</p>
+                          <p className="mt-1 text-sm text-[#61769D]">Latest outbound activity and application status.</p>
+                        </div>
+                        <span className="rounded-full border border-[#D5E4FF] bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#4677E6]">{(history?.applications || []).length} Logged</span>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {(history?.applications || []).length ? (
+                          <div className="hidden grid-cols-[1.15fr,0.85fr,0.7fr] gap-3 rounded-[1rem] border border-[#EEF2FA] bg-white px-4 py-2 lg:grid">
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Provider</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Bureau</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC] text-right">Status</p>
+                          </div>
+                        ) : null}
                         {(history?.applications || []).slice(0, 5).map((row: any) => (
-                          <div key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-xs font-black text-slate-900">{row.provider_name || 'Unknown provider'} · {row.product_name || 'Product'}</p>
-                            <p className="mt-1 text-xs text-slate-600">Status: {row.decision_status || 'submitted'}</p>
+                          <div key={row.id} className="grid gap-3 rounded-[1.15rem] border border-[#EEF2FA] bg-white p-4 lg:grid-cols-[1.15fr,0.85fr,0.7fr] lg:items-center">
+                            <div>
+                              <p className="text-sm font-black text-[#17233D]">{row.provider_name || 'Unknown provider'}</p>
+                              <p className="mt-1 text-xs text-[#61769D]">{row.product_name || 'Product'}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-[#17233D]">{row.bureau_used || 'Not logged'}</p>
+                              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#91A1BC]">Credit bureau used</p>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 lg:justify-end">
+                              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#91A1BC]">{row.submitted_at ? new Date(row.submitted_at).toLocaleDateString() : 'Pending date'}</p>
+                              <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${String(row.decision_status || '').includes('approved') ? 'border-[#CBEFD9] bg-[#E8FAEF] text-[#178D5B]' : 'border-[#D5E4FF] bg-[#EEF4FF] text-[#4677E6]'}`}>{row.decision_status || 'submitted'}</span>
+                            </div>
                           </div>
                         ))}
-                        {!(history?.applications || []).length ? <p className="text-xs text-slate-500">No applications logged yet.</p> : null}
+                        {!(history?.applications || []).length ? <p className="text-sm text-[#61769D]">No applications logged yet.</p> : null}
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Recent Results</p>
-                      <div className="mt-2 space-y-2">
+                    <div className="rounded-[1.8rem] border border-[#E4ECF8] bg-white p-5 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#91A1BC]">Recent Results</p>
+                          <p className="mt-1 text-sm text-[#61769D]">Funding outcomes and notes from recent decisions.</p>
+                        </div>
+                        <span className="rounded-full border border-[#E6DFF4] bg-[#F3F0FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#7A52DB]">{(history?.results || []).length} Outcomes</span>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {(history?.results || []).length ? (
+                          <div className="hidden grid-cols-[0.9fr,1.4fr] gap-3 rounded-[1rem] border border-[#EEF2FA] bg-[#FBFDFF] px-4 py-2 lg:grid">
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Outcome</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Decision notes</p>
+                          </div>
+                        ) : null}
                         {(history?.results || []).slice(0, 5).map((row: any) => (
-                          <div key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-xs font-black text-slate-900">{row.result_status || 'submitted'}</p>
-                            <p className="mt-1 text-xs text-slate-600">{row.result_notes || 'No notes provided.'}</p>
+                          <div key={row.id} className="grid gap-3 rounded-[1.15rem] border border-[#EEF2FA] bg-[#FBFDFF] p-4 lg:grid-cols-[0.9fr,1.4fr] lg:items-center">
+                            <div>
+                              <p className="text-sm font-black text-[#17233D]">{row.result_status || 'submitted'}</p>
+                              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#91A1BC]">{row.outcome_at ? new Date(row.outcome_at).toLocaleDateString() : 'Outcome pending'}</p>
+                            </div>
+                            <p className="text-sm text-[#61769D]">{row.result_notes || 'No notes provided.'}</p>
                           </div>
                         ))}
-                        {historyLoading ? <p className="text-xs text-slate-500">Loading history...</p> : null}
-                        {historyError ? <p className="text-xs text-red-600">{historyError}</p> : null}
-                        {!historyLoading && !(history?.results || []).length ? <p className="text-xs text-slate-500">No results logged yet.</p> : null}
+                        {historyLoading ? <p className="text-sm text-[#61769D]">Loading history...</p> : null}
+                        {historyError ? <p className="text-sm text-red-600">{historyError}</p> : null}
+                        {!historyLoading && !(history?.results || []).length ? <p className="text-sm text-[#61769D]">No results logged yet.</p> : null}
                       </div>
                     </div>
                   </div>

@@ -10,9 +10,9 @@ type TimelineItem = {
 
 function Row({ item }: { item: TimelineItem }) {
   return (
-    <div className="border-t border-white/5 px-4 py-3">
-      <div className="text-xs font-black uppercase tracking-wider text-slate-100">{item.title}</div>
-      {item.meta ? <div className="mt-1 text-xs text-slate-300">{item.meta}</div> : null}
+    <div className="border-t border-slate-100 px-4 py-3">
+      <div className="text-xs font-black uppercase tracking-wider text-[#1F315F]">{item.title}</div>
+      {item.meta ? <div className="mt-1 text-xs text-[#60739A]">{item.meta}</div> : null}
       <div className="mt-1 text-[11px] text-slate-500">{new Date(item.ts).toLocaleString()}</div>
     </div>
   );
@@ -101,19 +101,19 @@ export default function AuditTimeline({
   }, [routingRuns, systemMessages]);
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-900 text-slate-100">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-        <strong className="text-xs font-black uppercase tracking-widest text-slate-300">Audit Timeline</strong>
+    <div className="rounded-2xl border border-[#E2EAF7] bg-white text-slate-900 shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <strong className="text-xs font-black uppercase tracking-widest text-[#60739A]">Audit Timeline</strong>
         <button
           onClick={() => void load()}
-          className="rounded-lg border border-white/10 bg-black/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest"
+          className="rounded-lg border border-[#D6E5FF] bg-[#F4F8FF] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#315FD0]"
         >
           Refresh
         </button>
       </div>
 
-      {loading ? <div className="px-4 py-3 text-xs text-slate-400">Loading timeline...</div> : null}
-      {!loading && error ? <div className="px-4 py-3 text-xs font-semibold text-red-300">{error}</div> : null}
+      {loading ? <div className="px-4 py-3 text-xs text-slate-500">Loading timeline...</div> : null}
+      {!loading && error ? <div className="px-4 py-3 text-xs font-semibold text-red-700">{error}</div> : null}
       {!loading && !error && items.length === 0 ? (
         <div className="px-4 py-3 text-xs text-slate-500">No audit events yet.</div>
       ) : null}

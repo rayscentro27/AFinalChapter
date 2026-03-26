@@ -113,16 +113,16 @@ export default function InboxFiltersBar({
   }
 
   return (
-    <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="space-y-3 rounded-2xl border border-[#E2EAF7] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-3 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={q}
           onChange={(event) => setQ(event.target.value)}
           placeholder="Search subject, tags, last message"
-          className="min-w-[220px] flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500"
+          className="min-w-[220px] flex-1 rounded-xl border border-[#DCE7FA] bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-[#4A7AE8]"
         />
 
-        <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold uppercase tracking-widest text-slate-700">
+        <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)} className="rounded-xl border border-[#DCE7FA] bg-white px-2.5 py-2 text-xs font-bold uppercase tracking-widest text-slate-700">
           <option value="any">Status: Any</option>
           <option value="open">Open</option>
           <option value="pending">Pending</option>
@@ -132,14 +132,14 @@ export default function InboxFiltersBar({
           <option value="closed">Closed</option>
         </select>
 
-        <select value={provider} onChange={(event) => setProvider(event.target.value as ProviderFilter)} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold uppercase tracking-widest text-slate-700">
+        <select value={provider} onChange={(event) => setProvider(event.target.value as ProviderFilter)} className="rounded-xl border border-[#DCE7FA] bg-white px-2.5 py-2 text-xs font-bold uppercase tracking-widest text-slate-700">
           <option value="any">Channel: Any</option>
           <option value="meta">Facebook/Instagram Messenger</option>
           <option value="matrix">Matrix</option>
           <option value="google_voice">Google Voice</option>
         </select>
 
-        <select value={assigned} onChange={(event) => setAssigned(event.target.value as AssignedFilter)} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold uppercase tracking-widest text-slate-700">
+        <select value={assigned} onChange={(event) => setAssigned(event.target.value as AssignedFilter)} className="rounded-xl border border-[#DCE7FA] bg-white px-2.5 py-2 text-xs font-bold uppercase tracking-widest text-slate-700">
           <option value="any">Assigned: Any</option>
           <option value="unassigned">Unassigned</option>
           <option value="mine">Mine</option>
@@ -147,7 +147,7 @@ export default function InboxFiltersBar({
           <option value="agent">Agent</option>
         </select>
 
-        <select value={sla} onChange={(event) => setSla(event.target.value as SlaFilter)} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold uppercase tracking-widest text-slate-700">
+        <select value={sla} onChange={(event) => setSla(event.target.value as SlaFilter)} className="rounded-xl border border-[#DCE7FA] bg-white px-2.5 py-2 text-xs font-bold uppercase tracking-widest text-slate-700">
           <option value="any">SLA: Any</option>
           <option value="stale">Stale</option>
           <option value="breach">Breach</option>
@@ -155,7 +155,7 @@ export default function InboxFiltersBar({
 
         <button
           onClick={saveCurrentView}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
+          className="rounded-xl bg-[linear-gradient(135deg,#2E58E6,#4D8BFF)] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white shadow-[0_10px_20px_rgba(46,88,230,0.16)]"
         >
           Save View
         </button>
@@ -167,7 +167,7 @@ export default function InboxFiltersBar({
           <span key={`${view.name}-${index}`} className="inline-flex items-center gap-1">
             <button
               onClick={() => applyView(view)}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-slate-700"
+              className="rounded-lg border border-[#DCE7FA] bg-[#F4F8FF] px-2 py-1 text-[10px] font-black uppercase tracking-wider text-[#315FD0]"
             >
               {view.name}
             </button>

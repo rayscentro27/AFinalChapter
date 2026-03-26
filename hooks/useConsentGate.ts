@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { BACKEND_CONFIG } from '../adapters/config';
 import {
   ConsentRequirementRow,
   DEFAULT_REQUIRED_CONSENT_FLAGS,
@@ -195,6 +196,29 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
   const [requiredPolicySnapshots, setRequiredPolicySnapshots] = useState<ConsentPolicySnapshotMap>(DEFAULT_POLICY_SNAPSHOT_MAP);
 
   const refresh = useCallback(async () => {
+    if (BACKEND_CONFIG.mode === 'mvp_mock') {
+      if (!userId) {
+        setStatus(null);
+      } else {
+        setStatus({
+          user_id: userId,
+          tenant_id: null,
+          terms_accepted: true,
+          privacy_accepted: true,
+          ai_disclosure_accepted: true,
+          disclaimers_accepted: true,
+          comms_email_accepted: true,
+          has_required_consents: true,
+        });
+      }
+      setRequiredTypes(REQUIRED_CONSENT_TYPES);
+      setRequiredVersions(DEFAULT_REQUIRED_CONSENT_VERSIONS);
+      setRequiredPolicySnapshots(DEFAULT_POLICY_SNAPSHOT_MAP);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     if (!userId) {
       setStatus(null);
       setLoading(false);
@@ -334,6 +358,21 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
 
   const acceptConsents = useCallback(async (selected: ConsentSelections) => {
     if (!userId) return;
+
+    if (BACKEND_CONFIG.mode === 'mvp_mock') {
+      setStatus({
+        user_id: userId,
+        tenant_id: null,
+        terms_accepted: true,
+        privacy_accepted: true,
+        ai_disclosure_accepted: true,
+        disclaimers_accepted: true,
+        comms_email_accepted: true,
+        has_required_consents: true,
+      });
+      setError(null);
+      return;
+    }
 
     const hadRequiredConsents = Boolean(status?.has_required_consents);
 

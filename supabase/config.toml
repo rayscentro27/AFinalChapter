@@ -191,7 +191,9 @@ web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
 [auth.captcha]
-enabled = true
+# Local CLI auth runs without Turnstile so Vite dev login/signup are not blocked.
+# Hosted Supabase / production bot detection stays managed outside this local config.
+enabled = false
 provider = "turnstile"
 secret = "env(SUPABASE_AUTH_CAPTCHA_SECRET)"
 

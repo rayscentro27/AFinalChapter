@@ -365,6 +365,12 @@ const AICommandCenter: React.FC<AICommandCenterProps> = ({ contacts, onUpdateCon
   }, [tenantTasks]);
 
   const notifUnread = tenantNotifs.filter((n) => !n.read).length;
+  const tenantOpsSummary = useMemo(() => {
+    const pending = tenantTasks.filter((task) => task.status !== 'completed').length;
+    const approvals = tenantTasks.filter((task) => String(task.type || '').toLowerCase() === 'review').length;
+    const attention = tenantTasks.filter((task) => String(task.signal || '').toLowerCase() === 'red').length;
+    return { pending, approvals, attention, unread: notifUnread };
+  }, [tenantTasks, notifUnread]);
 
   return (
     <div className="fixed bottom-6 right-6 z-[100] font-sans">
@@ -521,6 +527,32 @@ const AICommandCenter: React.FC<AICommandCenterProps> = ({ contacts, onUpdateCon
               ) : null}
 
               <div className="mt-5 grid grid-cols-1 gap-4">
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Pending</div>
+                    <div className="mt-2 text-xl font-black tracking-tight text-slate-900">{tenantOpsSummary.pending}</div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Approvals</div>
+                    <div className="mt-2 text-xl font-black tracking-tight text-slate-900">{tenantOpsSummary.approvals}</div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Needs Attention</div>
+                    <div className="mt-2 text-xl font-black tracking-tight text-amber-700">{tenantOpsSummary.attention}</div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Unread</div>
+                    <div className="mt-2 text-xl font-black tracking-tight text-slate-900">{tenantOpsSummary.unread}</div>
+                  </div>
+                </div>
+
+                {tenantOpsSummary.attention > 0 ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"><AlertTriangle size={14} /> Workforce Attention</div>
+                    <div className="mt-2">One or more AI-assisted tasks are flagged red and need operator review now.</div>
+                  </div>
+                ) : null}
+
                 {groupedTasks.length === 0 && !tasksLoading ? (
                   <div className="p-8 rounded-2xl bg-white border border-slate-200 text-slate-500 text-sm">
                     No tasks found for this tenant.

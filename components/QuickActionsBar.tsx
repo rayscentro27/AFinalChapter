@@ -245,34 +245,34 @@ export default function QuickActionsBar({ tenantId, conversation, onUpdated }: Q
     <div className="grid gap-2">
       {error ? <div className="text-xs font-semibold text-red-700">{error}</div> : null}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3">
-        <span className="mr-1 text-[11px] font-black uppercase tracking-widest text-slate-500">Status</span>
-        <button disabled={busy} onClick={() => void setStatus('open')} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#E2EAF7] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-3 shadow-sm">
+        <span className="mr-1 text-[11px] font-black uppercase tracking-widest text-[#60739A]">Status</span>
+        <button disabled={busy} onClick={() => void setStatus('open')} className="rounded-lg border border-[#DCE7FA] bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0]">
           Open
         </button>
-        <button disabled={busy} onClick={() => void setStatus('pending_client')} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
+        <button disabled={busy} onClick={() => void setStatus('pending_client')} className="rounded-lg border border-[#DCE7FA] bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0]">
           Pending Client
         </button>
-        <button disabled={busy} onClick={() => void setStatus('pending_staff')} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
+        <button disabled={busy} onClick={() => void setStatus('pending_staff')} className="rounded-lg border border-[#DCE7FA] bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0]">
           Pending Staff
         </button>
         <button disabled={busy} onClick={() => void setStatus('escalated')} className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-800">
           Escalated
         </button>
-        <button disabled={busy} onClick={() => void setStatus('closed')} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
+        <button disabled={busy} onClick={() => void setStatus('closed')} className="rounded-lg border border-[#DCE7FA] bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0]">
           Closed
         </button>
 
         <span className="mx-1 h-5 w-px bg-slate-300" />
 
-        <span className="mr-1 text-[11px] font-black uppercase tracking-widest text-slate-500">Priority</span>
-        <button disabled={busy} onClick={() => void setPriority(10)} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
+        <span className="mr-1 text-[11px] font-black uppercase tracking-widest text-[#60739A]">Priority</span>
+        <button disabled={busy} onClick={() => void setPriority(10)} className="rounded-lg border border-[#DCE7FA] bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0]">
           10
         </button>
-        <button disabled={busy} onClick={() => void setPriority(50)} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
+        <button disabled={busy} onClick={() => void setPriority(50)} className="rounded-lg border border-[#DCE7FA] bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0]">
           50
         </button>
-        <button disabled={busy} onClick={() => void setPriority(100)} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
+        <button disabled={busy} onClick={() => void setPriority(100)} className="rounded-lg border border-[#DCE7FA] bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0]">
           100
         </button>
         <button disabled={busy} onClick={() => void urgent()} className="rounded-lg border border-red-300 bg-red-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-red-700">
@@ -281,13 +281,13 @@ export default function QuickActionsBar({ tenantId, conversation, onUpdated }: Q
 
         <span className="mx-1 h-5 w-px bg-slate-300" />
 
-        <span className="mr-1 text-[11px] font-black uppercase tracking-widest text-slate-500">Tags</span>
+        <span className="mr-1 text-[11px] font-black uppercase tracking-widest text-[#60739A]">Tags</span>
         {DEFAULT_TAGS.slice(0, 4).map((tag) => (
           <button
             key={tag}
             disabled={busy || tags.includes(tag)}
             onClick={() => void addTag(tag)}
-            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+            className="rounded-lg border border-[#DCE7FA] bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0] disabled:opacity-40"
           >
             + {tag}
           </button>
@@ -295,8 +295,8 @@ export default function QuickActionsBar({ tenantId, conversation, onUpdated }: Q
 
         <span className="mx-1 h-5 w-px bg-slate-300" />
 
-        <span className="mr-1 text-[11px] font-black uppercase tracking-widest text-slate-500">Assign</span>
-        <button disabled={busy} onClick={() => void unassign()} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest">
+        <span className="mr-1 text-[11px] font-black uppercase tracking-widest text-[#60739A]">Assign</span>
+        <button disabled={busy} onClick={() => void unassign()} className="rounded-lg border border-[#DCE7FA] bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0]">
           Unassign
         </button>
 
@@ -305,7 +305,7 @@ export default function QuickActionsBar({ tenantId, conversation, onUpdated }: Q
             value={selectedAgent}
             onChange={(event) => setSelectedAgent(event.target.value)}
             disabled={busy || agents.length === 0}
-            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-[10px] font-semibold"
+            className="rounded-lg border border-[#DCE7FA] bg-white px-2 py-1.5 text-[10px] font-semibold text-slate-700"
             title={agents.length ? 'Select agent' : 'No agents available'}
           >
             {agents.length === 0 ? (
@@ -329,7 +329,7 @@ export default function QuickActionsBar({ tenantId, conversation, onUpdated }: Q
 
         <span className="mx-1 h-5 w-px bg-slate-300" />
 
-        <button disabled={busy} onClick={() => void runRoutingForce()} className="rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-700">
+        <button disabled={busy} onClick={() => void runRoutingForce()} className="rounded-lg border border-[#D6E5FF] bg-[#EEF4FF] px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#315FD0]">
           Run routing
         </button>
 

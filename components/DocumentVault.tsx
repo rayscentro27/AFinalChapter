@@ -46,6 +46,26 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({
     () => (selectedCategory === 'All' ? documents : documents.filter((document) => document.type === selectedCategory)),
     [documents, selectedCategory]
   );
+  const orderedDocuments = useMemo(() => {
+    const rank: Record<ClientDocument['status'], number> = {
+      Missing: 0,
+      'Pending Review': 1,
+      Processing: 2,
+      Rejected: 3,
+      Verified: 4,
+      Signed: 5,
+    };
+
+    return [...filteredDocuments].sort((left, right) => {
+      const statusDelta = (rank[left.status] ?? 99) - (rank[right.status] ?? 99);
+      if (statusDelta !== 0) return statusDelta;
+      return Number(Boolean(right.required)) - Number(Boolean(left.required));
+    });
+  }, [filteredDocuments]);
+  const missingCount = documents.filter((document) => document.status === 'Missing').length;
+  const verifiedCount = documents.filter((document) => document.status === 'Verified' || document.status === 'Signed').length;
+  const pendingCount = documents.filter((document) => document.status === 'Pending Review' || document.status === 'Processing').length;
+  const nextDocumentRequest = documents.find((document) => document.required && document.status === 'Missing') || null;
 
   useEffect(() => {
     setSelectedCategory(defaultCategory);
@@ -148,22 +168,49 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({
           </div>
       )}
 
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between mb-8">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 uppercase tracking-tighter leading-none">
-            <Shield className="text-blue-600" size={24} /> Subject Vault
+          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 tracking-tight leading-none">
+            <Shield className="text-blue-600" size={24} /> Document Vault
           </h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Autonomous Integrity Guard Level 4</p>
+          <p className="mt-2 text-sm text-[#61769D]">One place to upload, verify, and track the records needed for credit, funding, grants, and business setup.</p>
         </div>
         <div className="flex gap-3">
             <button onClick={() => setIsShareModalOpen(true)} className="bg-white border border-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
-                <Share2 size={16} /> Secure Share
+                <Share2 size={16} /> Share Request
             </button>
-            <button onClick={() => fileInputRef.current?.click()} className="bg-slate-950 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95 flex items-center gap-2">
-                <Upload size={16} /> Secure Deposit
+            <button onClick={() => fileInputRef.current?.click()} disabled={readOnly} className="bg-slate-950 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95 flex items-center gap-2 disabled:opacity-50">
+                <Upload size={16} /> Upload Document
             </button>
         </div>
       </div>
+
+      <div className="mb-6 grid gap-4 md:grid-cols-4">
+        <div className="rounded-[1.55rem] border border-[#E4ECF8] bg-white p-4 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Missing</p>
+          <p className="mt-2 text-[1.8rem] font-black tracking-tight text-[#17233D]">{missingCount}</p>
+        </div>
+        <div className="rounded-[1.55rem] border border-[#E4ECF8] bg-white p-4 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Pending Review</p>
+          <p className="mt-2 text-[1.8rem] font-black tracking-tight text-[#C27A24]">{pendingCount}</p>
+        </div>
+        <div className="rounded-[1.55rem] border border-[#E4ECF8] bg-white p-4 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Verified</p>
+          <p className="mt-2 text-[1.8rem] font-black tracking-tight text-[#178D5B]">{verifiedCount}</p>
+        </div>
+        <div className="rounded-[1.55rem] border border-[#E4ECF8] bg-white p-4 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Next request</p>
+          <p className="mt-2 text-sm font-black tracking-tight text-[#17233D]">{nextDocumentRequest?.name || 'No urgent upload request'}</p>
+        </div>
+      </div>
+
+      {nextDocumentRequest ? (
+        <div className="mb-5 rounded-[1.5rem] border border-[#FFE1E7] bg-[#FFF6F8] px-4 py-4 text-sm text-[#17233D]">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#E25A74]">Next action</p>
+          <p className="mt-2 font-black tracking-tight">Upload {nextDocumentRequest.name} to keep this workflow moving.</p>
+          <p className="mt-1 text-[#61769D]">The document experience is unified here so clients and admins can work from one clear status view.</p>
+        </div>
+      ) : null}
 
       {uploadIntentLabel ? (
         <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
@@ -185,7 +232,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar p-1">
-        {filteredDocuments.map((doc) => (
+        {orderedDocuments.map((doc) => (
           <div key={doc.id} className={`p-8 rounded-[2.5rem] border-2 transition-all flex flex-col relative group bg-white shadow-sm hover:shadow-xl ${doc.status === 'Verified' ? 'border-emerald-100 hover:border-emerald-300' : 'border-slate-100 hover:border-blue-300'}`}>
             
             {/* FORENSIC X-RAY OVERLAY */}
@@ -222,8 +269,19 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({
             <div className="mt-8 pt-8 border-t border-slate-50 flex justify-between items-center">
               <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                   doc.status === 'Verified' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 
-                  'bg-slate-50 text-slate-400 border-slate-100'
+                  doc.status === 'Missing' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-slate-50 text-slate-400 border-slate-100'
               }`}>{doc.status}</div>
+              {doc.status === 'Missing' && !readOnly ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-xl border border-[#D5E4FF] bg-[#EEF4FF] px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#4677E6]"
+                >
+                  Upload now
+                </button>
+              ) : (
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">{doc.required ? 'Required' : 'Reference'}</span>
+              )}
             </div>
           </div>
         ))}

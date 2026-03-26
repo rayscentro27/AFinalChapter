@@ -8,6 +8,7 @@ import SignUp from './components/SignUp';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import ClientLandingPage from './components/ClientLandingPage';
+import ClientHomeV2 from './components/light/ClientHomeV2';
 import UnifiedInbox from './components/UnifiedInbox';
 import CommandPalette from './components/CommandPalette';
 import SystemSitemap from './components/SystemSitemap';
@@ -17,7 +18,7 @@ import AgenticHUD from './components/AgenticHUD';
 import UserHeader from './components/UserHeader';
 import { ViewMode, Contact, AgencyBranding, Course, Notification, ClientTask } from './types';
 // Added RefreshCw to imports
-import { Search, Bell, Zap, Command, Info, X, CreditCard, ShieldAlert, RefreshCw } from 'lucide-react';
+import { Search, Bell, Command, RefreshCw } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { data } from './adapters';
 import { BACKEND_CONFIG } from './adapters/config';
@@ -141,9 +142,16 @@ const UnsubscribePage = lazy(() => import('./src/pages/UnsubscribePage'));
 const AdminFunnelSequencesPage = lazy(() => import('./src/pages/AdminFunnelSequencesPage'));
 const AdminFunnelLeadsPage = lazy(() => import('./src/pages/AdminFunnelLeadsPage'));
 const AdminFunnelMetricsPage = lazy(() => import('./src/pages/AdminFunnelMetricsPage'));
+const ClientPortalV2 = lazy(() => import('./components/portal/ClientPortalV2'));
 
 const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/dashboard': ViewMode.DASHBOARD,
+  '/portal': ViewMode.PORTAL_OVERVIEW,
+  '/portal/overview': ViewMode.PORTAL_OVERVIEW,
+  '/portal/credit': ViewMode.PORTAL_CREDIT,
+  '/portal/funding': ViewMode.PORTAL_FUNDING,
+  '/portal/business': ViewMode.PORTAL_BUSINESS,
+  '/portal/grants': ViewMode.PORTAL_GRANTS,
   '/admin/contacts/merge': ViewMode.CONTACT_MERGE,
   '/admin/merge-jobs': ViewMode.MERGE_JOBS,
   '/admin/merge-queue': ViewMode.MERGE_QUEUE,
@@ -248,6 +256,16 @@ const RouteFallback = () => (
 
 function isLegalViewMode(view: ViewMode): boolean {
   return LEGAL_VIEWS.includes(view);
+}
+
+function isPortalRouteViewMode(view: ViewMode): boolean {
+  return [
+    ViewMode.PORTAL_OVERVIEW,
+    ViewMode.PORTAL_CREDIT,
+    ViewMode.PORTAL_FUNDING,
+    ViewMode.PORTAL_BUSINESS,
+    ViewMode.PORTAL_GRANTS,
+  ].includes(view);
 }
 
 function normalizePathname(pathname: string): string {
@@ -446,6 +464,16 @@ export const App = () => {
     const handleRouting = () => {
       const normalizedPath = normalizePathname(window.location.pathname);
       const mappedView = PATH_TO_VIEW[normalizedPath];
+      if (mappedView && isPortalRouteViewMode(mappedView)) {
+        if (window.location.hash.replace('#', '').toUpperCase() !== mappedView) {
+          window.location.hash = mappedView.toLowerCase();
+          return;
+        }
+
+        setCurrentView(mappedView);
+        return;
+      }
+
       if (!window.location.hash && mappedView) {
         window.location.hash = mappedView.toLowerCase();
         return;
@@ -475,6 +503,11 @@ export const App = () => {
 
         const clientAllowedViews: ViewMode[] = [
           ViewMode.PORTAL,
+          ViewMode.PORTAL_OVERVIEW,
+          ViewMode.PORTAL_CREDIT,
+          ViewMode.PORTAL_FUNDING,
+          ViewMode.PORTAL_BUSINESS,
+          ViewMode.PORTAL_GRANTS,
           ViewMode.PARTNER_MARKETPLACE,
           ViewMode.PRICING,
           ViewMode.BILLING,
@@ -529,16 +562,38 @@ export const App = () => {
     setBranding(saved);
   };
 
-  const navigate = (view: ViewMode) => {
+  const navigate = (view: ViewMode, pathname?: string) => {
+    if (pathname) {
+      const normalizedPath = normalizePathname(pathname);
+      if (normalizePathname(window.location.pathname) !== normalizedPath) {
+        window.history.pushState({}, '', normalizedPath);
+      }
+    }
+
+    if (window.location.hash.replace('#', '').toUpperCase() === view) {
+      setCurrentView(view);
+      return;
+    }
+
     window.location.hash = view.toLowerCase();
   };
 
   const isLegalView = isLegalViewMode(currentView);
   const showNavigation = Boolean(
     user
-    && user.role !== 'client'
     && ![ViewMode.CLIENT_LANDING, ViewMode.LOGIN, ViewMode.SIGNUP, ViewMode.ONBOARDING].includes(currentView)
     && !isLegalView
+    && (
+      user.role === 'client'
+        ? [
+            ViewMode.PORTAL,
+            ViewMode.PORTAL_CREDIT,
+            ViewMode.PORTAL_FUNDING,
+            ViewMode.PORTAL_BUSINESS,
+            ViewMode.PORTAL_GRANTS,
+          ].includes(currentView)
+        : !isPortalRouteViewMode(currentView)
+    )
     && isSystemReady
     && !consentGate.needsAcceptance
   );
@@ -633,6 +688,34 @@ export const App = () => {
       );
     }
 
+    if (isPortalRouteViewMode(currentView)) {
+      const previewContact: Contact = {
+        id: 'portal-preview',
+        name: user?.name || 'Portal Preview',
+        email: user?.email || 'preview@nexus.local',
+        phone: '',
+        company: 'Nexus Preview Workspace',
+        status: 'Active',
+        lastContact: 'Preview mode',
+        value: 145000,
+        source: 'Preview',
+        notes: 'Local portal preview mode.',
+        checklist: {},
+        clientTasks: [],
+      };
+
+      return (
+        <ClientPortalV2
+          currentView={currentView}
+          contact={user ? resolvePortalContact() : previewContact}
+          branding={branding}
+          onLogout={signOut}
+          onNavigate={navigate}
+          onOpenLegacyPortal={() => navigate(user ? ViewMode.PORTAL : ViewMode.CLIENT_LANDING, user ? undefined : '/')}
+        />
+      );
+    }
+
     if (!user) {
         if (currentView === ViewMode.SIGNUP) return <SignUp onRegister={addContact} onNavigate={navigate} />;
         if (currentView === ViewMode.LOGIN) return <Login onLogin={() => {}} onBack={() => navigate(ViewMode.CLIENT_LANDING)} />;
@@ -656,13 +739,32 @@ export const App = () => {
         return <ClientLandingPage onNavigate={navigate} />;
     }
 
-    if (currentView === ViewMode.PORTAL) {
+    const resolvePortalContact = (): Contact => {
       let myContact = contacts.find(c => c.email.toLowerCase() === user.email.toLowerCase());
       if (!myContact && contacts.length > 0) myContact = contacts[0];
-      const skeletonContact: Contact = {
-        id: 'new', name: user.name || 'New Client', email: user.email, phone: '', company: 'New Business', status: 'Lead', lastContact: 'Just now', value: 0, source: 'Registration', notes: 'Setup in progress.', checklist: {}, clientTasks: []
+
+      return myContact || {
+        id: 'new',
+        name: user.name || 'New Client',
+        email: user.email,
+        phone: '',
+        company: 'New Business',
+        status: 'Lead',
+        lastContact: 'Just now',
+        value: 0,
+        source: 'Registration',
+        notes: 'Setup in progress.',
+        checklist: {},
+        clientTasks: [],
       };
-      return <PortalView contact={myContact || skeletonContact} branding={branding} onLogout={signOut} onUpdateContact={updateContact} availableCourses={courses} />;
+    };
+
+    if (currentView === ViewMode.PORTAL) {
+      if (user.role === 'client') {
+        return <ClientHomeV2 contact={resolvePortalContact()} onNavigate={navigate} />;
+      }
+
+      return <PortalView contact={resolvePortalContact()} branding={branding} onLogout={signOut} onUpdateContact={updateContact} availableCourses={courses} />;
     }
 
     if (!isSystemReady && (user.role === 'admin' || user.role === 'super_admin')) {
@@ -781,9 +883,19 @@ export const App = () => {
   };
 
   const unreadNotifCount = notifications.filter(n => !n.read).length;
+  const currentViewLabel = currentView
+    .toLowerCase()
+    .split('_')
+    .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+  const roleLabel = !user
+    ? 'Guest'
+    : user.role === 'super_admin'
+      ? 'Super Admin'
+      : user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('_', ' ');
 
   return (
-    <div className="flex h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)] overflow-hidden font-sans text-slate-900 selection:bg-emerald-100 selection:text-emerald-900">
+    <div className="flex h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)] font-sans text-slate-900 subpixel-antialiased selection:bg-emerald-100 selection:text-emerald-900">
       {showNavigation && (
           <Sidebar 
             currentView={currentView} 
@@ -795,20 +907,56 @@ export const App = () => {
             userRole={user?.role}
           />
       )}
-      <main className={`flex-1 flex flex-col h-full overflow-hidden transition-all duration-500 ${showNavigation ? 'md:ml-64 border-l border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)]' : 'bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)]'}`}>
+      <main className={`flex-1 flex h-full flex-col overflow-hidden subpixel-antialiased transition-all duration-500 ${showNavigation ? 'border-l border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)] md:ml-64' : 'bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)]'}`}>
         {showNavigation && (
-         <header className="h-16 bg-white/90 border-b border-slate-200/80 flex items-center justify-between px-6 z-20 sticky top-0 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
-           <div onClick={() => setIsCommandOpen(true)} className="flex items-center gap-3 bg-slate-50 hover:bg-white transition-all px-4 py-2 rounded-xl cursor-pointer text-slate-500 text-xs w-full max-sm border border-slate-200 group shadow-sm">
-             <Search size={14} className="group-hover:text-emerald-600 transition-colors" /><span className="flex-1 font-bold uppercase tracking-widest">Search workspace</span><kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-mono font-bold text-slate-500"><Command size={8} /> K</kbd>
+         <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/92 px-6 py-4 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+             <div className="flex min-w-0 flex-1 items-center gap-4">
+               <div className="flex min-w-0 flex-col">
+                 <span className="text-[10px] font-black uppercase tracking-[0.24em] text-[#6F84B0]">
+                   {user.role === 'client' ? 'Client Workspace' : 'Operating System'}
+                 </span>
+                 <div className="mt-1 flex min-w-0 items-center gap-3">
+                   <h1 className="truncate text-xl font-black tracking-tight text-[#203266]">{currentViewLabel}</h1>
+                   <span className="hidden rounded-full border border-[#DCE7FA] bg-[#F4F8FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5572A8] sm:inline-flex">
+                     {roleLabel}
+                   </span>
+                 </div>
+               </div>
+
+               <button
+                 type="button"
+                 onClick={() => setIsCommandOpen(true)}
+                 className="group hidden max-w-xl flex-1 items-center gap-3 rounded-2xl border border-[#DCE7FA] bg-[linear-gradient(180deg,#ffffff_0%,#f7faff_100%)] px-4 py-3 text-left text-xs text-[#5F74A0] shadow-[0_10px_30px_rgba(62,95,170,0.08)] transition-all hover:border-[#BFD2F7] hover:shadow-[0_14px_36px_rgba(62,95,170,0.12)] md:flex"
+               >
+                 <div className="rounded-xl border border-[#E1EAFB] bg-[#F4F8FF] p-2 text-[#4A7AE8] transition-colors group-hover:bg-white">
+                   <Search size={14} />
+                 </div>
+                 <div className="min-w-0 flex-1">
+                   <div className="truncate text-[11px] font-black uppercase tracking-[0.18em] text-[#203266]">Search workspace</div>
+                   <div className="mt-1 truncate text-[11px] font-semibold text-[#7589B2]">Jump to views, contacts, commands, and system pages</div>
+                 </div>
+                 <kbd className="hidden items-center gap-1 rounded-xl border border-[#DCE7FA] bg-white px-2 py-1 text-[10px] font-mono font-bold text-[#6F84B0] lg:inline-flex">
+                   <Command size={10} /> K
+                 </kbd>
+               </button>
              </div>
-             <div className="flex items-center gap-3 ml-4">
-               <RequiredDisclaimers variant="badge" />
+
+             <div className="ml-0 flex items-center justify-between gap-3 lg:ml-4 lg:justify-end">
+               <div className="flex items-center gap-2">
+                 <div className="hidden items-center gap-2 rounded-full border border-[#DCE7FA] bg-[#F8FBFF] px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#5D77A8] md:inline-flex">
+                   <Bell size={12} className="text-[#4A7AE8]" />
+                   {unreadNotifCount > 0 ? `${unreadNotifCount} active alerts` : 'All clear'}
+                 </div>
+                 <RequiredDisclaimers variant="badge" />
+               </div>
                <UserHeader />
              </div>
+           </div>
           </header>
         )}
         <div className={`flex-1 overflow-auto custom-scrollbar relative ${showNavigation ? 'p-6' : ''}`}>
-           {user && !isLegalView && !consentGate.needsAcceptance ? <OfferBanner onUpgrade={() => navigate(ViewMode.BILLING)} /> : null}
+           {user && !isLegalView && !isPortalRouteViewMode(currentView) && !consentGate.needsAcceptance ? <OfferBanner onUpgrade={() => navigate(ViewMode.BILLING)} /> : null}
           <Suspense fallback={<RouteFallback />}>
             {renderContent()}
           </Suspense>

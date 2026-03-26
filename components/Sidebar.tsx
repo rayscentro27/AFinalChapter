@@ -1,14 +1,53 @@
 
-import React, { useState } from 'react';
-import { 
-  LayoutDashboard, Users, Globe, Settings, LogOut, Hexagon, 
-  Inbox, Calendar, Zap, Mic, Phone, Search, Megaphone, 
-  Store, Shield, ShieldCheck, TrendingUp, Scale, Briefcase, 
-  FileText, Fingerprint, Brain, Cpu, List, Box, ShieldAlert,
-  ChevronRight, Facebook, Instagram, Linkedin, MessageCircle, 
-  Music, Menu, X, AlertCircle, BrainCircuit, Smartphone, FlaskConical, CreditCard, Rocket, KeyRound
+import React, { useMemo, useState } from 'react';
+import {
+  BarChart3,
+  BriefcaseBusiness,
+  Building2,
+  Calendar,
+  CreditCard,
+  FileText,
+  Gift,
+  Globe2,
+  Home,
+  Inbox,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  Mail,
+  Menu,
+  MessageSquare,
+  Network,
+  Phone,
+  Rocket,
+  Scale,
+  Search,
+  Send,
+  Server,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  WalletCards,
+  Workflow,
+  Wrench,
+  X,
 } from 'lucide-react';
 import { ViewMode, AgencyBranding, Contact } from '../types';
+
+type NavItem = {
+  view: ViewMode;
+  label: string;
+  icon: React.ElementType;
+  badge?: number;
+  adminOnly?: boolean;
+};
+
+type NavSection = {
+  label: string;
+  items: NavItem[];
+};
 
 interface SidebarProps {
   currentView: ViewMode;
@@ -17,7 +56,6 @@ interface SidebarProps {
   onLogout: () => void | Promise<void>;
   branding?: AgencyBranding;
   contacts?: Contact[];
-  onOpenVoiceAssistant?: () => void;
   userRole?: string;
 }
 
@@ -28,219 +66,232 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout, 
   branding,
   contacts = [],
-  onOpenVoiceAssistant,
   userRole
 }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const isAdmin = ['admin', 'super_admin'].includes(String(userRole || '').toLowerCase());
 
   const handleNav = (view: ViewMode) => {
     window.location.hash = view.toLowerCase();
     setIsMobileOpen(false);
   };
 
-  // Consolidate unread and triage metrics
   const derivedPendingDocCount = pendingDocCount || contacts.flatMap(c => c.documents || []).filter(d => d.status === 'Pending Review').length || 0;
-  const triageCount = contacts.filter(c => c.status === 'Triage' || c.automationMetadata?.sentiment === 'Critical').length;
 
-  // Social Bridge logic for footer
-  const corePlatforms = ['facebook', 'instagram', 'linkedin'];
-  const socialStates = branding?.socialConnections || [];
-  const connectedSocials = socialStates.filter(s => corePlatforms.includes(s.platform.toLowerCase()) && s.connected);
-  const disconnectedCount = corePlatforms.filter(p => !socialStates.find(s => s.platform.toLowerCase() === p && s.connected)).length;
-
-  const getSocialIcon = (platform: string) => {
-    switch (platform.toLowerCase()) {
-      case 'facebook': return <Facebook size={14} />;
-      case 'instagram': return <Instagram size={14} />;
-      case 'linkedin': return <Linkedin size={14} />;
-      default: return null;
+  const navSections = useMemo<NavSection[]>(() => {
+    if (userRole === 'client') {
+      return [
+        {
+          label: 'Portal',
+          items: [
+            { view: ViewMode.PORTAL, label: 'Home', icon: Home },
+            { view: ViewMode.PORTAL_CREDIT, label: 'Credit Scores', icon: ShieldCheck },
+            { view: ViewMode.PORTAL_FUNDING, label: 'Funding Options', icon: WalletCards },
+            { view: ViewMode.PORTAL_BUSINESS, label: 'Business Setup', icon: Building2 },
+            { view: ViewMode.PORTAL_GRANTS, label: 'Grants Discovery', icon: Gift },
+          ],
+        },
+        {
+          label: 'Account',
+          items: [
+            { view: ViewMode.DOCUMENTS, label: 'Documents', icon: FileText },
+            { view: ViewMode.BILLING, label: 'Billing', icon: CreditCard },
+            { view: ViewMode.COMMUNICATION_PREFERENCES, label: 'Support', icon: MessageSquare },
+            { view: ViewMode.SECURITY_SETTINGS, label: 'Security', icon: ShieldAlert },
+            { view: ViewMode.KNOWLEDGE_HUB, label: 'NexusOne Labs', icon: Search },
+            { view: ViewMode.SETTINGS, label: 'Settings', icon: Settings },
+          ],
+        },
+      ];
     }
-  };
+
+    const sections: NavSection[] = [
+      {
+        label: 'Command',
+        items: [
+          { view: ViewMode.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
+          { view: ViewMode.ADMIN_CEO_BRIEFING, label: 'CEO Briefing', icon: Sparkles, adminOnly: true },
+          { view: ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER, label: 'AI Workforce', icon: Sparkles, adminOnly: true },
+          { view: ViewMode.ADMIN_COMMAND_INBOX, label: 'Command Inbox', icon: Inbox, adminOnly: true },
+          { view: ViewMode.INBOX, label: 'Unified Inbox', icon: Inbox, badge: 3 },
+          { view: ViewMode.SUPERVISOR_TRIAGE, label: 'Triage Hub', icon: ShieldAlert },
+          { view: ViewMode.CALENDAR, label: 'Calendar', icon: Calendar },
+          { view: ViewMode.AUTOMATION, label: 'Automation', icon: Workflow },
+          { view: ViewMode.STRATEGY_SANDBOX, label: 'Strategy Sandbox', icon: Rocket },
+        ],
+      },
+      {
+        label: 'Pipeline',
+        items: [
+          { view: ViewMode.LEAD_SCOUT, label: 'Lead Scout', icon: Search },
+          { view: ViewMode.CRM, label: 'Clients', icon: Users, badge: contacts.length || 392 },
+          { view: ViewMode.POWER_DIALER, label: 'Power Dialer', icon: Phone },
+          { view: ViewMode.SALES_TRAINER, label: 'Sales Trainer', icon: MessageSquare },
+          { view: ViewMode.MESSAGING_BRIDGE, label: 'Messaging Bridge', icon: MessageSquare },
+          { view: ViewMode.MARKETING, label: 'Marketing', icon: Send },
+          { view: ViewMode.ADMIN_FUNNEL_CONTROL_CENTER, label: 'Funnel Control', icon: Network, adminOnly: true },
+          { view: ViewMode.ADMIN_FUNNEL_SEQUENCES, label: 'Funnel Sequences', icon: Workflow, adminOnly: true },
+          { view: ViewMode.ADMIN_FUNNEL_LEADS, label: 'Funnel Leads', icon: Users, adminOnly: true },
+          { view: ViewMode.ADMIN_FUNNEL_METRICS, label: 'Funnel Metrics', icon: BarChart3, adminOnly: true },
+        ],
+      },
+      {
+        label: 'Capital',
+        items: [
+          { view: ViewMode.FUNDING_FLOW, label: 'Funding Applications', icon: BriefcaseBusiness },
+          { view: ViewMode.FUNDING_RESEARCH, label: 'Funding Research', icon: Search },
+          { view: ViewMode.FUNDING_OUTCOMES, label: 'Funding Outcomes', icon: WalletCards },
+          { view: ViewMode.WEALTH_MANAGER, label: 'Capital Planning', icon: WalletCards },
+          { view: ViewMode.ADMIN_REVIEW_ANALYTICS, label: 'Credit Optimization', icon: ShieldCheck },
+          { view: ViewMode.ADMIN_SBA, label: 'Business Builder', icon: Building2 },
+          { view: ViewMode.GRANTS, label: 'Grants & Opportunities', icon: Gift },
+          { view: ViewMode.ADMIN_FUNDING_CATALOG, label: 'Funding Catalog', icon: BriefcaseBusiness, adminOnly: true },
+          { view: ViewMode.ADMIN_GRANTS_CATALOG, label: 'Grants Catalog', icon: Gift, adminOnly: true },
+          { view: ViewMode.ADMIN_GRANTS_TRACKING, label: 'Grants Tracking', icon: FileText, adminOnly: true },
+          { view: ViewMode.PARTNER_MARKETPLACE, label: 'Marketplace', icon: Globe2 },
+          { view: ViewMode.FORENSIC_HUB, label: 'Forensic Hub', icon: ShieldCheck },
+          { view: ViewMode.LENDER_ROOM, label: 'Lender Room', icon: Scale },
+          { view: ViewMode.DOC_GENERATOR, label: 'Document Builder', icon: FileText },
+          { view: ViewMode.UPLOAD_CREDIT_REPORT, label: 'Credit Upload', icon: FileText },
+          { view: ViewMode.REVIEW_QUEUE, label: 'Review Queue', icon: FileText, badge: derivedPendingDocCount || undefined },
+          { view: ViewMode.DOCUMENTS, label: 'Document Vault', icon: FileText },
+        ],
+      },
+      {
+        label: 'Operations',
+        items: [
+          { view: ViewMode.RESEARCH_DASHBOARD, label: 'Analytics', icon: BarChart3 },
+          { view: ViewMode.KNOWLEDGE_HUB, label: 'Knowledge Hub', icon: Search },
+          { view: ViewMode.SCENARIO_RUNNER, label: 'Scenario Runner', icon: Workflow },
+          { view: ViewMode.INFRA_MONITOR, label: 'Infrastructure', icon: Server },
+          { view: ViewMode.SITEMAP, label: 'Sitemap', icon: Network },
+          { view: ViewMode.CHANNEL_MAPPER, label: 'Channel Mapper', icon: Network, adminOnly: true },
+          { view: ViewMode.CONTACT_MERGE, label: 'Contact Merge', icon: Users, adminOnly: true },
+          { view: ViewMode.MERGE_JOBS, label: 'Merge Jobs', icon: Workflow, adminOnly: true },
+          { view: ViewMode.MERGE_QUEUE, label: 'Merge Queue', icon: Workflow, adminOnly: true },
+          { view: ViewMode.SUGGESTIONS, label: 'Suggestions', icon: Sparkles, adminOnly: true },
+          { view: ViewMode.TEAM_MEMBERS, label: 'Team Members', icon: Users, adminOnly: true },
+          { view: ViewMode.ON_CALL, label: 'On Call', icon: Calendar, adminOnly: true },
+          { view: ViewMode.CHANNEL_POOLS, label: 'Channel Pools', icon: Network, adminOnly: true },
+          { view: ViewMode.DEAD_LETTERS, label: 'Dead Letters', icon: Mail, adminOnly: true },
+          { view: ViewMode.ADMIN_HEALTH, label: 'Gateway Health', icon: Server, adminOnly: true },
+          { view: ViewMode.ADMIN_AUTONOMY, label: 'Autonomy Dashboard', icon: Sparkles, adminOnly: true },
+          { view: ViewMode.ADMIN_CONTROL_PLANE, label: 'Control Plane', icon: ShieldAlert, adminOnly: true },
+          { view: ViewMode.SRE_DASHBOARD, label: 'SRE Dashboard', icon: Server, adminOnly: true },
+          { view: ViewMode.CHANNEL_HEALTH, label: 'Channel Health', icon: Server, adminOnly: true },
+          { view: ViewMode.OUTBOX, label: 'Outbox', icon: Send, adminOnly: true },
+          { view: ViewMode.PUBLIC_API, label: 'Public API', icon: Globe2, adminOnly: true },
+        ],
+      },
+      {
+        label: 'Admin',
+        items: [
+          { view: ViewMode.ADMIN_ORGANIZATION_DASHBOARD, label: 'Organization Admin', icon: Building2, adminOnly: true },
+          { view: ViewMode.ADMIN_WHITE_LABEL_SETTINGS, label: 'White Label', icon: Settings, adminOnly: true },
+          { view: ViewMode.ADMIN_SOURCE_REGISTRY, label: 'Source Registry', icon: Globe2, adminOnly: true },
+          { view: ViewMode.ADMIN_MONETIZATION_OPPORTUNITIES, label: 'Revenue Ops', icon: WalletCards, adminOnly: true },
+          { view: ViewMode.ADMIN_AUTONOMOUS_EXPANSION, label: 'Expansion', icon: Rocket, adminOnly: true },
+          { view: ViewMode.ADMIN_EXECUTIVE_DASHBOARD, label: 'Executive Dashboard', icon: BarChart3, adminOnly: true },
+          { view: ViewMode.ADMIN_NEXUS_ONE, label: 'Nexus One', icon: Rocket, adminOnly: true },
+          { view: ViewMode.ADMIN_CREDENTIALS, label: 'Credentials', icon: KeyRound, adminOnly: true },
+          { view: ViewMode.ADMIN_DEAL_ESCALATIONS, label: 'Deal Escalations', icon: ShieldAlert, adminOnly: true },
+          { view: ViewMode.ADMIN_LIFECYCLE_AUTOMATION, label: 'Lifecycle Automation', icon: Workflow, adminOnly: true },
+          { view: ViewMode.ADMIN_ROLES, label: 'Roles', icon: Users, adminOnly: true },
+          { view: ViewMode.ADMIN_MEMBERS, label: 'Members', icon: Users, adminOnly: true },
+          { view: ViewMode.ADMIN_POLICIES, label: 'Policies', icon: ShieldCheck, adminOnly: true },
+          { view: ViewMode.ADMIN_CONSENTS, label: 'Consents', icon: ShieldCheck, adminOnly: true },
+          { view: ViewMode.ADMIN_SUBSCRIPTIONS, label: 'Subscriptions', icon: CreditCard, adminOnly: true },
+          { view: ViewMode.ADMIN_DOCUMENTS, label: 'Admin Documents', icon: FileText, adminOnly: true },
+          { view: ViewMode.BILLING, label: 'Billing', icon: CreditCard },
+          { view: ViewMode.BILLING_COMMISSIONS, label: 'Commission Billing', icon: CreditCard },
+          { view: ViewMode.ADMIN_MAILING_QUEUE, label: 'Mailing Queue', icon: Mail, adminOnly: true },
+          { view: ViewMode.ADMIN_MAILING_DASHBOARD, label: 'Mailing Dashboard', icon: Mail, adminOnly: true },
+          { view: ViewMode.ADMIN_LEGAL_DOCS, label: 'Legal Publisher', icon: FileText, adminOnly: true },
+          { view: ViewMode.ADMIN_EMAIL_PROVIDERS, label: 'Email Providers', icon: Mail, adminOnly: true },
+          { view: ViewMode.ADMIN_EMAIL_ROUTING, label: 'Email Routing', icon: Mail, adminOnly: true },
+          { view: ViewMode.ADMIN_EMAIL_LOGS, label: 'Email Logs', icon: Inbox, adminOnly: true },
+          { view: ViewMode.ADMIN_WORKFLOWS, label: 'Workflows', icon: Workflow, adminOnly: true },
+          { view: ViewMode.ADMIN_COMMISSIONS, label: 'Commission Admin', icon: CreditCard, adminOnly: true },
+          { view: ViewMode.SETTINGS, label: 'Settings', icon: Settings },
+        ],
+      },
+    ];
+
+    return sections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => !item.adminOnly || isAdmin),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [contacts.length, derivedPendingDocCount, isAdmin, userRole]);
 
   return (
     <>
-      {/* Mobile Toggle */}
-      <button 
-        onClick={() => setIsMobileOpen(!isMobileOpen)} 
-        className="md:hidden fixed top-4 left-4 z-[60] p-2.5 bg-white text-slate-700 rounded-xl shadow-lg border border-slate-200 hover:bg-slate-50 transition-all active:scale-95"
+      <button
+        onClick={() => setIsMobileOpen(!isMobileOpen)}
+        className="fixed left-4 top-4 z-[60] rounded-xl border border-[#D8E6FF] bg-white p-2.5 text-[#3A66D3] shadow-lg transition-all active:scale-95 md:hidden"
       >
         {isMobileOpen ? <X size={22} /> : <Menu size={22} />}
       </button>
 
-      {/* Sidebar Container */}
-      <div className={`fixed top-0 left-0 h-screen w-64 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] text-slate-900 flex flex-col shadow-[0_24px_80px_rgba(15,23,42,0.08)] z-50 transition-transform duration-500 ease-in-out border-r border-slate-200/80 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        
-        {/* Header Section */}
-        <div className="p-8 flex items-center gap-4 bg-white/80 relative overflow-hidden flex-shrink-0 border-b border-slate-200/70 backdrop-blur-xl">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/8 blur-3xl pointer-events-none rounded-full"></div>
-          <div className="bg-emerald-600 p-2.5 rounded-2xl shadow-lg shadow-emerald-600/15 transition-transform hover:-translate-y-0.5">
-            <Hexagon className="text-slate-950 fill-slate-950/10" size={24} />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xl font-black tracking-tighter uppercase leading-none text-slate-900">
-              {branding?.name.split(' ')[0] || 'Nexus'}<span className="text-emerald-600">{branding?.name.split(' ')[1] || 'OS'}</span>
-            </span>
-            <div className="flex items-center gap-1.5 mt-1.5">
-               <div className="w-1.5 h-1.5 rounded-full bg-emerald-600"></div>
-               <span className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">Client Operations Workspace</span>
+      <div className={`fixed left-0 top-0 z-50 flex h-screen w-64 flex-col overflow-hidden border-r border-[#A8C7FF]/20 bg-[linear-gradient(180deg,#2E57C9_0%,#345FD5_36%,#27469E_100%)] text-white shadow-[0_18px_60px_rgba(28,54,141,0.28)] transition-transform duration-500 ease-in-out subpixel-antialiased ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="px-7 py-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-[1.85rem] font-black tracking-tight text-white">{branding?.name?.replace(' OS', '').replace('OS', '') || 'NexusOne'}</p>
             </div>
           </div>
         </div>
 
-        {/* Scrollable Nav Area */}
-        <nav className="flex-1 py-4 px-4 space-y-8 overflow-y-auto custom-scrollbar scroll-smooth">
-          
-          <SidebarSection label="Workspace">
-            <SidebarItem id={ViewMode.DASHBOARD} label="Home" icon={LayoutDashboard} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.STRATEGY_SANDBOX} label="Strategy Workspace" icon={Box} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.INBOX} label="Inbox" icon={Inbox} currentView={currentView} onViewChange={handleNav} badge={3} />
-            <SidebarItem id={ViewMode.SUPERVISOR_TRIAGE} label="Triage Hub" icon={ShieldAlert} currentView={currentView} onViewChange={handleNav} badge={triageCount || undefined} badgeColor="bg-red-600" />
-            <SidebarItem id={ViewMode.CALENDAR} label="Calendar" icon={Calendar} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.AUTOMATION} label="Automation" icon={Zap} currentView={currentView} onViewChange={handleNav} />
-          </SidebarSection>
-
-          <SidebarSection label="Client Growth">
-            <SidebarItem id={ViewMode.LEAD_SCOUT} label="Lead Scout" icon={Search} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.CRM} label="Pipeline" icon={Users} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.POWER_DIALER} label="Power Dialer" icon={Phone} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.SALES_TRAINER} label="Sales Coach" icon={BrainCircuit} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.MESSAGING_BRIDGE} label="Messaging" icon={Smartphone} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.MARKETING} label="Marketing" icon={Megaphone} currentView={currentView} onViewChange={handleNav} />
-          </SidebarSection>
-
-          <SidebarSection label="Funding Suite">
-            <SidebarItem id={ViewMode.PARTNER_MARKETPLACE} label="Marketplace" icon={Store} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.FORENSIC_HUB} label="Forensic Hub" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.WEALTH_MANAGER} label="Capital Planning" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.LENDER_ROOM} label="Lender Room" icon={Scale} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.SBA_PREP} label="SBA Prep" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.FUNDING_RESEARCH} label="Funding Research" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.RESEARCH_DASHBOARD} label="Research Dashboard" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.FUNDING_OUTCOMES} label="Funding Outcomes" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.GRANTS} label="Grants Engine" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.DOC_GENERATOR} label="Document Builder" icon={FileText} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.UPLOAD_CREDIT_REPORT} label="Credit Upload" icon={FileText} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.REVIEW_QUEUE} label="Review Queue" icon={Fingerprint} currentView={currentView} onViewChange={handleNav} badge={derivedPendingDocCount || undefined} badgeColor="bg-amber-600" />
-          </SidebarSection>
-
-          <SidebarSection label="Operations">
-            <SidebarItem id={ViewMode.KNOWLEDGE_HUB} label="Knowledge Hub" icon={Brain} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.SCENARIO_RUNNER} label="Scenario Runner" icon={FlaskConical} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.INFRA_MONITOR} label="Infrastructure" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.SITEMAP} label="Sitemap" icon={List} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.CHANNEL_MAPPER} label="Channel Mapper" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.CONTACT_MERGE} label="Contact Merge" icon={Users} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.MERGE_JOBS} label="Merge Jobs" icon={List} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.MERGE_QUEUE} label="Merge Queue" icon={List} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.TEAM_MEMBERS} label="Team Members" icon={Users} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.ON_CALL} label="On-Call" icon={Calendar} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.CHANNEL_POOLS} label="Channel Pools" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.DEAD_LETTERS} label="Dead Letters" icon={AlertCircle} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.ADMIN_HEALTH} label="Gateway Health" icon={Shield} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_AUTONOMY} label="Autonomy Dashboard" icon={BrainCircuit} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.SRE_DASHBOARD} label="SRE Dashboard" icon={Cpu} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.OUTBOX} label="Outbox" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.BILLING} label="Billing" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
-            <SidebarItem id={ViewMode.BILLING_COMMISSIONS} label="Commission Billing" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
-            {userRole === 'admin' && (
-              <>
-                <SidebarItem id={ViewMode.ADMIN_NEXUS_ONE} label="Nexus One" icon={Rocket} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_CREDENTIALS} label="Credentials" icon={KeyRound} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_CONTROL_PLANE} label="Control Plane" icon={ShieldAlert} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_SUBSCRIPTIONS} label="Subscriptions" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_CONSENTS} label="Consent Ledger" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_MAILING_QUEUE} label="Mailing Queue" icon={FileText} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_MAILING_DASHBOARD} label="Mailing Dashboard" icon={FileText} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_LEGAL_DOCS} label="Legal Publisher" icon={FileText} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_EMAIL_PROVIDERS} label="Email Providers" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_EMAIL_ROUTING} label="Email Routing" icon={MessageCircle} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_EMAIL_LOGS} label="Email Logs" icon={Inbox} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_EXECUTIVE_DASHBOARD} label="Executive Dashboard" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_DEAL_ESCALATIONS} label="Deal Escalations" icon={AlertCircle} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_LIFECYCLE_AUTOMATION} label="Lifecycle Automation" icon={AlertCircle} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_REVIEW_ANALYTICS} label="Review Analytics" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_RESEARCH_APPROVALS} label="Content Review" icon={ShieldCheck} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_FUNDING_CATALOG} label="Funding Catalog" icon={TrendingUp} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_GRANTS_CATALOG} label="Grants Catalog" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_GRANTS_TRACKING} label="Grants Tracking" icon={FileText} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_SBA} label="SBA Prep Admin" icon={Briefcase} currentView={currentView} onViewChange={handleNav} />
-                <SidebarItem id={ViewMode.ADMIN_COMMISSIONS} label="Commission Admin" icon={CreditCard} currentView={currentView} onViewChange={handleNav} />
-              </>
-            )}
-            <SidebarItem id={ViewMode.SETTINGS} label="Settings" icon={Settings} currentView={currentView} onViewChange={handleNav} />
-          </SidebarSection>
+        <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
+          {navSections.map((section) => (
+            <SidebarSection key={section.label} label={section.label}>
+              {section.items.map((item) => (
+                <SidebarItem
+                  key={item.label}
+                  id={item.view}
+                  label={item.label}
+                  icon={item.icon}
+                  currentView={currentView}
+                  onViewChange={handleNav}
+                  badge={item.badge}
+                />
+              ))}
+            </SidebarSection>
+          ))}
         </nav>
-        
-        {/* Sidebar Footer / Vitals */}
-        <div className="p-6 border-t border-slate-200/80 bg-white/70 backdrop-blur-xl space-y-6">
-          
-          {/* Social Bridge Mini-HUD */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Connected Channels</span>
-              <span className={`text-[8px] font-black uppercase ${disconnectedCount > 0 ? 'text-amber-500' : 'text-emerald-600'}`}>
-                {3 - disconnectedCount}/3 Sync
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              {corePlatforms.map((p) => {
-                const isConnected = socialStates.find(s => s.platform.toLowerCase() === p && s.connected);
-                return (
-                  <div 
-                    key={p} 
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${
-                      isConnected ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-400 grayscale'
-                    }`}
-                  >
-                    {getSocialIcon(p)}
-                  </div>
-                );
-              })}
-              {disconnectedCount > 0 && (
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center animate-pulse">
-                  <AlertCircle size={14} />
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Operational Progress */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest">
-              <span className="text-slate-400">System Status</span>
-              <span className="text-emerald-600">Stable</span>
-            </div>
-            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-              <div className="h-full bg-emerald-600 w-1/3"></div>
-            </div>
+        <div className="mt-auto px-5 py-6 text-white/75">
+          <div className="mb-4 flex items-center justify-between text-[0.72rem] font-black uppercase tracking-[0.18em]">
+            <span>NexusOne</span>
+            <span>Live</span>
           </div>
-
-          {/* Logout Action */}
-          <button 
-            onClick={onLogout} 
-            className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-red-600 transition-all w-full rounded-xl hover:bg-red-50 font-black text-[10px] uppercase tracking-widest group border border-transparent hover:border-red-200"
+          <button
+            onClick={onLogout}
+            className="flex w-full items-center gap-3 rounded-xl bg-white/10 px-4 py-3 text-left text-[0.72rem] font-black uppercase tracking-[0.18em] text-white transition-all hover:bg-white/16"
           >
-            <LogOut size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-            <span>Sign Out</span>
+            <LogOut size={16} />
+            Sign Out
           </button>
         </div>
       </div>
-      
-      {/* Overlay for mobile */}
-      {isMobileOpen && <div className="fixed inset-0 z-40 bg-slate-900/20 md:hidden backdrop-blur-sm transition-all" onClick={() => setIsMobileOpen(false)}></div>}
+
+      {isMobileOpen && <div className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm md:hidden" onClick={() => setIsMobileOpen(false)}></div>}
     </>
   );
 };
 
-const SidebarSection: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <section className="space-y-1.5">
-    <div className="px-3 mb-2 flex items-center justify-between">
-      <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.25em]">{label}</span>
-      <div className="h-px bg-slate-200 flex-1 ml-4 opacity-100"></div>
-    </div>
-    {children}
-  </section>
-);
+function SidebarSection(props: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <p className="px-4 text-[0.68rem] font-bold uppercase tracking-[0.22em] text-white/55">{props.label}</p>
+      <div className="space-y-1.5">{props.children}</div>
+    </section>
+  );
+}
 
 interface SidebarItemProps {
   id: ViewMode;
@@ -249,44 +300,34 @@ interface SidebarItemProps {
   currentView: ViewMode;
   onViewChange: (view: ViewMode) => void;
   badge?: number;
-  badgeColor?: string;
 }
 
-const SidebarItem: React.FC<SidebarItemProps> = ({ id, label, icon: Icon, currentView, onViewChange, badge, badgeColor = 'bg-blue-600' }) => {
+const SidebarItem: React.FC<SidebarItemProps> = ({ id, label, icon: Icon, currentView, onViewChange, badge }) => {
   const isActive = currentView === id;
 
   return (
-    <button 
+    <button
       onClick={() => onViewChange(id)}
-      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-300 group relative ${
-        isActive 
-          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm' 
-          : 'text-slate-700 hover:bg-white hover:text-slate-900 border border-transparent'
+      className={`group relative flex w-full items-center justify-between rounded-2xl px-4 py-3 transition-all duration-300 ${
+        isActive
+          ? 'bg-[linear-gradient(180deg,rgba(108,160,255,0.28),rgba(255,255,255,0.10))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_18px_40px_rgba(37,74,176,0.24)]'
+          : 'text-white/88 hover:bg-white/8'
       }`}
     >
-      {/* Active Indicator Bar */}
-      {isActive && <div className="absolute left-0 top-2.5 bottom-2.5 w-0.5 bg-emerald-600 rounded-full"></div>}
-
       <div className="flex items-center gap-3 overflow-hidden">
-        <div className={`flex-shrink-0 transition-all duration-500 ${isActive ? 'scale-110 rotate-0' : 'group-hover:scale-110 group-hover:-rotate-3'}`}>
-          <Icon 
-            size={18}
-            strokeWidth={isActive ? 2.5 : 2}
-            className={isActive ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-700 transition-colors'} 
-          />
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isActive ? 'bg-white/16' : 'bg-transparent'}`}>
+          <Icon size={18} className={isActive ? 'text-white' : 'text-white/88'} />
         </div>
-        <span className={`font-black text-[10px] uppercase tracking-wider truncate transition-all duration-300 ${isActive ? 'translate-x-1' : 'translate-x-0'}`}>
+        <span className="truncate text-sm font-bold tracking-tight">
           {label}
         </span>
       </div>
 
       {badge !== undefined ? (
-        <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-black min-w-[1.25rem] text-center shadow-sm ${isActive ? 'bg-emerald-600 text-white' : `${badgeColor} text-white`}`}>
+        <div className={`min-w-[1.45rem] rounded-full px-2 py-0.5 text-center text-[0.68rem] font-black ${isActive ? 'bg-white text-[#2C56C7]' : 'bg-white/18 text-white'}`}>
           {badge}
         </div>
-      ) : (
-        <ChevronRight size={12} className={`opacity-0 -translate-x-2 transition-all group-hover:opacity-50 group-hover:translate-x-0 ${isActive ? 'text-emerald-600' : 'text-slate-300'}`} />
-      )}
+      ) : null}
     </button>
   );
 };

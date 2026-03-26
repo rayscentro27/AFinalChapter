@@ -54,53 +54,53 @@ const UserHeader: React.FC = () => {
   if (!user) return null;
 
   return (
-    <header className="flex justify-between items-center px-6 py-3 bg-[#0B0C10] border-b border-[#66FCF1]/20 w-full animate-fade-in relative z-[100]">
-      <div className="flex items-center gap-6">
+    <header className="relative z-[100] flex items-center justify-between animate-fade-in subpixel-antialiased">
+      <div className="flex items-center gap-4">
         <div className="flex flex-col items-start">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-black text-[#66FCF1] uppercase tracking-wider">{user.email?.split('@')[0]}</span>
-            <span className="text-[8px] px-1.5 py-0.5 rounded bg-[#66FCF1]/10 text-[#66FCF1] border border-[#66FCF1]/30 font-black uppercase tracking-widest">
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-[#2E4A86]">{user.email?.split('@')[0]}</span>
+            <span className="rounded-full border border-[#D8E6FF] bg-[#F3F8FF] px-2 py-1 text-[8px] font-black uppercase tracking-[0.18em] text-[#4A6FC2]">
               {roleLabel(user.role)}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 mt-1">
-            <Shield size={10} className="text-slate-500" />
-            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Identity Link Verified</span>
+          <div className="mt-1 flex items-center gap-1.5">
+            <Shield size={10} className="text-[#7B90BE]" />
+            <span className="text-[8px] font-black uppercase tracking-[0.18em] leading-none text-[#7B90BE]">Identity Link Verified</span>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4">
         <NotificationBell />
 
-        <div className="h-8 w-px bg-white/10 mx-1"></div>
+        <div className="mx-1 h-8 w-px bg-[#DCE7FA]"></div>
 
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="flex items-center gap-3 group outline-none bg-white/5 hover:bg-white/10 px-3 py-2 rounded-2xl border border-white/5 transition-all"
+            className="group flex items-center gap-3 rounded-2xl border border-[#DCE7FA] bg-white px-3 py-2 outline-none transition-all hover:bg-[#F7FAFF]"
           >
-            <div className="w-8 h-8 rounded-xl bg-[#66FCF1] text-slate-950 flex items-center justify-center shadow-[0_0_15px_rgba(102,252,241,0.3)] transform group-hover:scale-105 transition-all">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#4C84F6,#5CCEC8)] text-white shadow-[0_10px_24px_rgba(80,128,233,0.22)] transition-all group-hover:scale-105">
               <UserIcon size={16} />
             </div>
             <div className="flex flex-col items-start">
-              <span className="text-[10px] font-black text-white uppercase tracking-tighter leading-none">Account</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.14em] leading-none text-[#22396F]">Account</span>
               <ChevronDown
                 size={10}
-                className={`text-[#66FCF1] transition-transform duration-300 mt-0.5 ${isMenuOpen ? 'rotate-180' : ''}`}
+                className={`mt-0.5 text-[#6A84BC] transition-transform duration-300 ${isMenuOpen ? 'rotate-180' : ''}`}
               />
             </div>
           </button>
 
           {isMenuOpen && (
-            <div className="absolute right-0 mt-3 w-64 bg-[#1F2833] rounded-2xl shadow-[0_30px_100px_rgba(0,0,0,0.8)] border border-[#66FCF1]/30 py-3 z-[200] animate-fade-in">
-              <div className="px-5 py-3 border-b border-white/5 mb-2">
-                <p className="text-[9px] font-black text-[#66FCF1] uppercase tracking-[0.2em] mb-1">Session Protocol</p>
-                <p className="text-xs font-bold text-white truncate">{user.email}</p>
+            <div className="absolute right-0 z-[200] mt-3 w-64 animate-fade-in rounded-2xl border border-[#DCE7FA] bg-white py-3 shadow-[0_24px_70px_rgba(36,58,114,0.16)]">
+              <div className="mb-2 border-b border-[#EEF3FB] px-5 py-3">
+                <p className="mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-[#6A84BC]">Session</p>
+                <p className="truncate text-xs font-bold text-[#203266]">{user.email}</p>
               </div>
 
               <button
-                className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-slate-300 hover:bg-[#66FCF1]/10 hover:text-[#66FCF1] transition-all text-left uppercase tracking-widest"
+                className="flex w-full items-center gap-3 px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[#526B9A] transition-all hover:bg-[#F4F8FF] hover:text-[#315FD0]"
                 onClick={() => {
                   setIsMenuOpen(false);
                   goToSettingsTab('general');
@@ -110,7 +110,7 @@ const UserHeader: React.FC = () => {
               </button>
 
               <button
-                className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-slate-300 hover:bg-[#66FCF1]/10 hover:text-[#66FCF1] transition-all text-left uppercase tracking-widest"
+                className="flex w-full items-center gap-3 px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.16em] text-[#526B9A] transition-all hover:bg-[#F4F8FF] hover:text-[#315FD0]"
                 onClick={() => {
                   setIsMenuOpen(false);
                   goToSettingsTab('connectivity');
@@ -119,13 +119,13 @@ const UserHeader: React.FC = () => {
                 <Settings size={16} /> OS Parameters
               </button>
 
-              <div className="h-px bg-white/5 my-2"></div>
+              <div className="my-2 h-px bg-[#EEF3FB]"></div>
 
               <button
                 onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-5 py-3 text-xs font-black uppercase tracking-widest text-red-400 hover:bg-red-400/10 transition-all text-left"
+                className="flex w-full items-center gap-3 px-5 py-3 text-left text-xs font-black uppercase tracking-[0.16em] text-red-500 transition-all hover:bg-red-50"
               >
-                <LogOut size={16} /> Terminate Session
+                <LogOut size={16} /> Sign Out
               </button>
             </div>
           )}

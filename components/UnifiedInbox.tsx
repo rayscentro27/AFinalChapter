@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Contact, InboxThread, UnifiedMessage, Message, InboxRouting, MessageAttachment } from '../types';
-import { MessageSquare, Archive, Send, Zap, Bot, Eye, Ghost, Sparkles, FileText, Route, Loader2, Paperclip, X } from 'lucide-react';
+import { MessageSquare, Archive, Send, Zap, Bot, Eye, Ghost, Sparkles, FileText, Route, Loader2, Paperclip, X, Building2, Phone, Mail, ShieldCheck } from 'lucide-react';
 import { sendInboxMessage, SendProvider } from '../lib/inboxSendClient';
 import { claimConversation } from '../lib/claimConversation';
 import { supabase } from '../lib/supabaseClient';
@@ -1058,12 +1058,15 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
   ]);
 
   return (
-    <div className="flex h-[calc(100vh-100px)] bg-slate-50 animate-fade-in overflow-hidden rounded-[3rem] border border-slate-200 shadow-2xl">
-      <div className="w-96 border-r border-slate-200 bg-white flex flex-col flex-shrink-0">
-        <div className="p-8 border-b border-slate-100">
+    <div className="flex h-[calc(100vh-100px)] animate-fade-in overflow-hidden rounded-[2.6rem] border border-[#DDE7F4] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] shadow-[0_24px_72px_rgba(36,58,114,0.08)]">
+      <div className="w-[360px] border-r border-[#E7EDF7] bg-white flex flex-col flex-shrink-0">
+        <div className="p-8 border-b border-[#EEF2FA] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)]">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Neural Inbox</h2>
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><MessageSquare size={20} /></div>
+            <div>
+              <p className="text-[0.72rem] font-black uppercase tracking-[0.22em] text-[#607CC1]">Inbox workspace</p>
+              <h2 className="mt-2 text-[2rem] font-black tracking-tight text-[#17233D]">Messaging Center</h2>
+            </div>
+            <div className="p-2 bg-[#EEF4FF] text-[#4677E6] rounded-xl"><MessageSquare size={20} /></div>
           </div>
           <div className="mb-4">
             <InboxFiltersBar
@@ -1095,22 +1098,23 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
               <div
                 key={thread.id}
                 onClick={() => handleSelectThread(thread)}
-                className={`p-6 border-b border-slate-50 cursor-pointer transition-all relative group ${selectedThreadId === thread.id ? 'bg-blue-50/50 border-l-4 border-l-indigo-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
+                className={`relative m-3 rounded-[1.5rem] border cursor-pointer transition-all group ${selectedThreadId === thread.id ? 'border-[#CFE0FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F4F8FF_100%)] shadow-[0_16px_32px_rgba(70,119,230,0.10)]' : 'border-[#EEF2FA] bg-white hover:border-[#D7E3F5] hover:bg-[#FBFDFF]'}`}
               >
-                <div className="flex justify-between items-start mb-2">
+                <div className="flex justify-between items-start p-4 pb-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xs shadow-lg transform rotate-3 group-hover:rotate-0 transition-transform">{thread.contactAvatar}</div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,#315FD0,#72A3FF)] text-xs font-black text-white shadow-[0_12px_24px_rgba(49,95,208,0.20)] transition-transform group-hover:scale-105">{thread.contactAvatar}</div>
                     <div>
-                      <span className="font-black text-sm uppercase text-slate-900 truncate block max-w-[120px]">{thread.contactName}</span>
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{thread.channel}</span>
+                      <span className="font-black text-sm text-[#17233D] truncate block max-w-[160px]">{thread.contactName}</span>
+                      <span className="text-[10px] font-semibold text-[#91A1BC]">{contactsById.get(thread.contactId)?.company || thread.channel}</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap mb-1">{thread.lastMessage.timestamp}</span>
-                    {unreadCount > 0 && <span className="bg-red-500 text-white w-4 h-4 rounded-full text-[8px] font-black flex items-center justify-center animate-bounce">{unreadCount}</span>}
+                    <span className="text-[10px] font-black text-[#9AA9C3] whitespace-nowrap mb-1">{thread.lastMessage.timestamp}</span>
+                    {unreadCount > 0 && <span className="bg-[#4A83F4] text-white min-w-5 h-5 rounded-full px-1 text-[8px] font-black flex items-center justify-center">{unreadCount}</span>}
                   </div>
                 </div>
-                <p className="text-xs text-slate-500 line-clamp-1 font-medium italic">"{thread.lastMessage.content}"</p>
+                <div className="px-4 pb-4">
+                  <p className="text-sm text-[#5E7096] line-clamp-2 font-medium">{thread.lastMessage.content}</p>
                 {threadSla ? (
                   <SlaBadges
                     conversation={threadSla}
@@ -1121,8 +1125,8 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                     emphasizePending={true}
                   />
                 ) : null}
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#9AA9C3]">
                     {threadAssignment?.assignee_type === 'ai' ? 'AI Assigned' : threadAssignment?.assignee_user_id ? 'Agent Assigned' : 'Unassigned'}
                   </span>
                   <button
@@ -1131,7 +1135,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                       void handleClaimThread(thread);
                     }}
                     disabled={!canClaim}
-                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-40"
+                    className="rounded-lg border border-[#D5E4FF] bg-[#EEF4FF] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#4677E6] disabled:opacity-40"
                   >
                     Claim
                   </button>
@@ -1146,6 +1150,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                     <MessageSquare size={10} /> Internal Guidance
                   </div>
                 ) : null}
+                </div>
               </div>
             );
           })}
@@ -1159,14 +1164,17 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
       </div>
 
       {selectedThread ? (
-        <div className="flex-1 flex flex-col min-w-0 bg-white relative">
-          <div className="h-24 border-b border-slate-200 flex justify-between items-center px-10 bg-white/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
+        <div className="flex-1 min-w-0 bg-white relative">
+          <div className="flex h-full min-w-0">
+            <div className="flex min-w-0 flex-1 flex-col border-r border-[#E7EDF7]">
+          <div className="min-h-24 border-b border-[#E7EDF7] flex justify-between items-center px-8 py-5 bg-white/90 backdrop-blur-md sticky top-0 z-10 shrink-0">
             <div className="flex items-center gap-5">
-              <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-sm uppercase shadow-2xl transform rotate-3">{selectedThread.contactAvatar}</div>
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,#315FD0,#72A3FF)] text-sm font-black uppercase text-white shadow-[0_14px_28px_rgba(49,95,208,0.22)]">{selectedThread.contactAvatar}</div>
               <div>
-                <h3 className="font-black text-xl uppercase tracking-tighter text-slate-900">{selectedThread.contactName}</h3>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Session: Active</span>
+                <h3 className="font-black text-[1.8rem] tracking-tight text-[#17233D]">{selectedThread.contactName}</h3>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm font-semibold text-[#5E7096]">{selectedContact?.company || 'Client account'}</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Since 2023</span>
                   <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
                     {selectedAssignmentLabel}
                   </span>
@@ -1193,58 +1201,31 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
               <div className="h-8 w-px bg-slate-100 mx-2"></div>
               <button
                 onClick={() => onUpdateContact?.({ ...contacts.find((c) => c.id === selectedThread.contactId)!, aiReason: 'Intervened by human admin' })}
-                className="bg-slate-950 text-white px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 transition-all shadow-xl active:scale-95"
+                className="rounded-xl bg-[linear-gradient(135deg,#2E58E6,#4D8BFF)] px-6 py-2.5 text-[10px] font-black uppercase tracking-widest text-white transition-all shadow-[0_14px_28px_rgba(46,88,230,0.22)] active:scale-95 hover:brightness-105"
               >
                 Take Control
               </button>
             </div>
           </div>
 
-          {selectedTenantId && selectedConversationId ? (
-            <div className="px-10 pb-3 pt-4 border-b border-slate-100 bg-white space-y-3">
-              <TagsPanel
-                tenantId={selectedTenantId}
-                conversationId={selectedConversationId}
-                tags={selectedConversationTags}
-                onUpdated={(nextTags) => {
-                  setConversationTags((prev) => {
-                    if (!selectedConversationId) return prev;
-                    return {
-                      ...prev,
-                      [selectedConversationId]: nextTags,
-                    };
-                  });
-                }}
-                enableRoutingButton={true}
-                autoRunRoutingOnUpdate={true}
-              />
-            </div>
-          ) : null}
-
-          {selectedTenantId && selectedConversationId ? (
-            <div className="px-10 pb-3 bg-white">
-              <AuditTimeline tenantId={selectedTenantId} conversationId={selectedConversationId} />
-            </div>
-          ) : null}
-
-          <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50/30 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-[linear-gradient(180deg,#F9FBFF_0%,#F3F7FF_100%)] custom-scrollbar">
             {selectedThread.messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.sender === 'client' ? 'justify-start' : 'justify-end'}`}>
-                <div className={`max-w-[70%] p-6 rounded-[2.5rem] text-sm font-medium leading-relaxed shadow-sm relative animate-fade-in ${
-                  msg.sender !== 'client' ? 'bg-slate-900 text-white rounded-br-none' : 'bg-white border border-slate-200 text-slate-700 rounded-bl-none shadow-slate-100'
+                <div className={`relative max-w-[72%] animate-fade-in rounded-[2rem] p-5 text-[1.02rem] font-medium leading-relaxed shadow-sm ${
+                  msg.sender !== 'client' ? 'rounded-br-[0.6rem] border border-[#DCE7FA] bg-[linear-gradient(180deg,#F2F6FF_0%,#EAF1FF_100%)] text-[#203266]' : 'rounded-bl-[0.6rem] bg-white border border-[#E7EDF7] text-slate-700 shadow-slate-100'
                 }`}>
                   {msg.sender === 'bot' && (
-                    <div className="flex items-center gap-1.5 text-[8px] font-black uppercase text-indigo-400 mb-3 border-b border-white/10 pb-2"><Bot size={12} /> Nexus Autonomous Proxy</div>
+                    <div className="mb-3 flex items-center gap-1.5 border-b border-[#DCE7FA] pb-2 text-[8px] font-black uppercase text-[#4A7AE8]"><Bot size={12} /> Nexus Autonomous Proxy</div>
                   )}
                   {(msg.messageType || msg.internalOnly) && msg.sender !== 'client' ? (
-                    <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-white/10 pb-2 text-[9px] font-black uppercase tracking-widest text-slate-300">
+                    <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-[#DCE7FA] pb-2 text-[9px] font-black uppercase tracking-widest text-[#6B82AE]">
                       <span>{msg.messageType ? String(msg.messageType).replace(/_/g, ' ') : 'system update'}</span>
-                      {msg.priority ? <span className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-white/90">{msg.priority}</span> : null}
-                      {msg.relatedStage ? <span className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-white/90">{String(msg.relatedStage).replace(/_/g, ' ')}</span> : null}
+                      {msg.priority ? <span className="rounded-full border border-[#D6E5FF] bg-white px-2 py-0.5 text-[#315FD0]">{msg.priority}</span> : null}
+                      {msg.relatedStage ? <span className="rounded-full border border-[#D6E5FF] bg-white px-2 py-0.5 text-[#315FD0]">{String(msg.relatedStage).replace(/_/g, ' ')}</span> : null}
                     </div>
                   ) : null}
                   <p className="whitespace-pre-wrap">{msg.content}</p>
-                  {msg.actionRequired?.reason ? <p className="mt-3 text-xs text-white/70">Why this exists: {String(msg.actionRequired.reason)}</p> : null}
+                  {msg.actionRequired?.reason ? <p className="mt-3 text-xs text-[#6B82AE]">Why this exists: {String(msg.actionRequired.reason)}</p> : null}
                   {Array.isArray(msg.attachments) && msg.attachments.length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {msg.attachments.map((attachment, index) => {
@@ -1257,7 +1238,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                             disabled={!canOpen || openingAttachmentId === attachment.attachmentId}
                             className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 ${
                               msg.sender !== 'client'
-                                ? 'border-white/20 bg-white/10 text-white'
+                                ? 'border-[#D6E5FF] bg-white text-[#315FD0]'
                                 : 'border-slate-200 bg-slate-100 text-slate-700'
                             }`}
                           >
@@ -1268,7 +1249,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                       })}
                     </div>
                   ) : null}
-                  <div className={`text-[9px] mt-4 font-black uppercase opacity-50 text-right ${msg.sender !== 'client' ? 'text-slate-300' : 'text-slate-400'}`}>
+                  <div className={`mt-4 text-[10px] font-black opacity-50 text-right ${msg.sender !== 'client' ? 'text-[#6B82AE]' : 'text-slate-400'}`}>
                     {msg.timestamp}{msg.deliveryStatus ? ` • ${msg.deliveryStatus}` : ''}
                   </div>
                   {msg.sender !== 'client' && String(msg.deliveryStatus || '').toLowerCase() === 'failed' ? (
@@ -1276,7 +1257,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                       <button
                         onClick={() => void retryFailedMessage(msg)}
                         disabled={isSending}
-                        className="rounded-lg border border-white/20 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white/90 disabled:opacity-40"
+                        className="rounded-lg border border-[#D6E5FF] px-2 py-1 text-[9px] font-black uppercase tracking-widest text-[#315FD0] disabled:opacity-40"
                       >
                         Retry
                       </button>
@@ -1288,124 +1269,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-8 bg-white border-t border-slate-100 shadow-2xl">
-            {selectedTenantId && selectedConversationId ? (
-              <div className="mb-4">
-                <QuickActionsBar
-                  tenantId={selectedTenantId}
-                  conversation={{
-                    id: selectedConversationId,
-                    tags: selectedConversationTags,
-                    status: selectedConversationStatus,
-                    priority: selectedConversationPriority,
-                    assignee_type: selectedConversationAssignment?.assignee_type || null,
-                    assignee_user_id: selectedConversationAssignment?.assignee_user_id || null,
-                    assignee_ai_key: selectedConversationAssignment?.assignee_ai_key || null,
-                  }}
-                  onUpdated={(updated) => {
-                    if (!selectedConversationId) return;
-
-                    if (Array.isArray(updated.tags)) {
-                      setConversationTags((prev) => ({
-                        ...prev,
-                        [selectedConversationId]: updated.tags as string[],
-                      }));
-                    }
-
-                    setConversationAssignments((prev) => ({
-                      ...prev,
-                      [selectedConversationId]: {
-                        id: selectedConversationId,
-                        assignee_type: (updated.assignee_type as 'contact' | 'agent' | 'ai' | null) || null,
-                        assignee_user_id: (updated.assignee_user_id as string | null) || null,
-                        assignee_ai_key: (updated.assignee_ai_key as string | null) || null,
-                      },
-                    }));
-
-                    if (updated.status) {
-                      setConversationStatuses((prev) => ({
-                        ...prev,
-                        [selectedConversationId]: String(updated.status),
-                      }));
-                    }
-
-                    if (typeof updated.priority === 'number') {
-                      setConversationPriorities((prev) => ({
-                        ...prev,
-                        [selectedConversationId]: Number(updated.priority),
-                      }));
-                    }
-                  }}
-                />
-              </div>
-            ) : null}
-            {selectedTenantId && selectedConversationId ? (
-              <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => void requestAiSuggestions()}
-                    disabled={aiSuggestionsLoading}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
-                  >
-                    {aiSuggestionsLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                    Suggest Reply
-                  </button>
-                  <button
-                    onClick={() => void requestThreadSummary()}
-                    disabled={summaryLoading}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
-                  >
-                    {summaryLoading ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
-                    Summarize
-                  </button>
-                  <button
-                    onClick={() => void requestRoutingRecommendation()}
-                    disabled={routingLoading}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
-                  >
-                    {routingLoading ? <Loader2 size={12} className="animate-spin" /> : <Route size={12} />}
-                    Route Suggestion
-                  </button>
-                </div>
-
-                {aiSuggestionsError ? <p className="text-[11px] font-bold text-amber-700">{aiSuggestionsError}</p> : null}
-                {summaryError ? <p className="text-[11px] font-bold text-amber-700">{summaryError}</p> : null}
-                {routingError ? <p className="text-[11px] font-bold text-amber-700">{routingError}</p> : null}
-
-                {aiSuggestions.length > 0 ? (
-                  <div className="mb-2 flex flex-wrap gap-2">
-                    {aiSuggestions.map((suggestion, index) => (
-                      <button
-                        key={selectedConversationId + '-suggestion-' + index}
-                        onClick={() => setInputText(suggestion)}
-                        className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1.5 text-left text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                {selectedSummary ? (
-                  <div className="mb-2 rounded-lg border border-slate-200 bg-white p-2">
-                    <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-500">Thread Summary</p>
-                    <p className="whitespace-pre-wrap text-[11px] font-medium text-slate-700">{selectedSummary}</p>
-                  </div>
-                ) : null}
-
-                {selectedRoutingRecommendation ? (
-                  <div className="rounded-lg border border-slate-200 bg-white p-2">
-                    <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-500">Routing Recommendation</p>
-                    <p className="text-[11px] font-semibold text-slate-700">
-                      Queue: {selectedRoutingRecommendation.recommended_queue} · Priority: {selectedRoutingRecommendation.priority} · Confidence: {selectedRoutingRecommendation.confidence}%
-                    </p>
-                    <p className="mt-1 text-[11px] font-medium text-slate-600">Reason: {selectedRoutingRecommendation.reason}</p>
-                    <p className="mt-1 text-[11px] font-medium text-slate-600">Next: {selectedRoutingRecommendation.next_action}</p>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
+          <div className="p-6 bg-white border-t border-[#E7EDF7] shadow-[0_-18px_44px_rgba(36,58,114,0.05)]">
             <div className="mb-3 flex items-center justify-between gap-3">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                 Sending via: {channelPreference === 'auto' ? `Auto${selectedRouting?.provider ? ` (${selectedRouting.provider})` : ''}` : channelPreference}
@@ -1473,14 +1337,14 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(inputText)}
-                  placeholder="Type an intervention message or send attachments..."
+                  placeholder="Write a message..."
                   disabled={isSending || attachmentsBusy}
-                  className="w-full pl-6 pr-16 py-5 bg-slate-100 border-none rounded-[2rem] text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none shadow-inner disabled:opacity-60"
+                  className="w-full pl-6 pr-16 py-5 bg-[#F5F8FD] border border-[#E4ECF8] rounded-[1.7rem] text-sm font-semibold focus:ring-2 focus:ring-indigo-500 transition-all outline-none shadow-inner disabled:opacity-60"
                 />
                 <button
                   onClick={() => handleSendMessage(inputText)}
                   disabled={isSending || attachmentsBusy || (!String(inputText || '').trim() && pendingAttachments.length === 0)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all shadow-xl active:scale-95 disabled:opacity-60"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-[#4677E6] text-white rounded-2xl hover:bg-[#315FD0] transition-all shadow-xl active:scale-95 disabled:opacity-60"
                 >
                   <Send size={20} />
                 </button>
@@ -1494,6 +1358,188 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                 {!isSending && sendError && <span className="text-amber-700">{sendError}</span>}
               </div>
             )}
+          </div>
+            </div>
+
+            <aside className="hidden w-[360px] flex-shrink-0 bg-[linear-gradient(180deg,#FBFDFF_0%,#F4F8FF_100%)] xl:flex xl:flex-col">
+              <div className="flex-1 space-y-4 overflow-y-auto p-5 custom-scrollbar">
+                <div className="rounded-[1.7rem] border border-[#E4ECF8] bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#91A1BC]">Client profile</p>
+                      <h4 className="mt-2 text-lg font-black tracking-tight text-[#17233D]">{selectedThread.contactName}</h4>
+                      <p className="mt-1 text-sm font-semibold text-[#5E7096]">{selectedContact?.company || 'Client account'}</p>
+                    </div>
+                    <span className="rounded-full border border-[#D5E4FF] bg-[#EEF4FF] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#4677E6]">
+                      {selectedConversationStatus || 'active'}
+                    </span>
+                  </div>
+                  <div className="mt-4 space-y-3 text-sm text-[#5E7096]">
+                    <div className="flex items-center gap-2"><Building2 size={15} className="text-[#4677E6]" /> {selectedContact?.company || 'No company on file'}</div>
+                    <div className="flex items-center gap-2"><Phone size={15} className="text-[#4677E6]" /> {selectedContact?.phone || 'No phone on file'}</div>
+                    <div className="flex items-center gap-2"><Mail size={15} className="text-[#4677E6]" /> {selectedContact?.email || 'No email on file'}</div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Priority</p>
+                      <p className="mt-2 text-base font-black tracking-tight text-[#17233D]">P{selectedConversationPriority || 0}</p>
+                    </div>
+                    <div className="rounded-2xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Protection</p>
+                      <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-black text-[#178D5B]"><ShieldCheck size={14} /> Verified</p>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedTenantId && selectedConversationId ? (
+                  <div className="rounded-[1.7rem] border border-[#E4ECF8] bg-white p-4 shadow-sm">
+                    <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#91A1BC]">Tags and routing</p>
+                    <TagsPanel
+                      tenantId={selectedTenantId}
+                      conversationId={selectedConversationId}
+                      tags={selectedConversationTags}
+                      onUpdated={(nextTags) => {
+                        setConversationTags((prev) => {
+                          if (!selectedConversationId) return prev;
+                          return {
+                            ...prev,
+                            [selectedConversationId]: nextTags,
+                          };
+                        });
+                      }}
+                      enableRoutingButton={true}
+                      autoRunRoutingOnUpdate={true}
+                    />
+                  </div>
+                ) : null}
+
+                {selectedTenantId && selectedConversationId ? (
+                  <div className="rounded-[1.7rem] border border-[#E4ECF8] bg-white p-4 shadow-sm">
+                    <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#91A1BC]">Actions</p>
+                    <QuickActionsBar
+                      tenantId={selectedTenantId}
+                      conversation={{
+                        id: selectedConversationId,
+                        tags: selectedConversationTags,
+                        status: selectedConversationStatus,
+                        priority: selectedConversationPriority,
+                        assignee_type: selectedConversationAssignment?.assignee_type || null,
+                        assignee_user_id: selectedConversationAssignment?.assignee_user_id || null,
+                        assignee_ai_key: selectedConversationAssignment?.assignee_ai_key || null,
+                      }}
+                      onUpdated={(updated) => {
+                        if (!selectedConversationId) return;
+
+                        if (Array.isArray(updated.tags)) {
+                          setConversationTags((prev) => ({
+                            ...prev,
+                            [selectedConversationId]: updated.tags as string[],
+                          }));
+                        }
+
+                        setConversationAssignments((prev) => ({
+                          ...prev,
+                          [selectedConversationId]: {
+                            id: selectedConversationId,
+                            assignee_type: (updated.assignee_type as 'contact' | 'agent' | 'ai' | null) || null,
+                            assignee_user_id: (updated.assignee_user_id as string | null) || null,
+                            assignee_ai_key: (updated.assignee_ai_key as string | null) || null,
+                          },
+                        }));
+
+                        if (updated.status) {
+                          setConversationStatuses((prev) => ({
+                            ...prev,
+                            [selectedConversationId]: String(updated.status),
+                          }));
+                        }
+
+                        if (typeof updated.priority === 'number') {
+                          setConversationPriorities((prev) => ({
+                            ...prev,
+                            [selectedConversationId]: Number(updated.priority),
+                          }));
+                        }
+                      }}
+                    />
+                  </div>
+                ) : null}
+
+                {selectedTenantId && selectedConversationId ? (
+                  <div className="rounded-[1.7rem] border border-[#E4ECF8] bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => void requestAiSuggestions()}
+                        disabled={aiSuggestionsLoading}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
+                      >
+                        {aiSuggestionsLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                        Suggest Reply
+                      </button>
+                      <button
+                        onClick={() => void requestThreadSummary()}
+                        disabled={summaryLoading}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
+                      >
+                        {summaryLoading ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
+                        Summarize
+                      </button>
+                      <button
+                        onClick={() => void requestRoutingRecommendation()}
+                        disabled={routingLoading}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 disabled:opacity-50"
+                      >
+                        {routingLoading ? <Loader2 size={12} className="animate-spin" /> : <Route size={12} />}
+                        Route Suggestion
+                      </button>
+                    </div>
+
+                    {aiSuggestionsError ? <p className="text-[11px] font-bold text-amber-700">{aiSuggestionsError}</p> : null}
+                    {summaryError ? <p className="text-[11px] font-bold text-amber-700">{summaryError}</p> : null}
+                    {routingError ? <p className="text-[11px] font-bold text-amber-700">{routingError}</p> : null}
+
+                    {aiSuggestions.length > 0 ? (
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {aiSuggestions.map((suggestion, index) => (
+                          <button
+                            key={selectedConversationId + '-suggestion-' + index}
+                            onClick={() => setInputText(suggestion)}
+                            className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1.5 text-left text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {selectedSummary ? (
+                      <div className="mb-3 rounded-2xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                        <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-500">Thread Summary</p>
+                        <p className="whitespace-pre-wrap text-[11px] font-medium text-slate-700">{selectedSummary}</p>
+                      </div>
+                    ) : null}
+
+                    {selectedRoutingRecommendation ? (
+                      <div className="rounded-2xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                        <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-500">Routing Recommendation</p>
+                        <p className="text-[11px] font-semibold text-slate-700">
+                          Queue: {selectedRoutingRecommendation.recommended_queue} · Priority: {selectedRoutingRecommendation.priority} · Confidence: {selectedRoutingRecommendation.confidence}%
+                        </p>
+                        <p className="mt-1 text-[11px] font-medium text-slate-600">Reason: {selectedRoutingRecommendation.reason}</p>
+                        <p className="mt-1 text-[11px] font-medium text-slate-600">Next: {selectedRoutingRecommendation.next_action}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {selectedTenantId && selectedConversationId ? (
+                  <div className="rounded-[1.7rem] border border-[#E4ECF8] bg-white p-4 shadow-sm">
+                    <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#91A1BC]">Activity timeline</p>
+                    <AuditTimeline tenantId={selectedTenantId} conversationId={selectedConversationId} />
+                  </div>
+                ) : null}
+              </div>
+            </aside>
           </div>
         </div>
       ) : (

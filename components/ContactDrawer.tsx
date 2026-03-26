@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Building2, Mail, MessageSquare, Phone, ShieldCheck, X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 type ContactRow = {
@@ -283,62 +284,80 @@ export default function ContactDrawer({ tenantId, conversationId, open, onClose 
 
   return (
     <>
-      {open ? <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} /> : null}
+      {open ? <div className="fixed inset-0 z-40 bg-[#203266]/18 backdrop-blur-md" onClick={onClose} /> : null}
       <aside
-        className={`fixed top-0 right-0 z-50 h-full w-full max-w-xl bg-slate-950 border-l border-white/10 shadow-2xl transform transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed top-0 right-0 z-50 h-full w-full max-w-xl border-l border-[#DCE7FA] bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] shadow-[0_24px_64px_rgba(41,72,138,0.16)] transform transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         <div className="h-full flex flex-col">
-          <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+          <div className="px-6 py-5 border-b border-[#E4ECF8] flex items-center justify-between bg-white/80 backdrop-blur-md">
             <div>
-              <h2 className="text-lg font-black uppercase tracking-widest text-slate-100">Contact</h2>
-              <div className="text-xs text-slate-400 mt-1">Conversation-linked identity and timeline</div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6C82AE]">Identity workspace</p>
+              <h2 className="mt-2 text-[1.75rem] font-black tracking-tight text-[#203266]">Contact Detail</h2>
+              <div className="text-xs text-[#6C82AE] mt-1">Conversation-linked identity, timeline, and relationship record</div>
             </div>
             <button
               onClick={onClose}
-              className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-black uppercase tracking-widest text-slate-200"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#F4F8FF] hover:bg-white text-xs font-black uppercase tracking-widest text-[#315FD0] border border-[#DCE7FA]"
             >
-              Close
+              <X size={14} /> Close
             </button>
           </div>
 
           <div className="flex-1 overflow-auto p-6 space-y-5">
-            {loading ? <div className="text-sm text-slate-400">Loading contact data...</div> : null}
-            {error ? <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</div> : null}
-            {success ? <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">{success}</div> : null}
+            {loading ? <div className="text-sm text-slate-500">Loading contact data...</div> : null}
+            {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+            {success ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</div> : null}
 
             {!loading && !contactId ? (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 This conversation has no linked contact yet.
               </div>
             ) : null}
 
-            <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-xs font-black uppercase tracking-widest text-slate-400">Contact Profile</div>
+            <section className="rounded-2xl border border-[#E4ECF8] bg-white/90 p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-widest text-[#6C82AE]">Contact Profile</div>
+                  <p className="mt-2 text-lg font-black tracking-tight text-[#203266]">{contact?.display_name || 'Unresolved contact'}</p>
+                </div>
+                <span className="rounded-full border border-[#D5E4FF] bg-[#EEF4FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#315FD0]">
+                  {identities.length} identities
+                </span>
+              </div>
               {contact ? (
-                <div className="mt-3 space-y-2 text-sm text-slate-200">
-                  <div><span className="text-slate-400">Name:</span> {contact.display_name || 'n/a'}</div>
-                  <div><span className="text-slate-400">Email:</span> {contact.primary_email || 'n/a'}</div>
-                  <div><span className="text-slate-400">Phone:</span> {contact.primary_phone || 'n/a'}</div>
-                  <div className="font-mono text-xs text-slate-400 break-all">{contact.id}</div>
-                  {contact.notes ? <div className="text-xs text-slate-400">{contact.notes}</div> : null}
+                <div className="mt-4 grid gap-3 text-sm text-[#203266] sm:grid-cols-2">
+                  <div className="rounded-[1.15rem] border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                    <div className="inline-flex items-center gap-2 text-[#6C82AE]"><Mail size={14} /> Email</div>
+                    <div className="mt-2 font-semibold text-[#203266]">{contact.primary_email || 'n/a'}</div>
+                  </div>
+                  <div className="rounded-[1.15rem] border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                    <div className="inline-flex items-center gap-2 text-[#6C82AE]"><Phone size={14} /> Phone</div>
+                    <div className="mt-2 font-semibold text-[#203266]">{contact.primary_phone || 'n/a'}</div>
+                  </div>
+                  <div className="rounded-[1.15rem] border border-[#EEF2FA] bg-[#FBFDFF] p-3 sm:col-span-2">
+                    <div className="inline-flex items-center gap-2 text-[#6C82AE]"><Building2 size={14} /> Contact record</div>
+                    <div className="mt-2 font-mono text-xs text-[#6C82AE] break-all">{contact.id}</div>
+                  </div>
+                  <div className="font-mono text-xs text-[#6C82AE] break-all">{contact.id}</div>
+                  {contact.notes ? <div className="text-xs text-[#6C82AE] sm:col-span-2">{contact.notes}</div> : null}
                 </div>
               ) : (
                 <div className="mt-2 text-sm text-slate-500">No contact row loaded.</div>
               )}
             </section>
 
-            <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <section className="rounded-2xl border border-[#E4ECF8] bg-white/90 p-4 shadow-sm">
               <div className="flex items-center justify-between gap-2">
-                <div className="text-xs font-black uppercase tracking-widest text-slate-400">Conversations</div>
-                <div className="text-xs text-slate-500">active {activeConversationCount} / total {conversations.length}</div>
+                <div className="text-xs font-black uppercase tracking-widest text-[#6C82AE]">Conversations</div>
+                <div className="rounded-full border border-[#E4ECF8] bg-[#F8FBFF] px-3 py-1 text-xs text-slate-500">active {activeConversationCount} / total {conversations.length}</div>
               </div>
               {conversations.length === 0 ? (
                 <div className="mt-2 text-sm text-slate-500">No conversations linked to this contact.</div>
               ) : (
                 <div className="mt-3 space-y-2 max-h-40 overflow-auto pr-1">
                   {conversations.map((row) => (
-                    <div key={row.id} className="rounded-lg border border-white/10 bg-black/30 p-2 text-xs">
-                      <div className="font-mono text-slate-300 break-all">{row.id}</div>
+                    <div key={row.id} className="rounded-xl border border-[#E4ECF8] bg-[#F8FBFF] p-3 text-xs">
+                      <div className="font-mono text-[#315FD0] break-all">{row.id}</div>
                       <div className="text-slate-500 mt-1">status {row.status || 'n/a'} • last {fmtDate(row.last_message_at || row.updated_at)}</div>
                     </div>
                   ))}
@@ -346,16 +365,19 @@ export default function ContactDrawer({ tenantId, conversationId, open, onClose 
               )}
             </section>
 
-            <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-xs font-black uppercase tracking-widest text-slate-400">Identities</div>
+            <section className="rounded-2xl border border-[#E4ECF8] bg-white/90 p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-black uppercase tracking-widest text-[#6C82AE]">Identities</div>
+                <div className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#178D5B]"><ShieldCheck size={12} /> Verified mapping</div>
+              </div>
               {identities.length === 0 ? (
                 <div className="mt-2 text-sm text-slate-500">No identities found.</div>
               ) : (
                 <div className="mt-3 space-y-2 max-h-48 overflow-auto pr-1">
                   {identities.map((row) => (
-                    <div key={row.id} className="rounded-lg border border-white/10 bg-black/30 p-2 text-xs">
-                      <div className="font-mono text-slate-200">{row.provider}:{row.identity_type}</div>
-                      <div className="font-mono text-slate-300 break-all">{row.identity_value}</div>
+                    <div key={row.id} className="rounded-xl border border-[#E4ECF8] bg-[#F8FBFF] p-3 text-xs">
+                      <div className="font-mono text-[#203266]">{row.provider}:{row.identity_type}</div>
+                      <div className="font-mono text-[#315FD0] break-all">{row.identity_value}</div>
                       <div className="text-slate-500 mt-1">
                         verified {row.verified ? 'true' : 'false'} • confidence {row.confidence} • primary {row.is_primary ? 'true' : 'false'}
                       </div>
@@ -365,21 +387,24 @@ export default function ContactDrawer({ tenantId, conversationId, open, onClose 
               )}
             </section>
 
-            <section className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
-              <div className="text-xs font-black uppercase tracking-widest text-slate-400">Link Identity</div>
+            <section className="rounded-2xl border border-[#E4ECF8] bg-white/90 p-4 space-y-3 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-black uppercase tracking-widest text-[#6C82AE]">Link Identity</div>
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#4677E6]"><MessageSquare size={12} /> Routing-safe</span>
+              </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <input
                   value={form.provider}
                   onChange={(e) => setForm((prev) => ({ ...prev, provider: e.target.value }))}
                   placeholder="provider"
-                  className="rounded-lg bg-black/30 border border-white/10 px-2 py-2 text-sm"
+                  className="rounded-xl bg-[#F8FBFF] border border-slate-200 px-3 py-2.5 text-sm text-[#203266]"
                 />
                 <input
                   value={form.identity_type}
                   onChange={(e) => setForm((prev) => ({ ...prev, identity_type: e.target.value }))}
                   placeholder="identity type"
-                  className="rounded-lg bg-black/30 border border-white/10 px-2 py-2 text-sm"
+                  className="rounded-xl bg-[#F8FBFF] border border-slate-200 px-3 py-2.5 text-sm text-[#203266]"
                 />
               </div>
 
@@ -387,18 +412,18 @@ export default function ContactDrawer({ tenantId, conversationId, open, onClose 
                 value={form.identity_value}
                 onChange={(e) => setForm((prev) => ({ ...prev, identity_value: e.target.value }))}
                 placeholder="identity value (email/phone/etc)"
-                className="w-full rounded-lg bg-black/30 border border-white/10 px-2 py-2 text-sm"
+                className="w-full rounded-xl bg-[#F8FBFF] border border-slate-200 px-3 py-2.5 text-sm text-[#203266]"
               />
 
               <input
                 value={form.channel_account_id}
                 onChange={(e) => setForm((prev) => ({ ...prev, channel_account_id: e.target.value }))}
                 placeholder="channel account id (optional uuid)"
-                className="w-full rounded-lg bg-black/30 border border-white/10 px-2 py-2 text-sm"
+                className="w-full rounded-xl bg-[#F8FBFF] border border-slate-200 px-3 py-2.5 text-sm text-[#203266]"
               />
 
               <div className="grid grid-cols-2 gap-2">
-                <label className="inline-flex items-center gap-2 text-xs text-slate-300">
+                <label className="inline-flex items-center gap-2 text-xs text-slate-600">
                   <input
                     type="checkbox"
                     checked={form.verified}
@@ -406,7 +431,7 @@ export default function ContactDrawer({ tenantId, conversationId, open, onClose 
                   />
                   Verified
                 </label>
-                <label className="inline-flex items-center gap-2 text-xs text-slate-300">
+                <label className="inline-flex items-center gap-2 text-xs text-slate-600">
                   <input
                     type="checkbox"
                     checked={form.is_primary}
@@ -424,26 +449,26 @@ export default function ContactDrawer({ tenantId, conversationId, open, onClose 
                   max={100}
                   value={form.confidence}
                   onChange={(e) => setForm((prev) => ({ ...prev, confidence: Number(e.target.value || 0) }))}
-                  className="w-20 rounded-lg bg-black/30 border border-white/10 px-2 py-1 text-sm"
+                  className="w-20 rounded-xl bg-[#F8FBFF] border border-slate-200 px-3 py-1.5 text-sm text-[#203266]"
                 />
               </div>
 
               <button
                 onClick={() => void linkIdentity()}
                 disabled={linkBusy || !contactId || !tenantId}
-                className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-black uppercase tracking-widest"
+                className="px-4 py-2.5 rounded-xl bg-[linear-gradient(135deg,#2E58E6,#4D8BFF)] hover:brightness-105 disabled:opacity-50 text-xs font-black uppercase tracking-widest text-white shadow-[0_14px_28px_rgba(46,88,230,0.20)]"
               >
                 {linkBusy ? 'Linking...' : 'Link Identity'}
               </button>
             </section>
 
-            <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <section className="rounded-2xl border border-[#E4ECF8] bg-white/90 p-4 shadow-sm">
               <button
                 onClick={() => setTimelineOpen((prev) => !prev)}
                 className="w-full flex items-center justify-between text-left"
               >
-                <span className="text-xs font-black uppercase tracking-widest text-slate-400">Timeline</span>
-                <span className="text-xs text-slate-500">{timelineOpen ? 'Hide' : 'Show'}</span>
+                <span className="text-xs font-black uppercase tracking-widest text-[#6C82AE]">Timeline</span>
+                <span className="rounded-full border border-[#E4ECF8] bg-[#F8FBFF] px-3 py-1 text-xs text-slate-500">{timelineOpen ? 'Hide' : 'Show'}</span>
               </button>
 
               {timelineOpen ? (
@@ -453,14 +478,14 @@ export default function ContactDrawer({ tenantId, conversationId, open, onClose 
                   {!timelineBusy && timelineItems.length === 0 ? (
                     <div className="text-sm text-slate-500">No timeline items found.</div>
                   ) : (
-                    <div className="max-h-56 overflow-auto divide-y divide-white/5">
+                    <div className="max-h-56 overflow-auto divide-y divide-slate-100">
                       {timelineItems.map((item) => (
                         <div key={item.id} className="py-2 text-xs">
                           <div className="flex items-center justify-between gap-2 text-slate-400">
                             <span>{item.provider} • {item.direction}</span>
                             <span>{fmtDate(item.received_at)}</span>
                           </div>
-                          <div className="mt-1 text-slate-200 whitespace-pre-wrap break-words">
+                          <div className="mt-1 text-[#203266] whitespace-pre-wrap break-words">
                             {String(item.body_text || '').slice(0, 260) || '[No body text]'}
                           </div>
                         </div>
