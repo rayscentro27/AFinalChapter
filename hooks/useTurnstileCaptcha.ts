@@ -39,6 +39,7 @@ const MAX_TOKEN_AGE_MS = 4 * 60 * 1000;
 export function useTurnstileCaptcha(options: UseTurnstileCaptchaOptions) {
   const hostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
   const isNetlifyReviewHost = hostname.endsWith('.netlify.app');
+  const isNetlifyDraftHost = hostname.includes('--') && hostname.endsWith('.netlify.app');
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaIssuedAt, setCaptchaIssuedAt] = useState<number | null>(null);
   const [captchaRuntimeFailed, setCaptchaRuntimeFailed] = useState(false);
@@ -46,7 +47,7 @@ export function useTurnstileCaptcha(options: UseTurnstileCaptchaOptions) {
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
   const turnstileWidgetIdRef = useRef<TurnstileWidgetId | null>(null);
 
-  const captchaRequired = isSupabaseConfigured && TURNSTILE_ENABLED;
+  const captchaRequired = isSupabaseConfigured && TURNSTILE_ENABLED && !isNetlifyDraftHost;
   const captchaSiteKeyMissing = captchaRequired && !TURNSTILE_SITE_KEY;
   const captchaReady = captchaRequired && !captchaSiteKeyMissing && !captchaRuntimeFailed;
 

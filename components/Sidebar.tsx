@@ -5,6 +5,7 @@ import {
   Building2,
   Calendar,
   CreditCard,
+  Crown,
   ChevronDown,
   FileText,
   Gift,
@@ -159,24 +160,24 @@ const Sidebar: React.FC<SidebarProps> = ({
     <>
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="fixed left-4 top-4 z-[60] rounded-xl border border-[#D8E6FF] bg-white p-2.5 text-[#3A66D3] shadow-lg transition-all active:scale-95 md:hidden"
+        className="fixed left-4 top-4 z-[60] rounded-[1rem] border border-[#D8E6FF] bg-white p-2.5 text-[#3A66D3] shadow-[0_12px_30px_rgba(34,66,152,0.12)] transition-all active:scale-95 md:hidden"
       >
         {isMobileOpen ? <X size={22} /> : <Menu size={22} />}
       </button>
 
-      <div className={`fixed left-0 top-0 z-50 flex h-screen w-64 flex-col overflow-hidden border-r border-[#A8C7FF]/20 bg-[linear-gradient(180deg,#2E57C9_0%,#345FD5_36%,#27469E_100%)] text-white shadow-[0_18px_60px_rgba(28,54,141,0.28)] transition-transform duration-500 ease-in-out subpixel-antialiased ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="px-7 py-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
-              <Sparkles className="h-5 w-5 text-white" />
+      <div className={`fixed left-0 top-0 z-50 flex h-screen w-60 flex-col overflow-hidden border-r border-white/10 bg-[linear-gradient(180deg,#2E57C9_0%,#315DD0_34%,#27489F_100%)] text-white shadow-[0_18px_56px_rgba(28,54,141,0.22)] transition-transform duration-500 ease-in-out subpixel-antialiased ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="border-b border-white/10 px-5 py-5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.95rem] bg-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">
+              <Crown className="h-4.5 w-4.5 fill-white text-white" />
             </div>
-            <div>
-              <p className="text-[1.85rem] font-black tracking-tight text-white">{branding?.name?.replace(' OS', '').replace('OS', '') || 'NexusOne'}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[1.32rem] font-black tracking-[-0.05em] text-white">{branding?.name?.replace(' OS', '').replace('OS', '') || 'NexusOne'}</p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
+        <nav className="flex-1 space-y-6 overflow-y-auto px-3.5 py-5">
           {userRole === 'client' ? clientSections.map((section) => (
             <SidebarSection key={section.label} label={section.label}>
               {section.items.map((item) => (
@@ -267,14 +268,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
         </nav>
 
-        <div className="mt-auto px-5 py-6 text-white/75">
-          <div className="mb-4 flex items-center justify-between text-[0.72rem] font-black uppercase tracking-[0.18em]">
+        <div className="mt-auto border-t border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.02)_0%,rgba(255,255,255,0.06)_100%)] px-5 py-5 text-white/75">
+          <div className="mb-4 flex items-center justify-between text-[0.68rem] font-black uppercase tracking-[0.22em]">
             <span>NexusOne</span>
             <span>Live</span>
           </div>
           <button
             onClick={onLogout}
-            className="flex w-full items-center gap-3 rounded-xl bg-white/10 px-4 py-3 text-left text-[0.72rem] font-black uppercase tracking-[0.18em] text-white transition-all hover:bg-white/16"
+            className="flex w-full items-center gap-3 rounded-[1rem] border border-white/10 bg-white/10 px-4 py-3 text-left text-[0.72rem] font-black uppercase tracking-[0.18em] text-white transition-all hover:bg-white/14"
           >
             <LogOut size={16} />
             Sign Out
@@ -289,26 +290,26 @@ const Sidebar: React.FC<SidebarProps> = ({
 
 function SidebarSection(props: { label: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-2">
-      <p className="px-4 text-[0.68rem] font-bold uppercase tracking-[0.22em] text-white/55">{props.label}</p>
-      <div className="space-y-1.5">{props.children}</div>
+    <section className="space-y-2.5">
+      <p className="px-4 text-[0.58rem] font-bold uppercase tracking-[0.26em] text-white/50">{props.label}</p>
+      <div className="space-y-2">{props.children}</div>
     </section>
   );
 }
 
 function CollapsibleSidebarSection(props: { label: string; title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
-    <section className="space-y-2">
-      <p className="px-4 text-[0.68rem] font-bold uppercase tracking-[0.22em] text-white/55">{props.label}</p>
+    <section className="space-y-2.5">
+      <p className="px-4 text-[0.58rem] font-bold uppercase tracking-[0.26em] text-white/50">{props.label}</p>
       <button
         type="button"
         onClick={props.onToggle}
-        className="flex w-full items-center justify-between rounded-2xl px-4 py-2 text-left text-[0.68rem] font-black uppercase tracking-[0.18em] text-white/70 transition-all hover:bg-white/8 hover:text-white"
+        className="flex w-full items-center justify-between rounded-[1rem] px-4 py-2 text-left text-[0.61rem] font-black uppercase tracking-[0.2em] text-white/68 transition-all hover:bg-white/7 hover:text-white"
       >
         <span>{props.title}</span>
         <ChevronDown size={14} className={`transition-transform ${props.isOpen ? 'rotate-180' : ''}`} />
       </button>
-      {props.isOpen ? <div className="space-y-1.5">{props.children}</div> : null}
+      {props.isOpen ? <div className="space-y-2">{props.children}</div> : null}
     </section>
   );
 }
@@ -328,23 +329,23 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ id, label, icon: Icon, curren
   return (
     <button
       onClick={() => onViewChange(id)}
-      className={`group relative flex w-full items-center justify-between rounded-2xl px-4 py-3 transition-all duration-300 ${
+      className={`group relative flex w-full items-center justify-between rounded-[1.05rem] px-3.5 py-2.5 transition-all duration-300 ${
         isActive
-          ? 'bg-[linear-gradient(180deg,rgba(108,160,255,0.28),rgba(255,255,255,0.10))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_18px_40px_rgba(37,74,176,0.24)]'
-          : 'text-white/88 hover:bg-white/8'
+          ? 'border border-white/12 bg-[linear-gradient(180deg,rgba(129,176,255,0.22),rgba(255,255,255,0.10))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_12px_24px_rgba(37,74,176,0.18)]'
+          : 'text-white/84 hover:bg-white/7'
       }`}
     >
-      <div className="flex items-center gap-3 overflow-hidden">
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isActive ? 'bg-white/16' : 'bg-transparent'}`}>
-          <Icon size={18} className={isActive ? 'text-white' : 'text-white/88'} />
+      <div className="flex items-center gap-2.5 overflow-hidden">
+        <div className={`flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-[0.85rem] ${isActive ? 'bg-white/14' : 'bg-transparent'}`}>
+          <Icon size={16} className={isActive ? 'text-white' : 'text-white/82'} />
         </div>
-        <span className="truncate text-sm font-bold tracking-tight">
+        <span className="truncate text-[0.84rem] font-bold tracking-tight">
           {label}
         </span>
       </div>
 
       {badge !== undefined ? (
-        <div className={`min-w-[1.45rem] rounded-full px-2 py-0.5 text-center text-[0.68rem] font-black ${isActive ? 'bg-white text-[#2C56C7]' : 'bg-white/18 text-white'}`}>
+        <div className={`min-w-[1.3rem] rounded-full px-1.5 py-0.5 text-center text-[0.6rem] font-black ${isActive ? 'bg-white text-[#2C56C7]' : 'bg-white/14 text-white'}`}>
           {badge}
         </div>
       ) : null}

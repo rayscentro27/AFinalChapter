@@ -95,22 +95,22 @@ const NotificationBell: React.FC = () => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={toggleDropdown}
-        className={`group relative rounded-xl border border-[#DCE7FA] bg-white p-2.5 text-[#6F84B0] shadow-sm transition-all hover:bg-[#F4F8FF] hover:text-[#315FD0] ${
+        className={`group relative rounded-[1rem] border border-[#E2EAF7] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(247,250,255,0.98)_100%)] p-2 text-[#6F84B0] shadow-[0_6px_18px_rgba(43,72,138,0.04)] transition-all hover:border-[#CAD7F1] hover:bg-white hover:text-[#315FD0] ${
           hasUnread ? 'animate-pulse' : ''
         }`}
         title="Notifications"
       >
-        <Bell size={20} className="group-hover:rotate-12 transition-transform" />
+        <Bell size={18} className="group-hover:rotate-12 transition-transform" />
         {hasUnread && (
           <span className="absolute right-2 top-2 h-2.5 w-2.5 animate-pulse rounded-full border-2 border-white bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.35)]" />
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 z-[100] mt-4 w-[420px] animate-fade-in overflow-hidden rounded-[2rem] border border-[#DCE7FA] bg-white shadow-[0_28px_80px_rgba(36,58,114,0.16)]">
-          <div className="flex items-center justify-between border-b border-[#EDF3FB] bg-[#FBFDFF] p-6 backdrop-blur-xl">
+        <div className="absolute right-0 z-[100] mt-4 w-[420px] animate-fade-in overflow-hidden rounded-[1.55rem] border border-[#DEE7F6] bg-[rgba(255,255,255,0.97)] shadow-[0_20px_52px_rgba(36,58,114,0.1)] backdrop-blur-xl">
+          <div className="flex items-center justify-between border-b border-[#EDF3FB] bg-[#FBFDFF] p-5 backdrop-blur-xl">
             <div className="flex items-center gap-3">
-              <div className="rounded-xl border border-[#DCE7FA] bg-[#F3F8FF] p-2 text-[#4A7AE8]">
+              <div className="rounded-[0.95rem] border border-[#DEE7F6] bg-[#F6FAFF] p-2 text-[#4A7AE8]">
                 <Zap size={16} fill="currentColor" className="animate-pulse" />
               </div>
               <div>
@@ -118,7 +118,7 @@ const NotificationBell: React.FC = () => {
                 <p className="mt-1.5 text-[8px] font-black uppercase tracking-[0.1em] text-[#6E84B2]">Tasks + status events</p>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="rounded-xl bg-[#F4F8FF] p-2 text-[#7A8FBA] transition-colors hover:text-[#315FD0]">
+            <button onClick={() => setIsOpen(false)} className="rounded-[0.95rem] bg-[#F4F8FF] p-2 text-[#7A8FBA] transition-colors hover:text-[#315FD0]">
               <X size={16} />
             </button>
           </div>
@@ -133,7 +133,7 @@ const NotificationBell: React.FC = () => {
                 <button
                   key={n.id}
                   onClick={() => markRead(n)}
-                  className={`w-full border-b border-[#EEF3FB] p-6 text-left transition-all hover:bg-[#F8FBFF] ${
+                  className={`w-full border-b border-[#EEF3FB] p-5 text-left transition-all hover:bg-[#F8FBFF] ${
                     n.read ? 'opacity-60' : ''
                   }`}
                   title={n.read ? 'Read' : 'Mark read'}

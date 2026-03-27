@@ -16,7 +16,7 @@ export default function RequiredDisclaimers({ variant = 'panel', title = 'Requir
     return (
       <a
         href="/disclaimers"
-        className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-200 hover:bg-amber-400/20 transition-colors"
+        className="inline-flex items-center gap-2 rounded-full border border-[#F2DEAE] bg-[linear-gradient(180deg,#FFF8E6_0%,#FFF2D6_100%)] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[#B98518] transition-colors hover:bg-[#FFF0CC]"
       >
         Educational Only
       </a>

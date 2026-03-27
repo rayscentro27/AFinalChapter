@@ -532,7 +532,7 @@ export const App = () => {
         }
       } else {
         if (isValidView) {
-          if ([ViewMode.CLIENT_LANDING, ViewMode.LOGIN, ViewMode.SIGNUP].includes(hash)) {
+          if ([ViewMode.LOGIN, ViewMode.SIGNUP].includes(hash)) {
             window.location.hash = (user.role === 'admin' || user.role === 'super_admin' || user.role === 'supervisor' || user.role === 'sales') ? 'dashboard' : 'training';
           } else {
             setCurrentView(hash);
@@ -895,7 +895,7 @@ export const App = () => {
       : user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('_', ' ');
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)] font-sans text-slate-900 subpixel-antialiased selection:bg-emerald-100 selection:text-emerald-900">
+    <div className="flex h-screen overflow-hidden bg-[linear-gradient(180deg,#f7faff_0%,#eef3fb_48%,#f6f8fd_100%)] font-sans text-slate-900 subpixel-antialiased selection:bg-emerald-100 selection:text-emerald-900">
       {showNavigation && (
           <Sidebar 
             currentView={currentView} 
@@ -907,18 +907,18 @@ export const App = () => {
             userRole={user?.role}
           />
       )}
-      <main className={`flex-1 flex h-full flex-col overflow-hidden subpixel-antialiased transition-all duration-500 ${showNavigation ? 'border-l border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)] md:ml-64' : 'bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_55%,#f8fafc_100%)]'}`}>
+      <main className={`flex-1 flex h-full flex-col overflow-hidden subpixel-antialiased transition-all duration-500 ${showNavigation ? 'border-l border-white/50 bg-[linear-gradient(180deg,#f7faff_0%,#eef3fb_48%,#f6f8fd_100%)] md:ml-64' : 'bg-[linear-gradient(180deg,#f7faff_0%,#eef3fb_48%,#f6f8fd_100%)]'}`}>
         {showNavigation && (
-         <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/92 px-6 py-4 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
-           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-             <div className="flex min-w-0 flex-1 items-center gap-4">
+         <header className="sticky top-0 z-20 bg-[rgba(247,250,255,0.72)] px-5 py-3 backdrop-blur-xl">
+           <div className="flex flex-col gap-3 rounded-[1.55rem] border border-[rgba(224,232,246,0.88)] bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(248,250,255,0.96)_100%)] px-4 py-3 shadow-[0_10px_28px_rgba(28,46,96,0.045)] lg:flex-row lg:items-center lg:justify-between">
+             <div className="flex min-w-0 flex-1 items-center gap-3">
                <div className="flex min-w-0 flex-col">
-                 <span className="text-[10px] font-black uppercase tracking-[0.24em] text-[#6F84B0]">
+                 <span className="text-[9px] font-black uppercase tracking-[0.26em] text-[#7A8CB3]">
                    {user.role === 'client' ? 'Client Workspace' : 'Operating System'}
                  </span>
-                 <div className="mt-1 flex min-w-0 items-center gap-3">
-                   <h1 className="truncate text-xl font-black tracking-tight text-[#203266]">{currentViewLabel}</h1>
-                   <span className="hidden rounded-full border border-[#DCE7FA] bg-[#F4F8FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5572A8] sm:inline-flex">
+                 <div className="mt-1 flex min-w-0 items-center gap-2.5">
+                   <h1 className="truncate text-[1.15rem] font-black tracking-[-0.03em] text-[#203266]">{currentViewLabel}</h1>
+                   <span className="hidden rounded-full border border-[#DEE7F6] bg-[#F7FAFF] px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#6079AA] sm:inline-flex">
                      {roleLabel}
                    </span>
                  </div>
@@ -927,24 +927,24 @@ export const App = () => {
                <button
                  type="button"
                  onClick={() => setIsCommandOpen(true)}
-                 className="group hidden max-w-xl flex-1 items-center gap-3 rounded-2xl border border-[#DCE7FA] bg-[linear-gradient(180deg,#ffffff_0%,#f7faff_100%)] px-4 py-3 text-left text-xs text-[#5F74A0] shadow-[0_10px_30px_rgba(62,95,170,0.08)] transition-all hover:border-[#BFD2F7] hover:shadow-[0_14px_36px_rgba(62,95,170,0.12)] md:flex"
+                 className="group hidden max-w-[33rem] flex-1 items-center gap-3 rounded-[1.2rem] border border-[#DFE7F4] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(246,249,255,0.98)_100%)] px-4 py-2.5 text-left text-xs text-[#5F74A0] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] transition-all hover:border-[#CAD9F4] hover:shadow-[0_8px_20px_rgba(62,95,170,0.06)] md:flex"
                >
-                 <div className="rounded-xl border border-[#E1EAFB] bg-[#F4F8FF] p-2 text-[#4A7AE8] transition-colors group-hover:bg-white">
-                   <Search size={14} />
+                 <div className="rounded-[0.9rem] border border-[#E4EBF8] bg-[linear-gradient(180deg,#F8FBFF_0%,#F1F6FF_100%)] p-2 text-[#5B81DB] transition-colors group-hover:bg-white">
+                   <Search size={13} />
                  </div>
                  <div className="min-w-0 flex-1">
-                   <div className="truncate text-[11px] font-black uppercase tracking-[0.18em] text-[#203266]">Search workspace</div>
-                   <div className="mt-1 truncate text-[11px] font-semibold text-[#7589B2]">Jump to views, contacts, commands, and system pages</div>
+                   <div className="truncate text-[10px] font-black uppercase tracking-[0.19em] text-[#203266]">Search workspace</div>
+                   <div className="mt-0.5 truncate text-[10px] font-semibold text-[#7B8FB8]">Jump to views, contacts, commands, and system pages</div>
                  </div>
-                 <kbd className="hidden items-center gap-1 rounded-xl border border-[#DCE7FA] bg-white px-2 py-1 text-[10px] font-mono font-bold text-[#6F84B0] lg:inline-flex">
+                 <kbd className="hidden items-center gap-1 rounded-[0.8rem] border border-[#E0E8F7] bg-white/96 px-2 py-1 text-[9px] font-mono font-bold text-[#7286AF] lg:inline-flex">
                    <Command size={10} /> K
                  </kbd>
                </button>
              </div>
 
-             <div className="ml-0 flex items-center justify-between gap-3 lg:ml-4 lg:justify-end">
+             <div className="ml-0 flex items-center justify-between gap-2 lg:ml-4 lg:justify-end">
                <div className="flex items-center gap-2">
-                 <div className="hidden items-center gap-2 rounded-full border border-[#DCE7FA] bg-[#F8FBFF] px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#5D77A8] md:inline-flex">
+                 <div className="hidden items-center gap-2 rounded-full border border-[#E2EAF7] bg-[rgba(248,251,255,0.96)] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[#627AA8] md:inline-flex">
                    <Bell size={12} className="text-[#4A7AE8]" />
                    {unreadNotifCount > 0 ? `${unreadNotifCount} active alerts` : 'All clear'}
                  </div>
@@ -955,7 +955,7 @@ export const App = () => {
            </div>
           </header>
         )}
-        <div className={`flex-1 overflow-auto custom-scrollbar relative ${showNavigation ? 'p-6' : ''}`}>
+        <div className={`relative flex-1 overflow-auto custom-scrollbar ${showNavigation ? 'p-5 md:p-6' : ''}`}>
            {user && !isLegalView && !isPortalRouteViewMode(currentView) && !consentGate.needsAcceptance ? <OfferBanner onUpgrade={() => navigate(ViewMode.BILLING)} /> : null}
           <Suspense fallback={<RouteFallback />}>
             {renderContent()}
