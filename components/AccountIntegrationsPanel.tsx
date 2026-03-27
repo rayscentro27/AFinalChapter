@@ -158,10 +158,10 @@ export default function AccountIntegrationsPanel() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
-            <Link2 size={18} className="text-blue-600" /> Account Integrations
+            <Link2 size={18} className="text-blue-600" /> Stack Integration Manager
           </h4>
           <p className="text-xs text-slate-500 mt-2 font-medium">
-            Connect your accounts with server-side tests. Credentials are stored in tenant integration vault and never shown in full.
+            Connect and manage your core business stack (CRM, email, payments, and more). Credentials are stored securely and never shown in full.
           </p>
         </div>
         <button

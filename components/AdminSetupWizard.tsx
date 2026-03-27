@@ -19,6 +19,34 @@ const AdminSetupWizard: React.FC<AdminSetupWizardProps> = ({ onNavigate, brandin
   const [activeStep, setActiveStep] = useState(0);
   const [isVerifying, setIsVerifying] = useState(false);
   const [aiStatus, setAiStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  // Readiness snapshot state
+  const [readiness, setReadiness] = useState({
+    hasRegisteredBusiness: false,
+    docsReady: false,
+    hasMajorDerog: false,
+    utilizationPct: 20,
+    monthsReserves: 2,
+    wantsGrants: false,
+    wantsSba: false,
+    wantsTier1: true,
+  });
+  // Business profile state
+  const [businessProfile, setBusinessProfile] = useState({
+    legalName: branding.name,
+    taxId: '',
+    structure: 'LLC',
+    industry: '',
+    ownershipPercentage: 100,
+    establishedDate: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+    website: '',
+    riskLevel: 'Low',
+    missionStatement: '',
+    impactSummary: ''
+  });
 
   // Supabase Connection State
   const [dbConfig, setDbConfig] = useState({
@@ -35,45 +63,188 @@ const AdminSetupWizard: React.FC<AdminSetupWizardProps> = ({ onNavigate, brandin
     setIsVerifying(true);
     setAiStatus('idle');
     await new Promise(resolve => setTimeout(resolve, 1500));
-    try {
-      const ok = await geminiService.pingServerAI();
-      setAiStatus(ok ? 'success' : 'error');
-    } catch {
-      setAiStatus('error');
-    }
-    setIsVerifying(false);
-  };
-
-  const testSupabaseConnection = async () => {
-    if (!dbConfig.url || !dbConfig.key) {
-        setDbError('Both URL and Key are required for cloud sync.');
-        setDbStatus('error');
-        return;
-    }
-    
-    setDbStatus('testing');
-    setDbError('');
-
-    try {
-        const client = createClient(dbConfig.url, dbConfig.key);
-        const { error } = await client.from('profiles').select('id').limit(1);
-        
-        if (error && error.message.includes('failed to fetch')) {
-            throw new Error("Could not reach Supabase endpoint.");
-        }
-
-        setDbStatus('success');
-        localStorage.setItem('nexus_supabase_url', dbConfig.url);
-        localStorage.setItem('nexus_supabase_key', dbConfig.key);
-    } catch (err: any) {
-        setDbStatus('error');
-        setDbError(err.message || 'Connection handshake failed.');
-    }
-  };
-
-  const handleFinalizeBranding = () => {
-    onUpdateBranding(tempBranding);
-    setActiveStep(2);
+    const steps = [
+      {
+        id: 'welcome',
+        label: 'Welcome',
+        title: 'Welcome to Nexus OS',
+        desc: 'Begin your SuperAdmin onboarding. This protocol will guide you through essential setup for your agency.',
+        icon: Shield,
+        color: 'text-emerald-500',
+        component: (
+          <div className="space-y-6 animate-fade-in">
+            <div className="p-6 bg-blue-50 border border-blue-100 rounded-2xl">
+              <h2 className="text-xl font-black text-blue-700 mb-2">Welcome, SuperAdmin!</h2>
+              <p className="text-slate-700 text-sm mb-2">You are about to activate your private Nexus OS instance. This wizard will help you connect services, verify readiness, and launch your AI-powered agency.</p>
+              <ul className="list-disc ml-6 text-xs text-slate-600">
+                <li>Connect AI and database services</li>
+                <li>Complete readiness checklist</li>
+                <li>Set up your business profile</li>
+                <li>Activate your AI workforce</li>
+                <li>Go live with your system</li>
+              </ul>
+            </div>
+            <button onClick={() => setActiveStep(1)} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20 transform hover:scale-[1.02] transition-all">Begin Setup <ArrowRight size={16} /></button>
+          </div>
+        )
+      },
+      {
+        id: 'ai',
+        label: 'AI Protocol',
+        title: 'Initialize Neural Core',
+        desc: 'Verify connectivity to Google Gemini. This powers your AI Underwriter, Content Engine, and Sales Coach.',
+        icon: BrainCircuit,
+        color: 'text-purple-500',
+        component: (
+          <div className="space-y-6 animate-fade-in">...</div>
+        )
+      },
+      {
+        id: 'branding',
+        label: 'Identity',
+        title: 'Agency Personalization',
+        desc: 'Customize the name and appearance that your clients and team will interact with.',
+        icon: PaletteIcon,
+        color: 'text-blue-500',
+        component: (
+          <div className="space-y-6 animate-fade-in">...</div>
+        )
+      },
+      {
+        id: 'readiness',
+        label: 'Readiness',
+        title: 'Readiness Snapshot',
+        desc: 'Complete the operational readiness checklist to ensure your agency is launch-ready.',
+        icon: CheckCircle,
+        color: 'text-emerald-600',
+        component: (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
+              <h3 className="text-lg font-black text-slate-800 mb-2">Operational Readiness</h3>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 text-sm text-slate-700">
+                  <input type="checkbox" checked={readiness.hasRegisteredBusiness} onChange={e => setReadiness(r => ({...r, hasRegisteredBusiness: e.target.checked}))} />
+                  Registered business entity
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-700">
+                  <input type="checkbox" checked={readiness.docsReady} onChange={e => setReadiness(r => ({...r, docsReady: e.target.checked}))} />
+                  All required documents ready
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-700">
+                  <input type="checkbox" checked={readiness.hasMajorDerog} onChange={e => setReadiness(r => ({...r, hasMajorDerog: e.target.checked}))} />
+                  Major derogatories (charge-off/collections)
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-700">
+                  Utilization %
+                  <input type="number" value={readiness.utilizationPct} onChange={e => setReadiness(r => ({...r, utilizationPct: Number(e.target.value)}))} className="w-20 ml-2 p-1 border rounded" />
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-700">
+                  Months reserves
+                  <input type="number" value={readiness.monthsReserves} onChange={e => setReadiness(r => ({...r, monthsReserves: Number(e.target.value)}))} className="w-20 ml-2 p-1 border rounded" />
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-700">
+                  <input type="checkbox" checked={readiness.wantsTier1} onChange={e => setReadiness(r => ({...r, wantsTier1: e.target.checked}))} />
+                  Want Tier 1 (0% intro)
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-700">
+                  <input type="checkbox" checked={readiness.wantsSba} onChange={e => setReadiness(r => ({...r, wantsSba: e.target.checked}))} />
+                  Want SBA path
+                </label>
+                <label className="flex items-center gap-3 text-sm text-slate-700">
+                  <input type="checkbox" checked={readiness.wantsGrants} onChange={e => setReadiness(r => ({...r, wantsGrants: e.target.checked}))} />
+                  Want grants
+                </label>
+              </div>
+            </div>
+            <button onClick={() => setActiveStep(activeStep + 1)} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20 transform hover:scale-[1.02] transition-all">Next: Business Profile <ArrowRight size={16} /></button>
+          </div>
+        )
+      },
+      {
+        id: 'businessProfile',
+        label: 'Business Profile',
+        title: 'Business Entity Profile',
+        desc: 'Enter your business details for compliance and AI-powered grant writing.',
+        icon: Briefcase,
+        color: 'text-blue-700',
+        component: (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
+              <h3 className="text-lg font-black text-slate-800 mb-2">Business Profile</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Legal Name</label><input type="text" value={businessProfile.legalName} onChange={e => setBusinessProfile(bp => ({...bp, legalName: e.target.value}))} className="w-full p-2 border rounded" /></div>
+                <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">EIN / Tax ID</label><input type="text" value={businessProfile.taxId} onChange={e => setBusinessProfile(bp => ({...bp, taxId: e.target.value}))} className="w-full p-2 border rounded" /></div>
+                <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Structure</label><select value={businessProfile.structure} onChange={e => setBusinessProfile(bp => ({...bp, structure: e.target.value}))} className="w-full p-2 border rounded"><option>LLC</option><option>S-Corp</option><option>C-Corp</option><option>Sole Prop</option></select></div>
+                <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Industry</label><input type="text" value={businessProfile.industry} onChange={e => setBusinessProfile(bp => ({...bp, industry: e.target.value}))} className="w-full p-2 border rounded" /></div>
+                <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Website</label><input type="text" value={businessProfile.website} onChange={e => setBusinessProfile(bp => ({...bp, website: e.target.value}))} className="w-full p-2 border rounded" /></div>
+                <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Risk Level</label><select value={businessProfile.riskLevel} onChange={e => setBusinessProfile(bp => ({...bp, riskLevel: e.target.value as any}))} className="w-full p-2 border rounded"><option>Low</option><option>Medium</option><option>High</option></select></div>
+              </div>
+              <div className="mt-4">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Mission Statement</label>
+                <textarea value={businessProfile.missionStatement} onChange={e => setBusinessProfile(bp => ({...bp, missionStatement: e.target.value}))} className="w-full p-2 border rounded" />
+              </div>
+              <div className="mt-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Impact Summary</label>
+                <textarea value={businessProfile.impactSummary} onChange={e => setBusinessProfile(bp => ({...bp, impactSummary: e.target.value}))} className="w-full p-2 border rounded" />
+                <p className="text-[9px] text-slate-400 mt-2 font-bold italic">Critical: This data powers your AI Grant Writer.</p>
+              </div>
+            </div>
+            <button onClick={() => setActiveStep(activeStep + 1)} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20 transform hover:scale-[1.02] transition-all">Next: AI Workforce <ArrowRight size={16} /></button>
+          </div>
+        )
+      },
+      {
+        id: 'aiWorkforce',
+        label: 'AI Workforce',
+        title: 'Activate AI Workforce',
+        desc: 'Review and activate your AI-powered team for underwriting, content, and support.',
+        icon: Cpu,
+        color: 'text-purple-700',
+        component: (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
+              <h3 className="text-lg font-black text-slate-800 mb-2">AI Workforce Activation</h3>
+              <ul className="list-disc ml-6 text-xs text-slate-600">
+                <li>AI Underwriter: <span className="text-emerald-600 font-bold">Ready</span></li>
+                <li>Content Engine: <span className="text-emerald-600 font-bold">Ready</span></li>
+                <li>Sales Coach: <span className="text-emerald-600 font-bold">Ready</span></li>
+                <li>Support Sentinel: <span className="text-emerald-600 font-bold">Ready</span></li>
+              </ul>
+              <p className="mt-4 text-xs text-slate-500">Your AI workforce is pre-configured. You can customize roles and permissions in the Admin Control Plane after launch.</p>
+            </div>
+            <button onClick={() => setActiveStep(activeStep + 1)} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20 transform hover:scale-[1.02] transition-all">Next: Launch <ArrowRight size={16} /></button>
+          </div>
+        )
+      },
+      {
+        id: 'database',
+        label: 'Infrastructure',
+        title: 'Live Cloud Sync',
+        desc: 'Connect your Supabase project to transition from local mock data to a live production database.',
+        icon: Database,
+        color: 'text-emerald-500',
+        component: (
+          <div className="space-y-6 animate-fade-in">...</div>
+        )
+      },
+      {
+        id: 'launch',
+        label: 'Launch',
+        title: 'System Live',
+        desc: 'Your agency is ready to launch! Complete setup to activate your Nexus OS instance.',
+        icon: Rocket,
+        color: 'text-blue-700',
+        component: (
+          <div className="space-y-6 animate-fade-in">
+            <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl">
+              <h2 className="text-xl font-black text-emerald-700 mb-2">Congratulations!</h2>
+              <p className="text-slate-700 text-sm mb-2">You have completed the SuperAdmin onboarding protocol. Your Nexus OS instance is now live and fully operational.</p>
+            </div>
+            <button onClick={handleCompleteSetup} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] shadow-2xl flex items-center justify-center gap-3 transform hover:-translate-y-1 transition-all active:scale-95">Go to Dashboard <Rocket size={20} /></button>
+          </div>
+        )
+      }
+    ];
   };
 
   const handleCompleteSetup = () => {
@@ -91,7 +262,7 @@ const AdminSetupWizard: React.FC<AdminSetupWizardProps> = ({ onNavigate, brandin
       color: 'text-purple-500',
       component: (
         <div className="space-y-6 animate-fade-in">
-          <div className={`p-6 rounded-2xl border-2 transition-all ${aiStatus === 'success' ? 'bg-emerald-50 border-emerald-200' : aiStatus === 'error' ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+          <div className={`${fintechMetric} border-2 transition-all ${aiStatus === 'success' ? 'bg-emerald-50 border-emerald-200' : aiStatus === 'error' ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
                 <Cpu size={24} className={aiStatus === 'success' ? 'text-emerald-500' : 'text-slate-400'} />
@@ -189,7 +360,7 @@ const AdminSetupWizard: React.FC<AdminSetupWizardProps> = ({ onNavigate, brandin
       color: 'text-emerald-500',
       component: (
         <div className="space-y-6 animate-fade-in">
-           <div className="bg-slate-950 p-6 rounded-[2rem] border border-white/10 shadow-2xl relative overflow-hidden">
+           <div className={`${fintechShell} bg-slate-950 p-6 border border-white/10 shadow-2xl relative overflow-hidden`}> 
                 <div className="absolute top-0 right-0 p-6 opacity-10"><Wifi size={100} /></div>
                 <div className="relative z-10">
                     <h4 className="text-white font-black uppercase tracking-tight mb-4 flex items-center gap-2"><Cloud className="text-blue-400" size={18}/> Cloud Integration</h4>

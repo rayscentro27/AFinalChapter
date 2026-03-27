@@ -1,10 +1,12 @@
 import type { HandlerEvent } from '@netlify/functions';
 import { getAdminSupabaseClient } from './supabase_admin_client';
 
-const STAFF_ROLES = new Set(['admin', 'supervisor', 'sales', 'salesperson']);
+const STAFF_ROLES = new Set(['admin', 'supervisor', 'sales', 'salesperson', 'superadmin', 'super_admin']);
 
 export function isStaffRole(role: string | null | undefined) {
-  return STAFF_ROLES.has(String(role || '').toLowerCase());
+  const normalized = String(role || '').toLowerCase();
+  // Accept both 'superadmin' and 'super_admin' as staff
+  return STAFF_ROLES.has(normalized) || normalized === 'superadmin' || normalized === 'super_admin';
 }
 
 export function getBearerToken(event: Pick<HandlerEvent, 'headers'>): string | null {

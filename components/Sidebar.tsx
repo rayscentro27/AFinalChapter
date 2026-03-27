@@ -112,27 +112,61 @@ const Sidebar: React.FC<SidebarProps> = ({
     return [];
   }, [userRole]);
 
+  // New flow-first sidebar structure
   const commandItems = [
     { view: ViewMode.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
     { view: ViewMode.INBOX, label: 'Unified Inbox', icon: Inbox, badge: unreadMessages || undefined },
-    { view: ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER, label: 'AI Workforce', icon: Sparkles, badge: activeAiCount || undefined, adminOnly: true },
-    { view: ViewMode.REVIEW_QUEUE, label: 'Approvals', icon: FileText, badge: derivedPendingDocCount || undefined },
-    { view: ViewMode.SUPERVISOR_TRIAGE, label: 'Triage Hub', icon: ShieldAlert, badge: triageCount || undefined },
+    { view: 'FOUNDER', label: 'Founder', icon: Crown, adminOnly: true },
   ].filter((item) => !item.adminOnly || isAdmin);
 
-  const growthItems = [
-    { view: ViewMode.LEAD_SCOUT, label: 'Leads', icon: Search },
+  // Operations group
+  const operationsItems = [
     { view: ViewMode.CRM, label: 'Clients', icon: Users, badge: contacts.length || undefined },
-    { view: ViewMode.MESSAGING_BRIDGE, label: 'Outreach', icon: MessageSquare },
+    { view: ViewMode.FUNDING_FLOW, label: 'Funding', icon: WalletCards },
+    { view: ViewMode.REVIEW_QUEUE, label: 'Approvals', icon: FileText, badge: derivedPendingDocCount || undefined },
+    { view: ViewMode.SUPERVISOR_TRIAGE, label: 'Alerts', icon: ShieldAlert, badge: triageCount || undefined },
+    { view: ViewMode.DOCUMENTS, label: 'Documents', icon: FileText },
+    { view: ViewMode.GRANTS, label: 'Grants', icon: Gift },
   ];
 
+  // Growth group
+  const growthItems = [
+    { view: ViewMode.LEAD_SCOUT, label: 'Opportunities', icon: Search },
+    { view: ViewMode.POWER_DIALER, label: 'Outreach', icon: MessageSquare },
+  ];
+
+  // AI group
+  const aiItems = [
+    { view: ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER, label: 'AI Workforce', icon: Sparkles, badge: activeAiCount || undefined, adminOnly: true },
+  ].filter((item) => !item.adminOnly || isAdmin);
+
+  // System group
+  const systemItems = [
+    { view: 'PLATFORM', label: 'Platform', icon: Server },
+    { view: ViewMode.BILLING, label: 'Billing', icon: CreditCard },
+  ];
+
+  // Advanced group
+  const advancedItems: NavItem[] = [
+    { view: ViewMode.CALENDAR, label: 'Calendar', icon: Calendar },
+    { view: ViewMode.STRATEGY_SANDBOX, label: 'Simulations', icon: Rocket },
+  ];
+
+  // Pipeline grouping: Growth (Leads, Clients, Outreach)
+  const growthItems = [
+    { view: ViewMode.LEAD_SCOUT, label: 'Leads', icon: Search }, // Lead Scout → Leads
+    { view: ViewMode.CRM, label: 'Clients', icon: Users, badge: contacts.length || undefined },
+    { view: ViewMode.POWER_DIALER, label: 'Outreach', icon: MessageSquare }, // Power Dialer + Messaging Bridge → Outreach
+  ];
+
+  // Move Calendar, Automation, Strategy Sandbox, Sales Trainer, Marketing under collapsed Advanced
   const advancedItems: NavItem[] = [
     { view: ViewMode.CALENDAR, label: 'Calendar', icon: Calendar },
     { view: ViewMode.AUTOMATION, label: 'Automation', icon: Workflow },
     { view: ViewMode.STRATEGY_SANDBOX, label: 'Strategy Sandbox', icon: Rocket },
-    { view: ViewMode.POWER_DIALER, label: 'Dialer', icon: Phone },
     { view: ViewMode.SALES_TRAINER, label: 'Sales Trainer', icon: MessageSquare },
     { view: ViewMode.MARKETING, label: 'Marketing', icon: Send },
+    // The rest remain as occasional tools
     { view: ViewMode.FUNDING_FLOW, label: 'Funding Applications', icon: WalletCards },
     { view: ViewMode.GRANTS, label: 'Grants', icon: Gift },
     { view: ViewMode.DOCUMENTS, label: 'Document Vault', icon: FileText },
@@ -208,9 +242,23 @@ const Sidebar: React.FC<SidebarProps> = ({
                 ))}
               </SidebarSection>
 
+              <SidebarSection label="Operations">
+                {operationsItems.map((item) => (
+                  <SidebarItem
+                    key={item.label}
+                    id={item.view}
+                    label={item.label}
+                    icon={item.icon}
+                    currentView={currentView}
+                    onViewChange={handleNav}
+                    badge={item.badge}
+                  />
+                ))}
+              </SidebarSection>
+
               <CollapsibleSidebarSection
                 label="Growth"
-                title="Daily growth"
+                title="Growth"
                 isOpen={openSections.growth || growthItems.some((item) => item.view === currentView)}
                 onToggle={() => toggleSection('growth')}
               >
@@ -227,13 +275,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 ))}
               </CollapsibleSidebarSection>
 
-              <CollapsibleSidebarSection
-                label="Advanced"
-                title="Occasional tools"
-                isOpen={openSections.advanced || advancedItems.some((item) => item.view === currentView)}
-                onToggle={() => toggleSection('advanced')}
-              >
-                {advancedItems.map((item) => (
+              <SidebarSection label="AI">
+                {aiItems.map((item) => (
                   <SidebarItem
                     key={item.label}
                     id={item.view}
@@ -244,15 +287,29 @@ const Sidebar: React.FC<SidebarProps> = ({
                     badge={item.badge}
                   />
                 ))}
-              </CollapsibleSidebarSection>
+              </SidebarSection>
+
+              <SidebarSection label="System">
+                {systemItems.map((item) => (
+                  <SidebarItem
+                    key={item.label}
+                    id={item.view}
+                    label={item.label}
+                    icon={item.icon}
+                    currentView={currentView}
+                    onViewChange={handleNav}
+                    badge={item.badge}
+                  />
+                ))}
+              </SidebarSection>
 
               <CollapsibleSidebarSection
-                label="System"
-                title="Platform controls"
-                isOpen={openSections.system || systemItems.some((item) => item.view === currentView)}
-                onToggle={() => toggleSection('system')}
+                label="Advanced"
+                title="Advanced"
+                isOpen={openSections.advanced || advancedItems.some((item) => item.view === currentView)}
+                onToggle={() => toggleSection('advanced')}
               >
-                {systemItems.map((item) => (
+                {advancedItems.map((item) => (
                   <SidebarItem
                     key={item.label}
                     id={item.view}

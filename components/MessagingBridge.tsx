@@ -9,9 +9,29 @@ const MessagingBridge: React.FC = () => {
         { id: 'ch_2', platform: 'SMS', status: 'Connected', autoReplyCount: 89, lastSync: 'Just now', webhookUrl: 'https://nexus.api/v2/wh/sms_1042' }
     ]);
 
+    // Empty state for messaging
+    const [selectedConversation, setSelectedConversation] = useState(null);
+
     return (
         <div className="max-w-7xl mx-auto space-y-8 animate-fade-in pb-20">
-            <div className="bg-indigo-950 p-12 rounded-[3rem] text-white relative overflow-hidden shadow-2xl border border-white/5">
+            {/* Activity indicator */}
+            <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 mb-2">
+                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                System Active • AI Monitoring Conversations
+            </div>
+
+            {/* Empty state if no conversation selected */}
+            {!selectedConversation && (
+                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-8 flex flex-col items-center justify-center text-center mb-8" style={{ minHeight: 220 }}>
+                    <div className="text-2xl font-bold text-slate-700 mb-2">No conversation selected</div>
+                    <div className="text-slate-500 mb-4">Select a conversation from the left or start a new action</div>
+                    <div className="flex gap-3">
+                        <button className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold">+ New Message</button>
+                        <button className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold">Assign AI Task</button>
+                        <button className="px-4 py-2 rounded-lg bg-slate-100 text-blue-700 font-semibold">View Pending Approvals</button>
+                    </div>
+                </div>
+            )}
                 <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12"><MessageSquare size={320} /></div>
                 <div className="relative z-10 max-w-2xl">
                     <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-10 border border-indigo-500/20">
@@ -26,7 +46,7 @@ const MessagingBridge: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8" style={{ maxWidth: 320 }}>
                 {channels.map(ch => (
                     <div key={ch.id} className="bg-white border border-slate-200 p-10 rounded-[3rem] shadow-sm relative overflow-hidden group hover:border-blue-500 transition-all">
                         <div className="flex justify-between items-start mb-10">

@@ -12,12 +12,22 @@ export type InboxFilters = {
   status: StatusFilter;
   provider: ProviderFilter;
   assigned: AssignedFilter;
+  function FiltersToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
+    return (
+      <button
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold text-sm shadow-sm hover:bg-slate-50 transition-all"
+        onClick={onClick}
+      >
+        Filters <span role="img" aria-label="settings">⚙️</span>
+      </button>
+    );
+  }
   sla: SlaFilter;
-  meUserId?: string;
+  export default function InboxFiltersBar(props: { filters: InboxFilters; onChange: (filters: InboxFilters) => void }) {
 };
 
 type SavedView = {
-  name: string;
+    const [showFilters, setShowFilters] = useState(false);
   filters: Omit<InboxFilters, 'meUserId'>;
 };
 
@@ -113,7 +123,7 @@ export default function InboxFiltersBar({
   }
 
   return (
-    <div className="space-y-3 rounded-2xl border border-[#E2EAF7] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-3 shadow-sm">
+    <div className="space-y-3 rounded-2xl border border-[#E2EAF7] bg-white p-3 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={q}

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { fintechMetric, fintechShell } from '../portal/fintechStyles';
 import {
   Activity,
   BriefcaseBusiness,
@@ -92,8 +93,25 @@ export default function SuperAdminHomeV2(props: SuperAdminHomeV2Props) {
 
   return (
     <div className="mx-auto max-w-[1380px] space-y-6 pb-10 subpixel-antialiased">
-      <section className="px-1 pt-2">
-        <h1 className="text-[1.72rem] font-black tracking-[-0.04em] text-[#1B2C61] sm:text-[2.02rem]">Welcome to the SuperAdmin Portal!</h1>
+      <section className="px-1 pt-2 flex items-center gap-4">
+        <h1 className="text-[1.72rem] font-black tracking-[-0.04em] text-[#1B2C61] sm:text-[2.02rem]">Command Overview</h1>
+        {/* Subtle activity indicator */}
+        <span className="flex items-center gap-1 text-xs font-semibold text-blue-700 ml-2">
+          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+          System Active • AI Monitoring Conversations
+        </span>
+      </section>
+
+      {/* Small AI workforce card */}
+      <section className="flex gap-4 mb-2">
+        <div className="rounded-xl border border-[#E5EAF2] bg-white px-4 py-3 flex flex-col items-start shadow-sm" style={{ minWidth: 180 }}>
+          <div className="text-xs font-bold text-blue-700 mb-1">AI Workforce</div>
+          <div className="flex flex-col gap-1 text-[13px]">
+            <span>Founder • <span className="text-green-600 font-semibold">Active</span></span>
+            <span>Analyst • <span className="text-yellow-600 font-semibold">Reviewing</span></span>
+            <span>Sentinel • <span className="text-blue-600 font-semibold">Monitoring</span></span>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-5">
@@ -195,7 +213,7 @@ export default function SuperAdminHomeV2(props: SuperAdminHomeV2Props) {
 
 function MetricCard(props: { icon: React.ReactNode; value: string | number; label: string }) {
   return (
-    <article className="flex h-full items-center rounded-[1.35rem] border border-[#E6ECF6] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(251,253,255,0.99)_100%)] px-5 py-5 shadow-[0_8px_24px_rgba(36,58,114,0.04)]">
+    <article className={`flex h-full items-center ${fintechMetric}`}>
       <div className="flex items-center gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/70 bg-[linear-gradient(135deg,#EEF4FF,#FFFFFF)] shadow-[inset_0_1px_0_rgba(255,255,255,0.95)]">{props.icon}</div>
         <div>
@@ -209,7 +227,7 @@ function MetricCard(props: { icon: React.ReactNode; value: string | number; labe
 
 function ActionCard(props: { title: string; helper: string; icon: React.ReactNode; onClick?: () => void }) {
   return (
-    <button type="button" onClick={props.onClick} className="rounded-[1.35rem] border border-[#E6ECF6] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(251,253,255,0.99)_100%)] px-5 py-4.5 text-left shadow-[0_8px_24px_rgba(36,58,114,0.04)] transition-all hover:-translate-y-0.5">
+    <button type="button" onClick={props.onClick} className={`${fintechShell} px-5 py-4.5 text-left transition-all hover:-translate-y-0.5`}>
       <div className="flex items-center gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-[1rem] border border-white/70 bg-[linear-gradient(135deg,#EFF5FF,#FFFFFF)]">{props.icon}</div>
         <div>

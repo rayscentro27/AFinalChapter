@@ -1,3 +1,4 @@
+import integrationsRoutes from './routes/integrations.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -208,6 +209,9 @@ await fastify.register(adminMembershipRoutes);
 await fastify.register(controlPlaneRoutes);
 await fastify.register(adminCommandRoutes);
 await fastify.register(adminCredentialRoutes);
+
+// Register Integration Manager API
+await fastify.register(integrationsRoutes, { prefix: '/api/integrations' });
 
 fastify.setErrorHandler((error, req, reply) => {
   req.log.error({
