@@ -462,6 +462,7 @@ export const App = () => {
   useEffect(() => {
     if (loading) return;
     const handleRouting = () => {
+      const isReviewBuild = BACKEND_CONFIG.env === 'review';
       const normalizedPath = normalizePathname(window.location.pathname);
       const mappedView = PATH_TO_VIEW[normalizedPath];
       if (mappedView && isPortalRouteViewMode(mappedView)) {
@@ -490,6 +491,11 @@ export const App = () => {
       }
 
       if (!user) {
+        if (isReviewBuild && hash === ViewMode.DASHBOARD) {
+          setCurrentView(ViewMode.DASHBOARD);
+          return;
+        }
+
         if (isValidView) setCurrentView(hash);
         else setCurrentView(ViewMode.CLIENT_LANDING);
         return;
@@ -717,6 +723,9 @@ export const App = () => {
     }
 
     if (!user) {
+        if (BACKEND_CONFIG.env === 'review' && currentView === ViewMode.DASHBOARD) {
+          return <Dashboard contacts={contacts} onFocusContact={(c) => { updateContact(c); navigate(ViewMode.CRM); }} />;
+        }
         if (currentView === ViewMode.SIGNUP) return <SignUp onRegister={addContact} onNavigate={navigate} />;
         if (currentView === ViewMode.LOGIN) return <Login onLogin={() => {}} onBack={() => navigate(ViewMode.CLIENT_LANDING)} />;
         if (currentView === ViewMode.FREE_SCORE) return <FreeScorePage />;
