@@ -68,13 +68,6 @@ const ClientLandingPage: React.FC<ClientLandingPageProps> = ({ onNavigate }) => 
         <nav className="hidden items-center gap-8 text-sm font-bold text-slate-600 md:flex">
           <button type="button" onClick={() => onNavigate(ViewMode.PRICING)} className="transition-colors hover:text-blue-600">Pricing</button>
           <button type="button" onClick={() => onNavigate(ViewMode.LOGIN)} className="transition-colors hover:text-blue-600">Sign In</button>
-          <button
-            type="button"
-            onClick={() => onNavigate(ViewMode.DASHBOARD)}
-            className="rounded-xl bg-[#2563EB] px-8 py-2.5 text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 active:scale-95"
-          >
-            SuperAdmin Portal
-          </button>
         </nav>
       </header>
 

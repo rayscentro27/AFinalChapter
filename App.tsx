@@ -587,7 +587,7 @@ export const App = () => {
   const isLegalView = isLegalViewMode(currentView);
   const showNavigation = Boolean(
     user
-    && ![ViewMode.CLIENT_LANDING, ViewMode.LOGIN, ViewMode.SIGNUP, ViewMode.ONBOARDING].includes(currentView)
+    && ![ViewMode.CLIENT_LANDING, ViewMode.LOGIN, ViewMode.SIGNUP, ViewMode.ONBOARDING, ViewMode.PRICING].includes(currentView)
     && !isLegalView
     && (
       user.role === 'client'
@@ -683,6 +683,7 @@ export const App = () => {
     if (currentView === ViewMode.FREE_SCORE) return <FreeScorePage />;
     if (currentView === ViewMode.FREE_CHECKLIST) return <FreeChecklistPage />;
     if (currentView === ViewMode.UNSUBSCRIBE) return <UnsubscribePage />;
+    if (currentView === ViewMode.CLIENT_LANDING) return <ClientLandingPage onNavigate={navigate} />;
 
     if (user && consentGate.needsAcceptance) {
       return (
@@ -784,6 +785,7 @@ export const App = () => {
         <div key={currentView} className="animate-spatial h-full">
             {(() => {
                 switch (currentView) {
+                  case ViewMode.CLIENT_LANDING: return <ClientLandingPage onNavigate={navigate} />;
                     case ViewMode.DASHBOARD: return <Dashboard contacts={contacts} onFocusContact={(c) => { updateContact(c); navigate(ViewMode.CRM); }} />;
                     case ViewMode.CRM: return <CRMTable contacts={contacts} onUpdateContact={updateContact} onAddContact={addContact} />;
                     case ViewMode.INBOX: return <UnifiedInbox contacts={contacts} onUpdateContact={updateContact} />;

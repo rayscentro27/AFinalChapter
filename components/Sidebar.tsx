@@ -1,4 +1,4 @@
-
+﻿
 import React, { useMemo, useState } from 'react';
 import {
   BarChart3,
@@ -126,7 +126,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { view: ViewMode.MESSAGING_BRIDGE, label: 'Outreach', icon: MessageSquare },
   ];
 
-  const advancedItems = [
+  const advancedItems: NavItem[] = [
     { view: ViewMode.CALENDAR, label: 'Calendar', icon: Calendar },
     { view: ViewMode.AUTOMATION, label: 'Automation', icon: Workflow },
     { view: ViewMode.STRATEGY_SANDBOX, label: 'Strategy Sandbox', icon: Rocket },
@@ -140,7 +140,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { view: ViewMode.BILLING, label: 'Billing', icon: CreditCard },
   ];
 
-  const systemItems = [
+  const systemItems: NavItem[] = [
     { view: ViewMode.ADMIN_CEO_BRIEFING, label: 'CEO Briefing', icon: Sparkles, adminOnly: true },
     { view: ViewMode.ADMIN_COMMAND_INBOX, label: 'Command Inbox', icon: Inbox, adminOnly: true },
     { view: ViewMode.RESEARCH_DASHBOARD, label: 'Analytics', icon: BarChart3 },
@@ -354,3 +354,4 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ id, label, icon: Icon, curren
 };
 
 export default Sidebar;
+

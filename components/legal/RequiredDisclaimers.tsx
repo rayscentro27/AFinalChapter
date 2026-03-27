@@ -30,15 +30,15 @@ export default function RequiredDisclaimers({ variant = 'panel', title = 'Requir
   const bullets = dynamicBullets.length > 0 ? dynamicBullets : DISCLAIMER_BULLETS;
 
   return (
-    <div className="rounded-2xl border border-amber-300/20 bg-amber-500/10 p-4 text-amber-100">
-      <h3 className="text-xs font-black uppercase tracking-widest mb-3">{title}</h3>
-      <ul className="space-y-2 text-xs leading-relaxed list-disc pl-4">
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-700 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+      <h3 className="mb-3 text-xs font-black uppercase tracking-widest text-amber-700">{title}</h3>
+      <ul className="list-disc space-y-2 pl-4 text-xs leading-relaxed text-slate-700">
         {bullets.map((item) => (
           <li key={item}>{item}</li>
         ))}
       </ul>
       {document?.version ? (
-        <p className="mt-3 text-[11px] text-amber-200/80">Version: {document.version}</p>
+        <p className="mt-3 text-[11px] text-amber-700/80">Version: {document.version}</p>
       ) : null}
     </div>
   );
