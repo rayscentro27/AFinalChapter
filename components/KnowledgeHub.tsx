@@ -54,7 +54,7 @@ const copyToClipboard = async (text: string) => {
 };
 
 const KnowledgeHub: React.FC = () => {
-  const [tab, setTab] = useState<'distiller' | 'legacy'>('distiller');
+  const [tab, setTab] = useState<'library' | 'ops'>('library');
 
   // Ingest
   const [url, setUrl] = useState('');
@@ -519,55 +519,152 @@ const KnowledgeHub: React.FC = () => {
         </div>
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center gap-2 bg-[#66FCF1]/10 text-[#66FCF1] px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-10 border border-[#66FCF1]/20">
-            Distiller + Knowledge Vault
+            Learning Library
           </div>
           <h1 className="text-5xl md:text-6xl font-black mb-6 tracking-tighter uppercase leading-[0.9]">
-            Train from <span className="text-[#66FCF1]">YouTube</span> into Employees
+            Approved knowledge for <span className="text-[#66FCF1]">teams</span> and clients
           </h1>
           <p className="text-slate-400 text-lg leading-relaxed font-medium">
-            Ingest transcript, distill into playbooks, generate prompt patches and scenario packs, then apply patches to your Supabase-backed AI employees.
+            Worker research and content generation happen elsewhere. This surface is for approved materials, SOPs, training, walkthroughs, and linked assets.
           </p>
         </div>
       </div>
 
       <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 shadow-inner w-fit mx-auto md:mx-0">
         <button
-          onClick={() => setTab('distiller')}
+          onClick={() => setTab('library')}
           className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-            tab === 'distiller' ? 'bg-slate-950 shadow-lg text-[#66FCF1]' : 'text-slate-400'
+            tab === 'library' ? 'bg-slate-950 shadow-lg text-[#66FCF1]' : 'text-slate-400'
           }`}
         >
-          Distiller Admin
+          Library
         </button>
         <button
-          onClick={() => setTab('legacy')}
+          onClick={() => setTab('ops')}
           className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-            tab === 'legacy' ? 'bg-slate-950 shadow-lg text-white' : 'text-slate-400'
+            tab === 'ops' ? 'bg-slate-950 shadow-lg text-white' : 'text-slate-400'
           }`}
         >
-          Legacy (Local)
+          Content Ops
         </button>
       </div>
 
-      {!canUseDb && tab === 'distiller' && (
+      {!canUseDb && tab === 'ops' && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-[2.5rem] p-8 text-amber-200 flex items-start gap-4">
           <AlertTriangle className="shrink-0" />
           <div>
             <div className="font-black uppercase tracking-widest text-[10px]">Supabase Not Configured</div>
             <div className="text-sm text-amber-100/90 mt-2">
-              Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Netlify + local) so this page can write playbooks/prompt patches/scenario packs.
+              Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Netlify + local) so content ops can write playbooks, prompt patches, and scenario packs.
             </div>
           </div>
         </div>
       )}
 
-      {tab === 'distiller' && (
+      {tab === 'library' && (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-[2.5rem] border border-white/10 bg-slate-950 p-6 shadow-2xl">
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Approved Materials</div>
+              <div className="mt-3 text-4xl font-black text-white">{recentDocs.length}</div>
+              <div className="mt-2 text-sm text-slate-400">Approved or imported materials available for review.</div>
+            </div>
+            <div className="rounded-[2.5rem] border border-white/10 bg-slate-950 p-6 shadow-2xl">
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Learning Assets</div>
+              <div className="mt-3 text-4xl font-black text-white">{recentPatches.length}</div>
+              <div className="mt-2 text-sm text-slate-400">Playbooks and training notes linked to workers.</div>
+            </div>
+            <div className="rounded-[2.5rem] border border-white/10 bg-slate-950 p-6 shadow-2xl">
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Default Mode</div>
+              <div className="mt-3 text-2xl font-black text-[#66FCF1]">View only</div>
+              <div className="mt-2 text-sm text-slate-400">Research and generation happen in backend workers.</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-8 shadow-2xl">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-white text-2xl font-black uppercase tracking-tight">Approved Materials</h2>
+                  <p className="text-slate-400 text-sm mt-2">Documents, SOPs, client education, and walkthrough assets.</p>
+                </div>
+                <button
+                  onClick={() => setRefreshTick((x) => x + 1)}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+                >
+                  <RefreshCw size={14} /> Refresh
+                </button>
+              </div>
+              <div className="mt-6 space-y-3">
+                {recentDocs.length === 0 ? (
+                  <div className="text-slate-500 text-sm">No approved materials yet.</div>
+                ) : (
+                  recentDocs.map((d) => (
+                    <div key={d.id} className="bg-white/5 border border-white/10 rounded-[2rem] p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="text-white font-black truncate">{d.title}</div>
+                          <div className="text-slate-500 text-xs mt-1 truncate">{d.source_url}</div>
+                        </div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-[#66FCF1]">{d.source_type || 'material'}</div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {(d.tags || []).slice(0, 4).map((tag) => (
+                          <span key={tag} className="rounded-full border border-white/10 bg-slate-900 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-8 shadow-2xl">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-white text-2xl font-black uppercase tracking-tight">Linked Playbooks</h2>
+                  <p className="text-slate-400 text-sm mt-2">Stored guidance and worker-facing notes tied to approved content.</p>
+                </div>
+                <button
+                  onClick={() => setRefreshTick((x) => x + 1)}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+                >
+                  <RefreshCw size={14} /> Refresh
+                </button>
+              </div>
+              <div className="mt-6 space-y-3">
+                {recentPatches.length === 0 ? (
+                  <div className="text-slate-500 text-sm">No linked playbooks yet.</div>
+                ) : (
+                  recentPatches.map((p) => (
+                    <div key={p.id} className="bg-white/5 border border-white/10 rounded-[2rem] p-5 flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="text-white font-black truncate">{p.agent_name}</div>
+                        <div className="text-slate-500 text-xs mt-1 truncate">{p.patch_title}</div>
+                        <div className="text-slate-600 text-[10px] mt-2 font-mono">{p.id}</div>
+                      </div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stored</div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="mt-6 rounded-[2rem] border border-white/10 bg-white/5 p-5 text-sm text-slate-300">
+                Backend research, transcript distillation, and content generation should stay in worker pipelines. This library is the review surface.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'ops' && (
         <div className="space-y-8">
           {/* 1) Ingest */}
           <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div>
-                <h2 className="text-white text-2xl font-black uppercase tracking-tight">1) Ingest YouTube Transcript</h2>
+                <h2 className="text-white text-2xl font-black uppercase tracking-tight">1) Ingest Source Transcript</h2>
                 <p className="text-slate-400 text-sm mt-2">
                   Calls `/.netlify/functions/ingest_youtube` and upserts into `knowledge_docs`.
                 </p>
@@ -838,7 +935,7 @@ const KnowledgeHub: React.FC = () => {
           <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div>
-                <h2 className="text-white text-2xl font-black uppercase tracking-tight">2) Import Distiller Output (One Paste)</h2>
+                <h2 className="text-white text-2xl font-black uppercase tracking-tight">2) Import Worker Output (One Paste)</h2>
                 <p className="text-slate-400 text-sm mt-2">
                   Paste only the final <span className="font-mono">IMPORT_JSON</span> object. This saves playbook + scenarios + patches and auto-applies patches with dedupe.
                 </p>
@@ -874,8 +971,8 @@ const KnowledgeHub: React.FC = () => {
           <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div>
-                <h2 className="text-white text-2xl font-black uppercase tracking-tight">3) Save Distilled Playbook</h2>
-                <p className="text-slate-400 text-sm mt-2">Paste the Distiller output (rules/checklist/templates) and save to `playbooks`.</p>
+                <h2 className="text-white text-2xl font-black uppercase tracking-tight">3) Save Playbook</h2>
+                <p className="text-slate-400 text-sm mt-2">Paste the worker output (rules/checklist/templates) and save to `playbooks`.</p>
               </div>
               <button
                 onClick={savePlaybook}
@@ -1149,17 +1246,6 @@ const KnowledgeHub: React.FC = () => {
         </div>
       )}
 
-      {tab === 'legacy' && (
-        <div className="bg-slate-950 border border-white/10 rounded-[3rem] p-10 shadow-2xl text-slate-200">
-          <div className="text-white font-black uppercase tracking-tight text-2xl">Legacy Knowledge Hub</div>
-          <p className="text-slate-400 text-sm mt-3">
-            This tab used to store SOPs and correction pairs in localStorage. Option 2 replaces that workflow with Supabase tables + Netlify Functions.
-          </p>
-          <div className="mt-6 text-slate-400 text-sm">
-            Run the SQL in <span className="font-mono">docs/supabase/knowledge_vault.sql</span> in Supabase SQL Editor, then use the Distiller Admin tab.
-          </div>
-        </div>
-      )}
     </div>
   );
 };

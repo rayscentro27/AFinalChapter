@@ -1,5 +1,5 @@
 import React from 'react';
-import OnboardingWizard from './components/OnboardingWizard';
+import OnboardingWizard from './OnboardingWizard';
 
 const ClientOnboarding = () => (
   <div className="max-w-2xl mx-auto py-10 px-4">

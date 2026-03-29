@@ -1,92 +1,4 @@
-                        '/client-detail': ViewMode.CLIENT_DETAIL,
-                          if (currentView === ViewMode.CLIENT_DETAIL) {
-                            const ClientDetailPanel = require('./components/ClientDetailPanel').default;
-                            return <ClientDetailPanel />;
-                          }
-                      if (currentView === ViewMode.DOCUMENTS_UPLOADED) {
-                        return <div style={{padding: 32}}><h1>Documents Uploaded</h1><p>Uploaded documents list coming soon.</p></div>;
-                      }
-                      if (currentView === ViewMode.DOCUMENTS_NEEDS_REVIEW) {
-                        return <div style={{padding: 32}}><h1>Documents Needs Review</h1><p>Documents pending review coming soon.</p></div>;
-                      }
-                      if (currentView === ViewMode.DOCUMENTS_APPROVED) {
-                        return <div style={{padding: 32}}><h1>Documents Approved</h1><p>Approved documents list coming soon.</p></div>;
-                      }
-                      if (currentView === ViewMode.DOCUMENTS_GENERATED) {
-                        return <div style={{padding: 32}}><h1>Documents Generated</h1><p>Generated documents list coming soon.</p></div>;
-                      }
-                      if (currentView === ViewMode.DOCUMENTS_ARCHIVED) {
-                        return <div style={{padding: 32}}><h1>Documents Archived</h1><p>Archived documents list coming soon.</p></div>;
-                      }
-                  '/documents/uploaded': ViewMode.DOCUMENTS_UPLOADED,
-                  '/documents/needs-review': ViewMode.DOCUMENTS_NEEDS_REVIEW,
-                  '/documents/approved': ViewMode.DOCUMENTS_APPROVED,
-                  '/documents/generated': ViewMode.DOCUMENTS_GENERATED,
-                  '/documents/archived': ViewMode.DOCUMENTS_ARCHIVED,
-                if (currentView === ViewMode.GRANTS_CATALOG) {
-                  return <div style={{padding: 32}}><h1>Grants Catalog</h1><p>Grants discovery and catalog coming soon.</p></div>;
-                }
-                if (currentView === ViewMode.GRANTS_SHORTLIST) {
-                  return <div style={{padding: 32}}><h1>Grants Shortlist</h1><p>Shortlisted grants coming soon.</p></div>;
-                }
-                if (currentView === ViewMode.GRANTS_DRAFTS) {
-                  return <div style={{padding: 32}}><h1>Grants Drafts</h1><p>Grant proposal drafts coming soon.</p></div>;
-                }
-                if (currentView === ViewMode.GRANTS_SUBMISSIONS) {
-                  return <div style={{padding: 32}}><h1>Grants Submissions</h1><p>Submitted grants coming soon.</p></div>;
-                }
-                if (currentView === ViewMode.GRANTS_TRACKING) {
-                  return <div style={{padding: 32}}><h1>Grants Tracking</h1><p>Grants tracking and outcomes coming soon.</p></div>;
-                }
-            '/grants/catalog': ViewMode.GRANTS_CATALOG,
-            '/grants/shortlist': ViewMode.GRANTS_SHORTLIST,
-            '/grants/drafts': ViewMode.GRANTS_DRAFTS,
-            '/grants/submissions': ViewMode.GRANTS_SUBMISSIONS,
-            '/grants/tracking': ViewMode.GRANTS_TRACKING,
-          if (currentView === ViewMode.FUNDING_OVERVIEW) {
-            return <div style={{padding: 32}}><h1>Funding Overview</h1><p>Funding pipeline overview coming soon.</p></div>;
-          }
-          if (currentView === ViewMode.FUNDING_PROGRAMS) {
-            return <div style={{padding: 32}}><h1>Funding Programs</h1><p>Funding programs list coming soon.</p></div>;
-          }
-          if (currentView === ViewMode.FUNDING_QUALIFICATION) {
-            return <div style={{padding: 32}}><h1>Funding Qualification</h1><p>Funding qualification details coming soon.</p></div>;
-          }
-          if (currentView === ViewMode.FUNDING_APPLICATIONS) {
-            return <div style={{padding: 32}}><h1>Funding Applications</h1><p>Funding applications list coming soon.</p></div>;
-          }
-          if (currentView === ViewMode.FUNDING_REQUIRED_DOCS) {
-            return <div style={{padding: 32}}><h1>Funding Required Docs</h1><p>Funding required documents coming soon.</p></div>;
-          }
-          if (currentView === ViewMode.FUNDING_OUTCOMES) {
-            return <div style={{padding: 32}}><h1>Funding Outcomes</h1><p>Funding outcomes and results coming soon.</p></div>;
-          }
-      '/funding': ViewMode.FUNDING_OVERVIEW,
-      '/funding/programs': ViewMode.FUNDING_PROGRAMS,
-      '/funding/qualification': ViewMode.FUNDING_QUALIFICATION,
-      '/funding/applications': ViewMode.FUNDING_APPLICATIONS,
-      '/funding/required-docs': ViewMode.FUNDING_REQUIRED_DOCS,
-      '/funding/outcomes': ViewMode.FUNDING_OUTCOMES,
-    if (currentView === ViewMode.FOUNDER) {
-      return <div style={{padding: 32}}><h1>Founder</h1><p>Founder dashboard and executive summary coming soon.</p></div>;
-    }
-    if (currentView === ViewMode.PLATFORM) {
-      const PlatformPanel = require('./components/PlatformPanel').default;
-      return <PlatformPanel />;
-    }
-    }
-import AffiliatePanel from './components/AffiliatePanel';
-    if (currentView === ViewMode.AFFILIATE_SYSTEM) {
-      return <AffiliatePanel />;
-    }
-import AdminRevenuePanel from './components/AdminRevenuePanel';
-    if (currentView === ViewMode.REVENUE_ENGINE) {
-      return <AdminRevenuePanel />;
-    }
-import FirstFiveMinuteUserFlow from './components/FirstFiveMinuteUserFlow';
-    if (currentView === ViewMode.FIRST_FIVE_MINUTE_FLOW) {
-      return <FirstFiveMinuteUserFlow />;
-    }
+
 
 import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import ClientDashboard from './components/ClientDashboard';
@@ -138,7 +50,6 @@ const PGFundingFlow = lazy(() => import('./components/PGFundingFlow'));
 const ExpenseTracker = lazy(() => import('./components/ExpenseTracker'));
 const CommissionManager = lazy(() => import('./components/CommissionManager'));
 const RiskMonitor = lazy(() => import('./components/RiskMonitor'));
-const LiveAutomationMonitor = lazy(() => import('./components/LiveAutomationMonitor'));
 const InvoicingHub = lazy(() => import('./components/InvoicingHub'));
 const WealthPortfolio = lazy(() => import('./components/WealthPortfolio'));
 const InfraMonitor = lazy(() => import('./components/InfraMonitor'));
@@ -265,7 +176,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/portal/business': ViewMode.PORTAL_BUSINESS,
   '/portal/grants': ViewMode.PORTAL_GRANTS,
   '/admin/contacts/merge': ViewMode.CONTACT_MERGE,
-  '/founder': ViewMode.FOUNDER,
+  '/founder': ViewMode.ADMIN_CEO_BRIEFING,
   '/platform': ViewMode.PLATFORM,
   '/admin/merge-jobs': ViewMode.MERGE_JOBS,
   '/admin/merge-queue': ViewMode.MERGE_QUEUE,
@@ -589,6 +500,12 @@ export const App = () => {
         return;
       }
 
+
+      // If no hash and no mapped view, show landing page by default
+      if (!window.location.hash && !mappedView) {
+        window.location.hash = 'client_landing';
+        return;
+      }
       if (!window.location.hash && mappedView) {
         window.location.hash = mappedView.toLowerCase();
         return;
@@ -605,8 +522,16 @@ export const App = () => {
       }
 
       if (!user) {
-        if (isReviewBuild && hash === ViewMode.DASHBOARD) {
-          setCurrentView(ViewMode.DASHBOARD);
+        // Prevent unauthenticated access to dashboard
+        if (hash === ViewMode.DASHBOARD) {
+          window.location.hash = 'client_landing';
+          setCurrentView(ViewMode.CLIENT_LANDING);
+          return;
+        }
+
+        // Allow unauthenticated users to access LOGIN and SIGNUP views
+        if ([ViewMode.LOGIN, ViewMode.SIGNUP].includes(hash)) {
+          setCurrentView(hash);
           return;
         }
 
@@ -651,9 +576,15 @@ export const App = () => {
           setCurrentView(hash);
         }
       } else {
+        // Only redirect from LOGIN/SIGNUP if user is fully authenticated
         if (isValidView) {
           if ([ViewMode.LOGIN, ViewMode.SIGNUP].includes(hash)) {
-            window.location.hash = (user.role === 'admin' || user.role === 'super_admin' || user.role === 'supervisor' || user.role === 'sales') ? 'dashboard' : 'training';
+            // Check for a valid, authenticated session (e.g., user.id or user.email)
+            if (user && user.id && user.email) {
+              window.location.hash = (user.role === 'admin' || user.role === 'super_admin' || user.role === 'supervisor' || user.role === 'sales') ? 'dashboard' : 'training';
+            } else {
+              setCurrentView(hash);
+            }
           } else {
             setCurrentView(hash);
           }
@@ -666,6 +597,15 @@ export const App = () => {
     handleRouting();
     return () => window.removeEventListener('hashchange', handleRouting);
   }, [user, loading]);
+
+  // Keep hook order stable across auth bootstrap states.
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white text-slate-500">
+        <span>Loading...</span>
+      </div>
+    );
+  }
 
   const updateContact = async (updatedContact: Contact) => {
     const saved = await data.updateContact(updatedContact);
@@ -900,10 +840,6 @@ export const App = () => {
       return <PortalView contact={resolvePortalContact()} branding={branding} onLogout={signOut} onUpdateContact={updateContact} availableCourses={courses} />;
     }
 
-    if (!isSystemReady && (user.role === 'admin' || user.role === 'super_admin')) {
-      return <AdminActivationCenterPage />;
-    }
-
     return (
         <div key={currentView} className="animate-spatial h-full">
             {(() => {
@@ -933,7 +869,13 @@ export const App = () => {
                     case ViewMode.CLIENT_DETAIL_ALERTS:
                       return <div style={{padding: 32}}><h1>Coming Soon</h1><p>Section under construction.</p></div>;
                   case ViewMode.CLIENT_LANDING: return <ClientLandingPage onNavigate={navigate} />;
-                    case ViewMode.DASHBOARD: return <Dashboard contacts={contacts} onFocusContact={(c) => { updateContact(c); navigate(ViewMode.CRM); }} />;
+                    case ViewMode.DASHBOARD:
+                      // Only render dashboard for authenticated users
+                      if (!user || !user.id || !user.email) {
+                        // If not authenticated, show landing or login
+                        return <ClientLandingPage onNavigate={navigate} />;
+                      }
+                      return <Dashboard contacts={contacts} onFocusContact={(c) => { updateContact(c); navigate(ViewMode.CRM); }} />;
                     case ViewMode.CRM: return <CRMTable contacts={contacts} onUpdateContact={updateContact} onAddContact={addContact} />;
                     case ViewMode.INBOX: return <UnifiedInbox contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.SETTINGS: return <Settings branding={branding} onUpdateBranding={updateBranding} onNavigate={navigate} />;
@@ -979,7 +921,8 @@ export const App = () => {
                     case ViewMode.ADMIN_RESEARCH_APPROVALS: return <AdminResearchApprovalsPage />;
                     case ViewMode.FUNDING_OUTCOMES: return renderTierGate(ViewMode.FUNDING_OUTCOMES, <FundingOutcomesPage />);
                     case ViewMode.BILLING_COMMISSIONS: return renderTierGate(ViewMode.BILLING_COMMISSIONS, <BillingCommissionsPage />);
-                    case ViewMode.AUTOMATION: return <LiveAutomationMonitor />;
+                    case ViewMode.AUTOMATION:
+                      return <AdminSuperAdminCommandCenterPage />;
                     case ViewMode.INVOICING: return <InvoicingHub contacts={contacts} onUpdateContact={updateContact} />;
                     case ViewMode.REPUTATION: return <ReputationManager branding={branding} onUpdateBranding={updateBranding} />;
                     case ViewMode.WEALTH_MANAGER: return <WealthPortfolio contacts={contacts} onUpdateContact={updateContact} />;

@@ -1,12 +1,12 @@
 import React from 'react';
-import ProgressBar from './components/ProgressBar';
-import NextActionCard from './components/NextActionCard';
-import FundingStatus from './components/FundingStatus';
-import CreditProfilePanel from './components/CreditProfilePanel';
-import AIAdvisorCard from './components/AIAdvisorCard';
-import ActivityTimeline from './components/ActivityTimeline';
-import ClientMessaging from './components/ClientMessaging';
-import DocumentUpload from './components/DocumentUpload';
+import ProgressBar from './ProgressBar';
+import NextActionCard from './NextActionCard';
+import FundingStatus from './FundingStatus';
+import CreditProfilePanel from './CreditProfilePanel';
+import AIAdvisorCard from './AIAdvisorCard';
+import ActivityTimeline from './ActivityTimeline';
+import ClientMessaging from './ClientMessaging';
+import DocumentUpload from './DocumentUpload';
 
 const mockData = {
   progress: 60,

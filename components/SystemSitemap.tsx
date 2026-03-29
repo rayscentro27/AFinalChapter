@@ -5,7 +5,7 @@ import {
   LayoutGrid, Globe, Users, ShieldCheck, Mail, Zap, 
   Phone, Mic, Target, Briefcase, RefreshCw, FileText, 
   Settings, CreditCard, Star, PieChart, GraduationCap,
-  ArrowRight, Search, Layout
+  ArrowRight, Search, Layout, Crown, WalletCards, Workflow, Server, Calendar, Rocket, Gift, ShieldAlert
 } from 'lucide-react';
 
 interface SystemSitemapProps {
@@ -25,59 +25,66 @@ const SystemSitemap: React.FC<SystemSitemapProps> = ({ onNavigate }) => {
       ]
     },
     {
-      title: 'Admin Workspace',
+      title: 'Command',
       color: 'text-indigo-600',
       items: [
-        { id: ViewMode.DASHBOARD, label: 'Executive Dashboard', desc: 'Daily metrics and AI briefings.', icon: LayoutGrid },
-        { id: ViewMode.CRM, label: 'CRM Pipeline', desc: 'Deal tracking and contact management.', icon: Users },
-        { id: ViewMode.INBOX, label: 'Unified Inbox', desc: 'Omnichannel communication center.', icon: Mail },
-        { id: ViewMode.ADMIN_CMS, label: 'No-Code Site Builder', desc: 'Manage branding and landing content.', icon: Layout },
-        { id: ViewMode.RESOURCES, label: 'Tools & Toolkit', desc: 'MCA Calcs and external link bank.', icon: Briefcase },
-        { id: ViewMode.SETTINGS, label: 'System Settings', desc: 'Global config, team, and security.', icon: Settings },
+        { id: ViewMode.DASHBOARD, label: 'Dashboard', desc: 'Operational home for day-to-day review.', icon: LayoutGrid },
+        { id: ViewMode.INBOX, label: 'Inbox', desc: 'Communication review and next steps.', icon: Mail },
+        { id: ViewMode.ADMIN_CEO_BRIEFING, label: 'Founder Briefing', desc: 'CEO review layer for blockers and approvals.', icon: Crown },
       ]
     },
     {
-        title: 'Sales & Marketing Ops',
-        color: 'text-orange-600',
-        items: [
-          { id: ViewMode.POWER_DIALER, label: 'Power Dialer', desc: 'Auto-dialing lead queue with AI scripts.', icon: Phone },
-          { id: ViewMode.SALES_TRAINER, label: 'AI Sales Coach', desc: 'Voice-based roleplay and training.', icon: Mic },
-          { id: ViewMode.MARKETING, label: 'AI Campaigns', desc: 'Email automation and social video studio.', icon: Zap },
-          { id: ViewMode.LEAD_MAP, label: 'Lead Scout', icon: Search, desc: 'Geo-intelligence territory search.' },
-          { id: ViewMode.FORM_BUILDER, label: 'Form Builder', desc: 'Drag-and-drop lead capture forms.', icon: FileText },
-          { id: ViewMode.REPUTATION, label: 'Reputation Manager', desc: 'Google review automation and shield.', icon: Star },
-        ]
-      },
-      {
-        title: 'Underwriting & Capital',
-        color: 'text-emerald-600',
-        items: [
-          { id: ViewMode.LENDERS, label: 'Lender Marketplace', desc: 'Manage rate sheets and partner rules.', icon: Briefcase },
-          { id: ViewMode.REVIEW_QUEUE, label: 'Compliance Queue', desc: 'Verify client docs and ID items.', icon: ShieldCheck },
-          { id: ViewMode.DOC_GENERATOR, label: 'Doc Generator', desc: 'AI-assisted NDAs and legal forms.', icon: FileText },
-          { id: ViewMode.SERVICING, label: 'Loan Servicing', desc: 'Portfolio yields and collections assistant.', icon: Briefcase },
-          { id: ViewMode.SYNDICATION, label: 'Syndication Manager', desc: 'Investor splits and deployed AUM.', icon: PieChart },
-          { id: ViewMode.CREDIT_MEMO, label: 'Credit Memo Builder', desc: 'Formal loan packets for lenders.', icon: FileText },
-        ]
-      },
-      {
-        title: 'Client Experience',
-        color: 'text-purple-600',
-        items: [
-          { id: ViewMode.PORTAL, label: 'Client Portal', desc: 'The dashboard your borrower sees.', icon: ShieldCheck },
-          { id: ViewMode.COURSE_BUILDER, label: 'LMS Builder', desc: 'Build client training courses.', icon: GraduationCap },
-          { id: ViewMode.GRANTS, label: 'Grant Manager', desc: 'AI discovery of free capital.', icon: Star },
-        ]
-      }
+      title: 'Operations',
+      color: 'text-emerald-600',
+      items: [
+        { id: ViewMode.CRM, label: 'Clients', desc: 'Active client accounts and readiness states.', icon: Users },
+        { id: ViewMode.FUNDING_FLOW, label: 'Funding', desc: 'Readiness, pipeline, outcomes, and billing triggers.', icon: WalletCards },
+        { id: ViewMode.REVIEW_QUEUE, label: 'Approvals', desc: 'Decision queue for documents, applications, and exceptions.', icon: ShieldCheck },
+        { id: ViewMode.SUPERVISOR_TRIAGE, label: 'Alerts', desc: 'Escalations and items needing attention.', icon: ShieldAlert },
+        { id: ViewMode.DOCUMENTS, label: 'Documents', desc: 'Uploaded, approved, generated, archived.', icon: FileText },
+        { id: ViewMode.GRANTS, label: 'Grants', desc: 'Grant discovery and application support.', icon: Gift },
+      ]
+    },
+    {
+      title: 'Growth',
+      color: 'text-orange-600',
+      items: [
+        { id: ViewMode.LEAD_SCOUT, label: 'Opportunities', desc: 'Found leads, fit, and pursuit status.', icon: Search },
+        { id: ViewMode.POWER_DIALER, label: 'Outreach', desc: 'Outbound follow-up and contact work.', icon: Phone },
+      ]
+    },
+    {
+      title: 'AI',
+      color: 'text-purple-600',
+      items: [
+        { id: ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER, label: 'AI Employees', desc: 'Named employees, runtime services, and stored reports.', icon: Workflow },
+        { id: ViewMode.KNOWLEDGE_HUB, label: 'Learning Center', desc: 'Approved training, SOPs, and walkthroughs.', icon: GraduationCap },
+      ]
+    },
+    {
+      title: 'System',
+      color: 'text-slate-600',
+      items: [
+        { id: ViewMode.ADMIN_CONTROL_PLANE, label: 'Platform', desc: 'System control, flags, and operational safety.', icon: Server },
+        { id: ViewMode.BILLING, label: 'Billing', desc: 'Revenue, plans, and subscription controls.', icon: CreditCard },
+      ]
+    },
+    {
+      title: 'Advanced',
+      color: 'text-cyan-700',
+      items: [
+        { id: ViewMode.CALENDAR, label: 'Calendar', desc: 'Deadlines, due dates, and follow-ups.', icon: Calendar },
+        { id: ViewMode.SCENARIO_RUNNER, label: 'Simulations', desc: 'Advanced experiments and scenario testing.', icon: Rocket },
+      ]
+    }
   ];
 
   return (
     <div className="max-w-6xl mx-auto pb-20 animate-fade-in">
       <div className="mb-10 text-center">
-        <h1 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">System Sitemap & View Reviewer</h1>
+        <h1 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">Nexus Journey Map</h1>
         <p className="text-slate-500 max-w-2xl mx-auto text-lg leading-relaxed">
-            Quickly navigate every view in the Nexus OS ecosystem. Use this for testing, 
-            auditing, and verifying the platform's comprehensive feature set.
+            A simplified map of the client journey, admin command layers, and advanced system surfaces.
         </p>
       </div>
 

@@ -4,6 +4,8 @@ import { Contact } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
+const BRANDING_CACHE_KEY = 'nexus_branding_cache';
+
 interface OnboardingWizardProps {
   contact: Contact;
   onComplete: (updatedContact: Contact) => void;
@@ -54,28 +56,23 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ contact, onComplete
         .from('tenant_memberships')
         .select('tenant_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (mErr) throw mErr;
       if (!membership?.tenant_id) throw new Error('No tenant membership found.');
 
-      // Map magnitude + branding to audit logs
-      const { error: aError } = await supabase.from('audit_logs').insert({
-        tenant_id: membership.tenant_id,
-        user_id: user.id,
-        action: 'initialize_portal',
-        entity_type: 'tenant',
-        entity_id: membership.tenant_id,
-        meta: {
-          magnitude: Number(formData.goal),
-          revenue: Number(formData.revenue),
-          branding: {
-            name: formData.companyName || 'Nexus OS',
-            primaryColor: '#66FCF1',
-          },
-        },
-      });
-      if (aError) throw aError;
+      // Persist onboarding branding locally so the public app can pick it up
+      // without depending on restricted audit log reads/writes.
+      try {
+        window.localStorage.setItem(BRANDING_CACHE_KEY, JSON.stringify({
+          name: formData.companyName || 'Nexus OS',
+          primaryColor: '#66FCF1',
+          heroHeadline: 'The Operating System for Business Funding.',
+          heroSubheadline: 'Consolidate your CRM, Dialer, and Underwriting into one AI platform.',
+        }));
+      } catch {
+        // Ignore storage failures; onboarding can continue.
+      }
 
       // Save intake + generate baseline tasks via Netlify function (idempotent).
       const token = await getAccessToken();

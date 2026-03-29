@@ -12,22 +12,24 @@ export type InboxFilters = {
   status: StatusFilter;
   provider: ProviderFilter;
   assigned: AssignedFilter;
-  function FiltersToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
-    return (
-      <button
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold text-sm shadow-sm hover:bg-slate-50 transition-all"
-        onClick={onClick}
-      >
-        Filters <span role="img" aria-label="settings">⚙️</span>
-      </button>
-    );
-  }
   sla: SlaFilter;
-  export default function InboxFiltersBar(props: { filters: InboxFilters; onChange: (filters: InboxFilters) => void }) {
 };
 
+function FiltersToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <button
+      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold text-sm shadow-sm hover:bg-slate-50 transition-all"
+      onClick={onClick}
+    >
+      Filters <span role="img" aria-label="settings">⚙️</span>
+    </button>
+  );
+}
+
+
+
 type SavedView = {
-    const [showFilters, setShowFilters] = useState(false);
+  name: string;
   filters: Omit<InboxFilters, 'meUserId'>;
 };
 

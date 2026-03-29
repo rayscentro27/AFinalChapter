@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Command, User, FileText, ArrowRight, LayoutDashboard, Settings, Users, Globe, Zap, Mail, Phone, Plus, Briefcase, PieChart, CreditCard, Receipt, GitBranch, Share2, Star, Target, RefreshCw } from 'lucide-react';
+import { Search, User, FileText, ArrowRight, LayoutDashboard, Settings, Users, Mail, Phone, Briefcase, WalletCards, Gift, Workflow, Server, CreditCard, Calendar, Rocket, Sparkles, ShieldCheck } from 'lucide-react';
 import { Contact, ViewMode } from '../types';
 
 interface CommandPaletteProps {
@@ -62,30 +62,30 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, contac
 
   const sections: { heading: string; items: CommandItem[] }[] = [
     {
-      heading: 'Quick Actions',
+      heading: 'Core Journey',
       items: [
-        { id: 'act_new', icon: <Plus size={16} />, label: 'Create New Lead', action: () => onNavigate(ViewMode.SIGNUP) }, 
-        { id: 'act_dash', icon: <LayoutDashboard size={16} />, label: 'Go to Dashboard', action: () => onNavigate(ViewMode.DASHBOARD) },
-        { id: 'act_crm', icon: <Users size={16} />, label: 'Go to CRM', action: () => onNavigate(ViewMode.CRM) },
-        { id: 'act_inbox', icon: <Mail size={16} />, label: 'Unified Inbox', action: () => onNavigate(ViewMode.INBOX) },
-        { id: 'act_dialer', icon: <Phone size={16} />, label: 'Power Dialer', action: () => onNavigate(ViewMode.POWER_DIALER) },
+        { id: 'act_dash', icon: <LayoutDashboard size={16} />, label: 'Dashboard', action: () => onNavigate(ViewMode.DASHBOARD) },
+        { id: 'act_inbox', icon: <Mail size={16} />, label: 'Inbox', action: () => onNavigate(ViewMode.INBOX) },
+        { id: 'act_founder', icon: <Sparkles size={16} />, label: 'Founder Briefing', action: () => onNavigate(ViewMode.ADMIN_CEO_BRIEFING) },
+        { id: 'act_clients', icon: <Users size={16} />, label: 'Clients', action: () => onNavigate(ViewMode.CRM) },
+        { id: 'act_funding', icon: <WalletCards size={16} />, label: 'Funding', action: () => onNavigate(ViewMode.FUNDING_FLOW) },
+        { id: 'act_docs', icon: <FileText size={16} />, label: 'Documents', action: () => onNavigate(ViewMode.DOCUMENTS) },
+        { id: 'act_approvals', icon: <ShieldCheck size={16} />, label: 'Approvals', action: () => onNavigate(ViewMode.REVIEW_QUEUE) },
+        { id: 'act_grants', icon: <Gift size={16} />, label: 'Grants', action: () => onNavigate(ViewMode.GRANTS) },
+        { id: 'act_library', icon: <FileText size={16} />, label: 'Learning Center', action: () => onNavigate(ViewMode.KNOWLEDGE_HUB) },
       ]
     },
     {
-      heading: 'Tools & Modules',
+      heading: 'Operations & Systems',
       items: [
-        { id: 'tool_lenders', icon: <Briefcase size={16} />, label: 'Lender Marketplace', action: () => onNavigate(ViewMode.LENDERS) },
-        { id: 'tool_intel', icon: <Target size={16} />, label: 'Market Intelligence', action: () => onNavigate(ViewMode.MARKET_INTEL) },
-        { id: 'tool_docgen', icon: <FileText size={16} />, label: 'Document Generator', action: () => onNavigate(ViewMode.DOC_GENERATOR) },
-        { id: 'tool_renew', icon: <RefreshCw size={16} />, label: 'Renewal Tracker', action: () => onNavigate(ViewMode.RENEWALS) },
-        { id: 'tool_pg', icon: <CreditCard size={16} />, label: 'PG Funding Flow', action: () => onNavigate(ViewMode.FUNDING_FLOW) },
-        { id: 'tool_exp', icon: <Receipt size={16} />, label: 'Expense Tracker', action: () => onNavigate(ViewMode.EXPENSES) },
-        { id: 'tool_syn', icon: <PieChart size={16} />, label: 'Syndication Manager', action: () => onNavigate(ViewMode.SYNDICATION) },
-        { id: 'tool_part', icon: <Briefcase size={16} />, label: 'Partner Portal', action: () => onNavigate(ViewMode.PARTNERS) },
-        { id: 'tool_auto', icon: <GitBranch size={16} />, label: 'Automation Engine', action: () => onNavigate(ViewMode.AUTOMATION) },
-        { id: 'tool_mark', icon: <Zap size={16} />, label: 'Marketing Hub', action: () => onNavigate(ViewMode.MARKETING) },
-        { id: 'tool_rep', icon: <Star size={16} />, label: 'Reputation Manager', action: () => onNavigate(ViewMode.REPUTATION) },
-        { id: 'tool_sett', icon: <Settings size={16} />, label: 'Settings', action: () => onNavigate(ViewMode.SETTINGS) },
+        { id: 'tool_ops', icon: <Search size={16} />, label: 'Opportunities', action: () => onNavigate(ViewMode.LEAD_SCOUT) },
+        { id: 'tool_outreach', icon: <Phone size={16} />, label: 'Outreach', action: () => onNavigate(ViewMode.POWER_DIALER) },
+        { id: 'tool_ai', icon: <Workflow size={16} />, label: 'AI Employees', action: () => onNavigate(ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER) },
+        { id: 'tool_platform', icon: <Server size={16} />, label: 'Platform', action: () => onNavigate(ViewMode.ADMIN_CONTROL_PLANE) },
+        { id: 'tool_billing', icon: <CreditCard size={16} />, label: 'Billing', action: () => onNavigate(ViewMode.BILLING) },
+        { id: 'tool_calendar', icon: <Calendar size={16} />, label: 'Calendar', action: () => onNavigate(ViewMode.CALENDAR) },
+        { id: 'tool_sim', icon: <Rocket size={16} />, label: 'Simulations', action: () => onNavigate(ViewMode.SCENARIO_RUNNER) },
+        { id: 'tool_settings', icon: <Settings size={16} />, label: 'Settings', action: () => onNavigate(ViewMode.SETTINGS) },
       ]
     },
     {

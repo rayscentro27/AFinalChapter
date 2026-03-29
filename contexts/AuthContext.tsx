@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth } from '../adapters';
 import { UserProfile } from '../adapters/types';
 
+const ACTIVE_TENANT_KEY = 'nexus_active_tenant_id';
+
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
@@ -26,6 +28,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const persistTenantId = (nextUser: UserProfile | null) => {
+    try {
+      if (nextUser?.tenantId) {
+        window.localStorage.setItem(ACTIVE_TENANT_KEY, nextUser.tenantId);
+      } else {
+        window.localStorage.removeItem(ACTIVE_TENANT_KEY);
+      }
+    } catch {
+      // Ignore storage failures.
+    }
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -39,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const existingUser = await auth.getCurrentUser();
         if (active) {
           setUser(existingUser);
+          persistTenantId(existingUser);
           setLoading(false);
         }
       } catch {
@@ -54,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = auth.onAuthStateChange((newUser) => {
       if (!active) return;
       setUser(newUser);
+      persistTenantId(newUser);
       setLoading(false);
     });
 
@@ -68,6 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { user: newUser, error } = await auth.signIn(email, password, captchaToken);
     if (error) throw error;
     setUser(newUser);
+    persistTenantId(newUser);
   };
 
   const signInWithGoogle = async (captchaToken?: string) => {
@@ -77,23 +94,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { user: newUser, error } = await auth.signInWithGoogle(captchaToken);
     if (error) throw error;
-    if (newUser) setUser(newUser);
+    if (newUser) {
+      setUser(newUser);
+      persistTenantId(newUser);
+    }
   };
 
   const signUp = async (data: any) => {
     const { user: newUser, error } = await auth.signUp(data);
     if (error) throw error;
     setUser(newUser);
+    persistTenantId(newUser);
   };
 
   const signOut = async () => {
     await auth.signOut();
     setUser(null);
+    persistTenantId(null);
   };
 
   const refreshUser = async () => {
     const refreshedUser = await auth.getCurrentUser();
     setUser(refreshedUser);
+    persistTenantId(refreshedUser);
   };
 
   return (

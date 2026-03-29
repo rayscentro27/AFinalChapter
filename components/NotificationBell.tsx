@@ -14,9 +14,20 @@ type TenantNotification = {
   created_at: string;
 };
 
+const ACTIVE_TENANT_KEY = 'nexus_active_tenant_id';
+
 async function getAccessToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data?.session?.access_token || null;
+}
+
+function getActiveTenantId(userTenantId?: string): string {
+  if (userTenantId) return userTenantId;
+  try {
+    return String(window.localStorage.getItem(ACTIVE_TENANT_KEY) || '').trim();
+  } catch {
+    return '';
+  }
 }
 
 const NotificationBell: React.FC = () => {
@@ -28,9 +39,10 @@ const NotificationBell: React.FC = () => {
 
   const fetchNotifications = async () => {
     const token = await getAccessToken();
-    if (!token) return;
+    const tenantId = getActiveTenantId(user?.tenantId);
+    if (!token || !tenantId) return;
 
-    const res = await fetch('/.netlify/functions/list_notifications?limit=8', {
+    const res = await fetch(`/.netlify/functions/list_notifications?tenant_id=${encodeURIComponent(tenantId)}&limit=8`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -45,9 +57,14 @@ const NotificationBell: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    fetchNotifications();
+    const poll = () => {
+      if (document.hidden) return;
+      void fetchNotifications();
+    };
 
-    const interval = setInterval(fetchNotifications, 15000);
+    poll();
+
+    const interval = window.setInterval(poll, 60000);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -55,12 +72,20 @@ const NotificationBell: React.FC = () => {
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        void fetchNotifications();
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       clearInterval(interval);
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user?.id]);
+  }, [user?.id, user?.tenantId]);
 
   const toggleDropdown = () => {
     setIsOpen(!isOpen);
@@ -74,12 +99,13 @@ const NotificationBell: React.FC = () => {
     setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
 
     const token = await getAccessToken();
-    if (!token) return;
+    const tenantId = getActiveTenantId(user?.tenantId);
+    if (!token || !tenantId) return;
 
     await fetch('/.netlify/functions/mark_notification_read', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ notification_id: n.id }),
+      body: JSON.stringify({ tenant_id: tenantId, notification_id: n.id }),
     });
   };
 

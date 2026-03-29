@@ -4,6 +4,28 @@ import { supabase } from '../../lib/supabaseClient';
 import { DataAdapter } from '../types';
 import { Contact, AgencyBranding, Tenant } from '../../types';
 
+const BRANDING_CACHE_KEY = 'nexus_branding_cache';
+
+function readCachedBranding(): AgencyBranding | null {
+  try {
+    const stored = window.localStorage.getItem(BRANDING_CACHE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed as AgencyBranding;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedBranding(branding: AgencyBranding) {
+  try {
+    window.localStorage.setItem(BRANDING_CACHE_KEY, JSON.stringify(branding));
+  } catch {
+    // Best effort only.
+  }
+}
+
 export const supabaseDataAdapter: DataAdapter = {
   getContacts: async () => {
     const { data, error } = await supabase
@@ -88,37 +110,18 @@ export const supabaseDataAdapter: DataAdapter = {
   },
 
   getBranding: async () => {
-    const { data, error } = await supabase
-      .from('audit_logs')
-      .select('meta')
-      .eq('action', 'initialize_portal')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    const cached = typeof window !== 'undefined' ? readCachedBranding() : null;
+    if (cached) return cached;
 
-    if (error || !data || !data.meta?.branding) {
-        return { name: 'Nexus OS', primaryColor: '#66FCF1' };
-    }
-    
-    return data.meta.branding as AgencyBranding;
+    // Browser-side branding should never depend on audit_logs because that
+    // table is intentionally restricted in production. Fall back to a safe
+    // default and let admin screens persist branding through their own flow.
+    return { name: 'Nexus OS', primaryColor: '#66FCF1' };
   },
 
   updateBranding: async (branding) => {
-    // Branding persists in the most recent initialization log
-    const { data: log } = await supabase
-        .from('audit_logs')
-        .select('id, meta')
-        .eq('action', 'initialize_portal')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-    
-    if (log) {
-        const updatedMeta = { ...log.meta, branding };
-        await supabase
-            .from('audit_logs')
-            .update({ meta: updatedMeta })
-            .eq('id', log.id);
+    if (typeof window !== 'undefined') {
+      writeCachedBranding(branding);
     }
     
     return branding;

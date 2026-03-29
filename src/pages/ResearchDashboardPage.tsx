@@ -88,9 +88,23 @@ async function fetchResearch(
     headers,
   });
 
-  const payload = await response.json().catch(() => ({}));
+  const contentType = response.headers.get('content-type') || '';
+  const raw = await response.text();
+  let payload: any = {};
+
+  if (contentType.includes('application/json')) {
+    try {
+      payload = raw ? JSON.parse(raw) : {};
+    } catch {
+      payload = { raw };
+    }
+  } else if (raw.trim()) {
+    payload = { raw };
+  }
+
   if (!response.ok) {
-    throw new Error(String(payload?.error || `Request failed: ${response.status}`));
+    const fallback = raw.trim().startsWith('<') ? `Request failed: ${response.status}` : `Request failed: ${response.status}`;
+    throw new Error(String(payload?.error || fallback));
   }
 
   return payload;

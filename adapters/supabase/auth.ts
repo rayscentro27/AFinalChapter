@@ -135,34 +135,39 @@ async function enforceSsoConstraints(user: any): Promise<void> {
   }
 }
 
-const resolveRoleFromMemberships = async (userId: string, fallbackRole: any): Promise<UserProfile['role']> => {
+const resolveProfileFromMemberships = async (userId: string, fallbackRole: any): Promise<{ role: UserProfile['role']; tenantId?: string }> => {
   try {
     const rows = await resolveMembershipRows(userId);
-    if (!rows.length) return coerceRole(fallbackRole);
+    if (!rows.length) return { role: coerceRole(fallbackRole) };
 
     let best: UserProfile['role'] = coerceRole(fallbackRole);
+    let bestTenantId = String(rows[0]?.tenant_id || '').trim() || undefined;
     for (const row of rows) {
       const r = coerceRole(row?.role);
-      if (ROLE_PRIORITY[r] > ROLE_PRIORITY[best]) best = r;
+      if (ROLE_PRIORITY[r] > ROLE_PRIORITY[best]) {
+        best = r;
+        bestTenantId = String(row?.tenant_id || '').trim() || bestTenantId;
+      }
     }
 
-    return best;
+    return { role: best, tenantId: bestTenantId };
   } catch {
-    return coerceRole(fallbackRole);
+    return { role: coerceRole(fallbackRole) };
   }
 };
 
 const toUserProfile = async (user: any): Promise<UserProfile> => {
   await enforceSsoConstraints(user);
 
-  const resolvedRole = await resolveRoleFromMemberships(user.id, user.user_metadata?.role);
+  const resolved = await resolveProfileFromMemberships(user.id, user.user_metadata?.role);
   return {
     id: user.id,
     email: user.email!,
     name: user.user_metadata?.name || '',
-    role: resolvedRole,
+    role: resolved.role,
     onboardingComplete: user.user_metadata?.onboardingComplete,
     commissionSplit: user.user_metadata?.commissionSplit,
+    tenantId: resolved.tenantId,
   };
 };
 

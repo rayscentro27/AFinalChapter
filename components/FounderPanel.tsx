@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { fetchIntegrationReadiness, fetchIntegrationSummary } from '../services/integrationManager';
 import { fintechShell } from './portal/fintechStyles';
-import { ShieldCheck, Rocket, Layers, BarChart3 } from 'lucide-react';
+import { ShieldCheck, Rocket, Layers, BarChart3, Workflow, ArrowRight } from 'lucide-react';
 import { AiEmployeeBadge } from './AiEmployeeBadge';
 
 /**
- * Nexus Founder Panel: Focused dashboard for the "Nexus Founder" AI persona.
- * Surfaces founder-specific metrics, readiness, and system-first recommendations.
+ * Nexus Founder Panel: executive review layer for the "Nexus Founder" AI persona.
+ * Surfaces readiness, blockers, and AI-prepared next actions for review.
  */
 const founderTips = [
   'Eliminate low-value work before scaling.',
@@ -23,6 +23,11 @@ const readinessChecklist = [
   'Business bank account connected',
   'EIN and compliance docs ready'
 ];
+
+function openWorkforceCenter() {
+  window.history.pushState({}, '', '/admin/ai-command-center');
+  window.location.hash = 'admin_super_admin_command_center';
+}
 
 export default function FounderPanel() {
   const [readiness, setReadiness] = useState<any>(null);
@@ -56,7 +61,26 @@ export default function FounderPanel() {
         <h1 className="text-3xl font-black text-blue-900 mb-2 flex items-center gap-2">
           <AiEmployeeBadge employee="Nexus Founder" size={40} />
         </h1>
-        <p className="text-slate-600 text-lg">Executive command layer: see what matters now, what is blocked, and what needs action.</p>
+        <p className="text-slate-600 text-lg">Founder briefing layer: review the AI summary, blockers, approvals, and next actions.</p>
+      </div>
+      <div className="mb-8 rounded-2xl border border-blue-100 bg-white p-5 shadow-md">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-widest text-blue-700">AI Employees</div>
+            <div className="mt-2 text-lg font-black text-slate-900">Open the employee command center</div>
+            <p className="mt-2 text-sm text-slate-600">Review named employees, runtime services, recent reports, and the dependencies affecting the workforce.</p>
+          </div>
+          <button
+            type="button"
+            onClick={openWorkforceCenter}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-widest text-white"
+          >
+            Open Command Center <ArrowRight size={14} />
+          </button>
+        </div>
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+          <Workflow size={12} /> Review-first, not debug-first
+        </div>
       </div>
       {loading ? (
         <div className="text-slate-500">Loading integration status...</div>
@@ -66,7 +90,7 @@ export default function FounderPanel() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
             <div className={`${fintechShell} p-6 rounded-2xl border border-blue-100 bg-white shadow-md`}>
-              <h2 className="text-lg font-bold text-blue-700 mb-3 flex items-center gap-2"><ShieldCheck /> Readiness</h2>
+              <h2 className="text-lg font-bold text-blue-700 mb-3 flex items-center gap-2"><ShieldCheck /> Launch Readiness</h2>
               <ul className="list-disc ml-6 text-sm text-slate-700 space-y-2">
                 <li>Core Services: <b className={readiness.core_services ? 'text-emerald-600' : 'text-red-600'}>{readiness.core_services ? 'Ready' : 'Not Ready'}</b></li>
                 <li>AI Access: <b className={readiness.ai_access ? 'text-emerald-600' : 'text-red-600'}>{readiness.ai_access ? 'Ready' : 'Not Ready'}</b></li>
@@ -77,7 +101,7 @@ export default function FounderPanel() {
               </ul>
             </div>
             <div className={`${fintechShell} p-6 rounded-2xl border border-emerald-100 bg-white shadow-md`}>
-              <h2 className="text-lg font-bold text-emerald-700 mb-3 flex items-center gap-2"><Rocket /> System Guidance</h2>
+              <h2 className="text-lg font-bold text-emerald-700 mb-3 flex items-center gap-2"><Rocket /> Review Guidance</h2>
               <ul className="list-disc ml-6 text-sm text-slate-700 space-y-2">
                 {readiness.blocking && readiness.blocking.length > 0 ? (
                   <li className="text-red-600">Blocking: {readiness.blocking.join(', ')}</li>

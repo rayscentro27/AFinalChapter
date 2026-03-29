@@ -1,7 +1,6 @@
 ﻿
 import React, { useMemo, useState } from 'react';
 import {
-  BarChart3,
   Building2,
   Calendar,
   CreditCard,
@@ -16,14 +15,11 @@ import {
   Menu,
   MessageSquare,
   Phone,
-  Rocket,
   Search,
-  Send,
   Server,
   Settings,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Users,
   WalletCards,
   Workflow,
@@ -81,7 +77,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const derivedPendingDocCount = pendingDocCount || contacts.flatMap(c => c.documents || []).filter(d => d.status === 'Pending Review').length || 0;
   const unreadMessages = contacts.reduce((count, contact) => count + (contact.messageHistory?.filter((message) => !message.read && message.sender === 'client').length || 0), 0);
   const triageCount = contacts.filter((contact) => contact.status === 'Triage' || contact.automationMetadata?.sentiment === 'Critical').length;
-  const activeAiCount = contacts.filter((contact) => contact.automationMetadata?.intensity && contact.status !== 'Closed').length;
 
   const clientSections = useMemo<NavSection[]>(() => {
     if (userRole === 'client') {
@@ -89,11 +84,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         {
           label: 'Portal',
           items: [
-            { view: ViewMode.PORTAL, label: 'Home', icon: Home },
-            { view: ViewMode.PORTAL_CREDIT, label: 'Credit Scores', icon: ShieldCheck },
-            { view: ViewMode.PORTAL_FUNDING, label: 'Funding Options', icon: WalletCards },
+            { view: ViewMode.PORTAL, label: 'Next Action', icon: Home },
             { view: ViewMode.PORTAL_BUSINESS, label: 'Business Setup', icon: Building2 },
-            { view: ViewMode.PORTAL_GRANTS, label: 'Grants Discovery', icon: Gift },
+            { view: ViewMode.PORTAL_CREDIT, label: 'Credit Profile', icon: ShieldCheck },
+            { view: ViewMode.PORTAL_FUNDING, label: 'Funding Readiness', icon: WalletCards },
+            { view: ViewMode.PORTAL_GRANTS, label: 'Grants', icon: Gift },
           ],
         },
         {
@@ -112,14 +107,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     return [];
   }, [userRole]);
 
-  // New flow-first sidebar structure
   const commandItems = [
     { view: ViewMode.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
-    { view: ViewMode.INBOX, label: 'Unified Inbox', icon: Inbox, badge: unreadMessages || undefined },
-    { view: 'FOUNDER', label: 'Founder', icon: Crown, adminOnly: true },
+    { view: ViewMode.INBOX, label: 'Inbox', icon: Inbox, badge: unreadMessages || undefined },
+    { view: ViewMode.ADMIN_CEO_BRIEFING, label: 'Founder', icon: Crown, adminOnly: true },
   ].filter((item) => !item.adminOnly || isAdmin);
 
-  // Operations group
   const operationsItems = [
     { view: ViewMode.CRM, label: 'Clients', icon: Users, badge: contacts.length || undefined },
     { view: ViewMode.FUNDING_FLOW, label: 'Funding', icon: WalletCards },
@@ -129,61 +122,23 @@ const Sidebar: React.FC<SidebarProps> = ({
     { view: ViewMode.GRANTS, label: 'Grants', icon: Gift },
   ];
 
-  // Growth group
   const growthItems = [
-    { view: ViewMode.LEAD_SCOUT, label: 'Opportunities', icon: Search },
-    { view: ViewMode.POWER_DIALER, label: 'Outreach', icon: MessageSquare },
+    { view: ViewMode.LEAD_SCOUT, label: 'Opportunities', icon: Search, badge: contacts.filter((contact) => contact.status === 'Lead').length || undefined },
+    { view: ViewMode.POWER_DIALER, label: 'Outreach', icon: Phone },
   ];
 
-  // AI group
-  const aiItems = [
-    { view: ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER, label: 'AI Workforce', icon: Sparkles, badge: activeAiCount || undefined, adminOnly: true },
-  ].filter((item) => !item.adminOnly || isAdmin);
-
-  // System group
-  const systemItems = [
-    { view: 'PLATFORM', label: 'Platform', icon: Server },
-    { view: ViewMode.BILLING, label: 'Billing', icon: CreditCard },
-  ];
-
-  // Advanced group
   const advancedItems: NavItem[] = [
     { view: ViewMode.CALENDAR, label: 'Calendar', icon: Calendar },
-    { view: ViewMode.STRATEGY_SANDBOX, label: 'Simulations', icon: Rocket },
+    { view: ViewMode.SCENARIO_RUNNER, label: 'Simulations', icon: Workflow },
   ];
 
-  // Pipeline grouping: Growth (Leads, Clients, Outreach)
-  const growthItems = [
-    { view: ViewMode.LEAD_SCOUT, label: 'Leads', icon: Search }, // Lead Scout → Leads
-    { view: ViewMode.CRM, label: 'Clients', icon: Users, badge: contacts.length || undefined },
-    { view: ViewMode.POWER_DIALER, label: 'Outreach', icon: MessageSquare }, // Power Dialer + Messaging Bridge → Outreach
-  ];
-
-  // Move Calendar, Automation, Strategy Sandbox, Sales Trainer, Marketing under collapsed Advanced
-  const advancedItems: NavItem[] = [
-    { view: ViewMode.CALENDAR, label: 'Calendar', icon: Calendar },
-    { view: ViewMode.AUTOMATION, label: 'Automation', icon: Workflow },
-    { view: ViewMode.STRATEGY_SANDBOX, label: 'Strategy Sandbox', icon: Rocket },
-    { view: ViewMode.SALES_TRAINER, label: 'Sales Trainer', icon: MessageSquare },
-    { view: ViewMode.MARKETING, label: 'Marketing', icon: Send },
-    // The rest remain as occasional tools
-    { view: ViewMode.FUNDING_FLOW, label: 'Funding Applications', icon: WalletCards },
-    { view: ViewMode.GRANTS, label: 'Grants', icon: Gift },
-    { view: ViewMode.DOCUMENTS, label: 'Document Vault', icon: FileText },
-    { view: ViewMode.UPLOAD_CREDIT_REPORT, label: 'Credit Upload', icon: ShieldCheck },
-    { view: ViewMode.BILLING, label: 'Billing', icon: CreditCard },
+  const aiItems: NavItem[] = [
+    { view: ViewMode.ADMIN_SUPER_ADMIN_COMMAND_CENTER, label: 'AI Employees', icon: Workflow },
   ];
 
   const systemItems: NavItem[] = [
-    { view: ViewMode.ADMIN_CEO_BRIEFING, label: 'CEO Briefing', icon: Sparkles, adminOnly: true },
-    { view: ViewMode.ADMIN_COMMAND_INBOX, label: 'Command Inbox', icon: Inbox, adminOnly: true },
-    { view: ViewMode.RESEARCH_DASHBOARD, label: 'Analytics', icon: BarChart3 },
-    { view: ViewMode.KNOWLEDGE_HUB, label: 'Knowledge Hub', icon: Search },
-    { view: ViewMode.INFRA_MONITOR, label: 'Infrastructure', icon: Server },
-    { view: ViewMode.ADMIN_EXECUTIVE_DASHBOARD, label: 'Executive Dashboard', icon: Building2, adminOnly: true },
-    { view: ViewMode.ADMIN_CONTROL_PLANE, label: 'Control Plane', icon: ShieldAlert, adminOnly: true },
-    { view: ViewMode.ADMIN_HEALTH, label: 'Gateway Health', icon: Server, adminOnly: true },
-    { view: ViewMode.SETTINGS, label: 'Settings', icon: Settings },
+    { view: ViewMode.ADMIN_CONTROL_PLANE, label: 'Platform', icon: Server, adminOnly: true },
+    { view: ViewMode.BILLING, label: 'Billing', icon: CreditCard },
   ].filter((item) => !item.adminOnly || isAdmin);
 
   const toggleSection = (key: CollapsibleKey) => {

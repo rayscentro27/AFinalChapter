@@ -10,6 +10,7 @@ export interface UserProfile {
   // Added optional properties to support staff onboarding and commissions
   onboardingComplete?: boolean;
   commissionSplit?: number;
+  tenantId?: string;
 }
 
 export interface AuthAdapter {

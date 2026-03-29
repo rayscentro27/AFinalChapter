@@ -5,6 +5,8 @@ import { Contact } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
+const BRANDING_CACHE_KEY = 'nexus_branding_cache';
+
 interface OnboardingQuestionnaireProps {
   contact: Contact;
   onComplete: (updatedContact: Contact) => void;
@@ -38,30 +40,19 @@ const OnboardingQuestionnaire: React.FC<OnboardingQuestionnaireProps> = ({ conta
         .from('tenant_memberships')
         .select('tenant_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (!membership) throw new Error("No tenant membership found.");
 
-      // 2. Map Magnitude & Branding to Audit Logs
-      const { error: aError } = await supabase
-        .from('audit_logs')
-        .insert({
-          tenant_id: membership.tenant_id,
-          user_id: user.id,
-          action: 'initialize_portal',
-          entity_type: 'tenant',
-          entity_id: membership.tenant_id,
-          meta: { 
-            magnitude: Number(formData.goal),
-            revenue: Number(formData.revenue),
-            branding: {
-              name: formData.companyName || 'Nexus OS',
-              primaryColor: '#66FCF1'
-            }
-          }
-        });
-
-      if (aError) throw aError;
+      // 2. Persist branding locally for the browser app.
+      try {
+        window.localStorage.setItem(BRANDING_CACHE_KEY, JSON.stringify({
+          name: formData.companyName || 'Nexus OS',
+          primaryColor: '#66FCF1',
+        }));
+      } catch {
+        // Ignore storage failures; onboarding can continue.
+      }
 
       // Generate baseline tasks for this tenant (idempotent) via Netlify function.
       try {

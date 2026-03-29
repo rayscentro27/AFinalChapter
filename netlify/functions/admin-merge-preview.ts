@@ -38,7 +38,10 @@ export const handler: Handler = async (event) => {
     return json(proxied.status, proxied.json || {});
   } catch (error: any) {
     const statusCode = Number(error?.statusCode) || 400;
-    return json(statusCode, { ok: false, error: String(error?.message || 'bad_request') });
+    // Log the detailed error server-side (optional: use a logger)
+    console.error('admin-merge-preview error:', error);
+    // Return a generic error message to the client
+    return json(statusCode, { ok: false, error: 'internal_server_error' });
   }
 };
 
