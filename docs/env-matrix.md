@@ -1,5 +1,15 @@
 # Env Matrix (Phase 1)
 
+## Local file layout
+- Frontend browser vars: `env/frontend/.env`
+- Gateway / Oracle VM vars: `env/gateway/.env`
+- Netlify Functions vars: `env/netlify-functions/.env`
+- Supabase auth parity / local captcha: `env/supabase-auth/.env`
+- Mac Mini worker vars: `env/mac-mini-worker/.env`
+- Tenant credential staging sheet: `env/tenant-integrations/.env`
+
+Fill one file at a time, save, then verify before moving to the next.
+
 ## Backend (Fastify gateway on Oracle VM)
 
 ### Required at startup (secret)
