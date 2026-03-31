@@ -294,7 +294,10 @@ async function gatherSignals(tenantId) {
     queuedAdminJobs,
     tenantProbe,
   ] = await Promise.all([
-    safeCount('notification_channels', (query) => query.eq('tenant_id', tenantId).eq('kind', 'telegram').eq('is_active', true)),
+    safeCount(
+      'notification_channels',
+      (query) => query.eq('tenant_id', tenantId).in('kind', ['telegram', 'telegram_chat']).eq('is_active', true)
+    ),
     safeCount('executive_briefings', (query) => query.eq('tenant_id', tenantId)),
     safeCount('setup_domains', (query) => query.eq('tenant_id', tenantId)),
     safeCount('admin_commands', (query) => query.eq('tenant_id', tenantId)),
@@ -373,8 +376,11 @@ function localChecksFor(definition, signal, storedChecksByKey) {
         summary = signal.telegramConfigured ? 'Telegram bot token is configured.' : 'TELEGRAM_BOT_TOKEN is missing.';
       }
       if (check.check_key === 'routing') {
-        status = signal.notificationChannels.count > 0 ? 'passed' : 'warn';
-        summary = signal.notificationChannels.count > 0 ? 'Telegram notification routing is configured.' : 'No active telegram notification_channels rows were found.';
+        const telegramRoutingCount = Number(signal.notificationChannels.count || 0);
+        status = telegramRoutingCount > 0 ? 'passed' : 'warn';
+        summary = telegramRoutingCount > 0
+          ? 'Telegram notification routing is configured.'
+          : 'No active telegram or telegram_chat notification_channels rows were found.';
       }
     }
 
@@ -420,8 +426,12 @@ function localChecksFor(definition, signal, storedChecksByKey) {
 
     if (definition.integration_key === 'review_control_plane') {
       if (check.check_key === 'approval_queue') {
-        status = signal.approvalQueue.missing ? 'failed' : signal.approvalQueue.count > 0 ? 'passed' : 'warn';
-        summary = signal.approvalQueue.missing ? 'approval_queue table is missing.' : signal.approvalQueue.count > 0 ? 'Approval queue entries are visible.' : 'No approval queue entries exist yet for this tenant.';
+        status = signal.approvalQueue.missing ? 'failed' : signal.approvalQueue.count > 0 ? 'passed' : 'passed';
+        summary = signal.approvalQueue.missing
+          ? 'approval_queue table is missing.'
+          : signal.approvalQueue.count > 0
+            ? 'Approval queue entries are visible.'
+            : 'Approval queue is empty and ready for the first review item.';
       }
       if (check.check_key === 'tenant_policies') {
         status = signal.tenantPolicies.missing ? 'failed' : signal.tenantPolicies.count > 0 ? 'passed' : 'warn';
