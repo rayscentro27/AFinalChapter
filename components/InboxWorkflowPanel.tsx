@@ -98,7 +98,8 @@ function deriveAiMode(row: Partial<WorkflowConversationRow>): AiMode {
   return 'off';
 }
 
-function deriveEffectiveOwner(row: Partial<WorkflowConversationRow>): string {
+function deriveEffectiveOwner(row?: Partial<WorkflowConversationRow> | null): string {
+  if (!row) return '';
   return String(row.owner_user_id || row.assigned_staff_user_id || row.assignee_user_id || '').trim();
 }
 
