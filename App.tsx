@@ -75,6 +75,8 @@ const AdminFunnelControlCenterPage = lazy(() => import('./src/pages/AdminFunnelC
 const AdminWhiteLabelSettingsPage = lazy(() => import('./src/pages/AdminWhiteLabelSettingsPage'));
 const AdminExecutiveDashboardPage = lazy(() => import('./src/pages/AdminExecutiveDashboardPage'));
 const AdminActivationCenterPage = lazy(() => import('./src/pages/AdminActivationCenterPage'));
+const AdminHermesPage = lazy(() => import('./src/pages/AdminHermesPage'));
+const AdminTradingLabPage = lazy(() => import('./src/pages/AdminTradingLabPage'));
 const AdminCredentialManagementPage = lazy(() => import('./src/pages/AdminCredentialManagementPage'));
 const AdminDealEscalationsPage = lazy(() => import('./src/pages/AdminDealEscalationsPage'));
 const LifecycleAutomationPage = lazy(() => import('./src/pages/LifecycleAutomationPage'));
@@ -219,6 +221,8 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/funnel-control': ViewMode.ADMIN_FUNNEL_CONTROL_CENTER,
   '/admin/white-label': ViewMode.ADMIN_WHITE_LABEL_SETTINGS,
   '/admin/executive-dashboard': ViewMode.ADMIN_EXECUTIVE_DASHBOARD,
+  '/admin/hermes': ViewMode.ADMIN_HERMES,
+  '/admin/trading-lab': ViewMode.ADMIN_TRADING_LAB,
   '/admin/nexus-one': ViewMode.ADMIN_NEXUS_ONE,
   '/admin/credentials': ViewMode.ADMIN_CREDENTIALS,
   '/admin/deal-escalations': ViewMode.ADMIN_DEAL_ESCALATIONS,
@@ -920,6 +924,8 @@ export const App = () => {
                     case ViewMode.ADMIN_FUNNEL_CONTROL_CENTER: return <AdminFunnelControlCenterPage />;
                     case ViewMode.ADMIN_WHITE_LABEL_SETTINGS: return <AdminWhiteLabelSettingsPage />;
                     case ViewMode.ADMIN_EXECUTIVE_DASHBOARD: return <AdminExecutiveDashboardPage />;
+                    case ViewMode.ADMIN_HERMES: return <AdminHermesPage />;
+                    case ViewMode.ADMIN_TRADING_LAB: return <AdminTradingLabPage />;
                     case ViewMode.ADMIN_NEXUS_ONE: return <AdminActivationCenterPage />;
                     case ViewMode.ADMIN_CREDENTIALS: return <AdminCredentialManagementPage />;
                     case ViewMode.ADMIN_DEAL_ESCALATIONS: return <AdminDealEscalationsPage />;

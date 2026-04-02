@@ -23,6 +23,12 @@ export type TradingAccessSnapshot = {
   paper_trading_recommended: boolean;
   reserve_confirmed: boolean;
   business_growth_positioned: boolean;
+  trading_access_tier: 'super_admin' | 'internal_operator' | 'client_basic' | 'client_intermediate' | 'client_advanced';
+  trading_stage: 'education_only' | 'paper_trading' | 'strategy_view' | 'demo_broker_enabled' | 'admin_lab_full';
+  admin_lab_enabled: boolean;
+  strategy_access_allowed: boolean;
+  demo_connection_allowed: boolean;
+  trading_level: number;
   updated_at: string | null;
 };
 
@@ -40,6 +46,12 @@ type AccessRow = {
   disclaimer_accepted_at: string | null;
   paper_trading_acknowledged: boolean;
   access_status: 'locked' | 'eligible_pending' | 'in_progress' | 'ready' | 'unlocked';
+  trading_access_tier: 'super_admin' | 'internal_operator' | 'client_basic' | 'client_intermediate' | 'client_advanced';
+  trading_stage: 'education_only' | 'paper_trading' | 'strategy_view' | 'demo_broker_enabled' | 'admin_lab_full';
+  admin_lab_enabled: boolean;
+  strategy_access_allowed: boolean;
+  demo_connection_allowed: boolean;
+  trading_level: number;
   metadata: Record<string, unknown>;
   updated_at: string | null;
 };
@@ -142,7 +154,7 @@ async function readAccessRow(
   const { data, error } = await supabase
     .from('user_advanced_access')
     .select(
-      'tenant_id,user_id,feature_key,eligibility_status,unlocked_by_rule,opted_in,opted_in_at,intro_video_url,intro_video_watched_at,disclaimer_version,disclaimer_accepted_at,paper_trading_acknowledged,access_status,metadata,updated_at'
+      'tenant_id,user_id,feature_key,eligibility_status,unlocked_by_rule,opted_in,opted_in_at,intro_video_url,intro_video_watched_at,disclaimer_version,disclaimer_accepted_at,paper_trading_acknowledged,access_status,trading_access_tier,trading_stage,admin_lab_enabled,strategy_access_allowed,demo_connection_allowed,trading_level,metadata,updated_at'
     )
     .eq('tenant_id', tenantId)
     .eq('user_id', userId)
@@ -168,6 +180,60 @@ function computeAccessStatus(params: {
   return 'ready';
 }
 
+async function resolveTenantRoles(
+  supabase: SupabaseClient,
+  tenantId: string,
+  userId: string
+): Promise<string[]> {
+  const roles: string[] = [];
+
+  const { data: memberships } = await supabase
+    .from('tenant_memberships')
+    .select('role')
+    .eq('tenant_id', tenantId)
+    .eq('user_id', userId);
+
+  (memberships || []).forEach((row: any) => {
+    const role = String(row?.role || '').toLowerCase();
+    if (role) roles.push(role);
+  });
+
+  if (roles.length > 0) return Array.from(new Set(roles));
+
+  const { data: legacy } = await supabase
+    .from('tenant_members')
+    .select('role')
+    .eq('tenant_id', tenantId)
+    .eq('user_id', userId);
+
+  (legacy || []).forEach((row: any) => {
+    const role = String(row?.role || '').toLowerCase();
+    if (role) roles.push(role);
+  });
+
+  return Array.from(new Set(roles));
+}
+
+function computeTradingLevel(params: {
+  eligible: boolean;
+  optedIn: boolean;
+  videoComplete: boolean;
+  disclaimerComplete: boolean;
+  paperAcknowledged: boolean;
+  strategyAccessAllowed: boolean;
+  demoConnectionAllowed: boolean;
+}): number {
+  let level = 0;
+  if (params.eligible) level = Math.max(level, 10);
+  if (params.optedIn) level = Math.max(level, 25);
+  if (params.videoComplete) level = Math.max(level, 40);
+  if (params.disclaimerComplete) level = Math.max(level, 55);
+  if (params.paperAcknowledged) level = Math.max(level, 70);
+  if (params.strategyAccessAllowed) level = Math.max(level, 80);
+  if (params.demoConnectionAllowed) level = Math.max(level, 90);
+  return level;
+}
+
 async function upsertAccessRow(
   supabase: SupabaseClient,
   input: {
@@ -177,6 +243,12 @@ async function upsertAccessRow(
     eligible: boolean;
     accessStatus: 'locked' | 'eligible_pending' | 'in_progress' | 'ready' | 'unlocked';
     introVideoUrl: string | null;
+    tradingAccessTier: TradingAccessSnapshot['trading_access_tier'];
+    tradingStage: TradingAccessSnapshot['trading_stage'];
+    adminLabEnabled: boolean;
+    strategyAccessAllowed: boolean;
+    demoConnectionAllowed: boolean;
+    tradingLevel: number;
   }
 ): Promise<AccessRow> {
   const payload = {
@@ -193,6 +265,12 @@ async function upsertAccessRow(
     disclaimer_accepted_at: input.existing?.disclaimer_accepted_at || null,
     paper_trading_acknowledged: Boolean(input.existing?.paper_trading_acknowledged),
     access_status: input.accessStatus,
+    trading_access_tier: input.tradingAccessTier,
+    trading_stage: input.tradingStage,
+    admin_lab_enabled: input.adminLabEnabled,
+    strategy_access_allowed: input.strategyAccessAllowed,
+    demo_connection_allowed: input.demoConnectionAllowed,
+    trading_level: input.tradingLevel,
     metadata: input.existing?.metadata || {},
   };
 
@@ -200,7 +278,7 @@ async function upsertAccessRow(
     .from('user_advanced_access')
     .upsert(payload, { onConflict: 'tenant_id,user_id,feature_key' })
     .select(
-      'tenant_id,user_id,feature_key,eligibility_status,unlocked_by_rule,opted_in,opted_in_at,intro_video_url,intro_video_watched_at,disclaimer_version,disclaimer_accepted_at,paper_trading_acknowledged,access_status,metadata,updated_at'
+      'tenant_id,user_id,feature_key,eligibility_status,unlocked_by_rule,opted_in,opted_in_at,intro_video_url,intro_video_watched_at,disclaimer_version,disclaimer_accepted_at,paper_trading_acknowledged,access_status,trading_access_tier,trading_stage,admin_lab_enabled,strategy_access_allowed,demo_connection_allowed,trading_level,metadata,updated_at'
     )
     .single();
 
@@ -304,12 +382,20 @@ export async function buildTradingAccessSnapshot(
     reconcileTasks?: boolean;
   }
 ): Promise<TradingAccessSnapshot> {
-  const [approvedFunding, capitalProfile, allocation, existingAccess] = await Promise.all([
+  const [approvedFunding, capitalProfile, allocation, existingAccess, membershipRoles, adminCompat] = await Promise.all([
     hasApprovedFunding(supabase, params.tenantId, params.userId),
     readCapitalProfile(supabase, params.tenantId, params.userId),
     readAllocationChoice(supabase, params.tenantId, params.userId),
     readAccessRow(supabase, params.tenantId, params.userId),
+    resolveTenantRoles(supabase, params.tenantId, params.userId),
+    supabase.rpc('nexus_is_master_admin_compat').then((res) => res.data).catch(() => false),
   ]);
+
+  const normalizedRoles = membershipRoles.map((role) => String(role || '').toLowerCase());
+  const isSuperAdminRole = normalizedRoles.some((role) => role === 'admin' || role === 'super_admin' || role === 'superadmin');
+  const isInternalOperatorRole = normalizedRoles.some((role) => role === 'supervisor');
+  const isSuperAdmin = Boolean(adminCompat) || isSuperAdminRole;
+  const isInternalOperator = isSuperAdmin || isInternalOperatorRole;
 
   const reserveConfirmed = Boolean(capitalProfile?.reserve_confirmed);
   const setupStatus = String(capitalProfile?.capital_setup_status || 'not_started').toLowerCase();
@@ -336,16 +422,65 @@ export async function buildTradingAccessSnapshot(
   const videoComplete = Boolean(existingAccess?.intro_video_watched_at);
   const disclaimerVersion = String(existingAccess?.disclaimer_version || DEFAULT_DISCLAIMER_VERSION);
   const disclaimerComplete = Boolean(existingAccess?.disclaimer_accepted_at) && disclaimerVersion.length > 0;
-  const accessReady = eligible && optedIn && videoComplete && disclaimerComplete;
-  const accessStatus = computeAccessStatus({ eligible, optedIn, videoComplete, disclaimerComplete, accessReady });
+  const baseAccessReady = eligible && optedIn && videoComplete && disclaimerComplete;
+  const accessReady = isInternalOperator ? true : baseAccessReady;
+  const accessStatus = isInternalOperator ? 'unlocked' : computeAccessStatus({ eligible, optedIn, videoComplete, disclaimerComplete, accessReady });
+  const paperAcknowledged = Boolean(existingAccess?.paper_trading_acknowledged);
+
+  const strategyAccessAllowed = isInternalOperator ? true : Boolean(existingAccess?.strategy_access_allowed) || paperAcknowledged;
+  const demoConnectionAllowed = isInternalOperator ? true : Boolean(existingAccess?.demo_connection_allowed);
+
+  let tradingAccessTier: TradingAccessSnapshot['trading_access_tier'] = 'client_basic';
+  let tradingStage: TradingAccessSnapshot['trading_stage'] = 'education_only';
+  let adminLabEnabled = false;
+
+  if (isSuperAdmin) {
+    tradingAccessTier = 'super_admin';
+    tradingStage = 'admin_lab_full';
+    adminLabEnabled = true;
+  } else if (isInternalOperator) {
+    tradingAccessTier = 'internal_operator';
+    tradingStage = 'admin_lab_full';
+    adminLabEnabled = true;
+  } else if (demoConnectionAllowed) {
+    tradingAccessTier = 'client_advanced';
+    tradingStage = 'demo_broker_enabled';
+  } else if (strategyAccessAllowed) {
+    tradingAccessTier = 'client_advanced';
+    tradingStage = 'strategy_view';
+  } else if (accessReady) {
+    tradingAccessTier = 'client_intermediate';
+    tradingStage = 'paper_trading';
+  } else {
+    tradingAccessTier = 'client_basic';
+    tradingStage = 'education_only';
+  }
+
+  const tradingLevel = isInternalOperator
+    ? 100
+    : computeTradingLevel({
+        eligible,
+        optedIn,
+        videoComplete,
+        disclaimerComplete,
+        paperAcknowledged,
+        strategyAccessAllowed,
+        demoConnectionAllowed,
+      });
 
   const saved = await upsertAccessRow(supabase, {
     tenantId: params.tenantId,
     userId: params.userId,
     existing: existingAccess,
-    eligible,
+    eligible: isInternalOperator ? true : eligible,
     accessStatus,
     introVideoUrl: defaultIntroVideoUrl(),
+    tradingAccessTier,
+    tradingStage,
+    adminLabEnabled,
+    strategyAccessAllowed,
+    demoConnectionAllowed,
+    tradingLevel,
   });
 
   if (params.reconcileTasks) {
@@ -364,8 +499,8 @@ export async function buildTradingAccessSnapshot(
     tenant_id: params.tenantId,
     user_id: params.userId,
     feature_key: ADVANCED_TRADING_FEATURE,
-    eligible,
-    blockers,
+    eligible: isInternalOperator ? true : eligible,
+    blockers: isInternalOperator ? [] : blockers,
     unlocked: accessReady,
     opted_in: optedIn,
     video_complete: videoComplete,
@@ -380,6 +515,12 @@ export async function buildTradingAccessSnapshot(
     paper_trading_recommended: true,
     reserve_confirmed: reserveConfirmed,
     business_growth_positioned: businessGrowthPositioned,
+    trading_access_tier: saved.trading_access_tier || tradingAccessTier,
+    trading_stage: saved.trading_stage || tradingStage,
+    admin_lab_enabled: Boolean(saved.admin_lab_enabled ?? adminLabEnabled),
+    strategy_access_allowed: Boolean(saved.strategy_access_allowed ?? strategyAccessAllowed),
+    demo_connection_allowed: Boolean(saved.demo_connection_allowed ?? demoConnectionAllowed),
+    trading_level: Number(saved.trading_level ?? tradingLevel),
     updated_at: saved.updated_at || null,
   };
 }
