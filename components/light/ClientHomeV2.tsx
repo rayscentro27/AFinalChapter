@@ -93,7 +93,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
   const displayName = props.contact.name || 'Client';
   const documents = props.contact.documents || [];
   const missingDocuments = documents.filter((document) => document.required && document.status === 'Missing').length;
-  const unreadMessages = (props.contact.messageHistory || []).filter((message) => message.sender !== 'client' && !message.read).length;
+  const unreadMessages = portalMessages.filter((message) => message.sender !== 'client' && !message.read).length;
   const pendingTasks = (props.contact.clientTasks || []).filter((task) => task.status === 'pending');
   const nextTask = pendingTasks[0] || null;
   const nextMilestoneLabel = nextTask?.title || 'Open funding and review your strongest offers';
@@ -101,7 +101,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
 
   useEffect(() => {
     setPortalMessages(props.contact.messageHistory || []);
-  }, [props.contact.id]);
+  }, [props.contact.id, props.contact.messageHistory]);
 
   const clarityCards = [
     {
