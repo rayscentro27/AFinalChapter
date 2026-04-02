@@ -38,7 +38,7 @@ export const handler: Handler = async (event) => {
     const isInternal = INTERNAL_API_KEY && internalKey && String(internalKey).trim() === INTERNAL_API_KEY;
     const body = (isInternal ? InternalBodySchema : BodySchema).parse(JSON.parse(event.body || '{}'));
 
-    let actorUserId = 'internal';
+    let actorUserId: string | null = null;
     if (!isInternal) {
       const actor = await requireStaffUser(event);
       actorUserId = actor.userId;
@@ -135,7 +135,7 @@ export const handler: Handler = async (event) => {
       category: 'report_digest',
       subject,
       body: bodyText,
-      createdBy: actorUserId,
+      createdBy: actorUserId || null,
       requiresReview: true,
       status: body.status || 'draft',
     });
