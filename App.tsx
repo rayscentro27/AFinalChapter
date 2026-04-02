@@ -137,6 +137,7 @@ const AdminLegalPublisher = lazy(() => import('./src/pages/AdminLegalPublisher')
 const AdminEmailProvidersPage = lazy(() => import('./src/pages/AdminEmailProvidersPage'));
 const AdminEmailRoutingPage = lazy(() => import('./src/pages/AdminEmailRoutingPage'));
 const AdminEmailLogsPage = lazy(() => import('./src/pages/AdminEmailLogsPage'));
+const AdminEmailPolicyViewerPage = lazy(() => import('./src/pages/AdminEmailPolicyViewerPage'));
 const WorkflowDetailPage = lazy(() => import('./src/pages/WorkflowDetailPage'));
 const AdminWorkflowsPage = lazy(() => import('./src/pages/AdminWorkflowsPage'));
 const FreeScorePage = lazy(() => import('./src/pages/FreeScorePage'));
@@ -246,6 +247,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/email/providers': ViewMode.ADMIN_EMAIL_PROVIDERS,
   '/admin/email/routing': ViewMode.ADMIN_EMAIL_ROUTING,
   '/admin/email/logs': ViewMode.ADMIN_EMAIL_LOGS,
+  '/admin/email/policies': ViewMode.ADMIN_EMAIL_POLICY_VIEWER,
   '/admin/workflows': ViewMode.ADMIN_WORKFLOWS,
   '/admin/funding/catalog': ViewMode.ADMIN_FUNDING_CATALOG,
   '/admin/grants/catalog': ViewMode.ADMIN_GRANTS_CATALOG,
@@ -970,6 +972,7 @@ export const App = () => {
                     case ViewMode.ADMIN_EMAIL_PROVIDERS: return <AdminEmailProvidersPage />;
                     case ViewMode.ADMIN_EMAIL_ROUTING: return <AdminEmailRoutingPage />;
                     case ViewMode.ADMIN_EMAIL_LOGS: return <AdminEmailLogsPage />;
+                    case ViewMode.ADMIN_EMAIL_POLICY_VIEWER: return <AdminEmailPolicyViewerPage />;
                     case ViewMode.ADMIN_WORKFLOWS: return <AdminWorkflowsPage />;
                     case ViewMode.ADMIN_FUNNEL_SEQUENCES: return <AdminFunnelSequencesPage />;
                     case ViewMode.ADMIN_FUNNEL_LEADS: return <AdminFunnelLeadsPage />;
