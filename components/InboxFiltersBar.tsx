@@ -84,7 +84,7 @@ export default function InboxFiltersBar({
   const [provider, setProvider] = useState<ProviderFilter>('any');
   const [assigned, setAssigned] = useState<AssignedFilter>('any');
   const [sla, setSla] = useState<SlaFilter>('any');
-  const [workflow, setWorkflow] = useState<WorkflowFilter>('new');
+  const [workflow, setWorkflow] = useState<WorkflowFilter>('all');
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
   useEffect(() => {

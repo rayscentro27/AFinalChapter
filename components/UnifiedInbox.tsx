@@ -316,7 +316,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
     provider: 'any',
     assigned: 'any',
     sla: 'any',
-    workflow: 'new',
+    workflow: 'all',
   });
   const [dbUnreadCounts, setDbUnreadCounts] = useState<Record<string, number>>({});
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
