@@ -342,6 +342,7 @@ async function loadInboxContactsForTenants(tenantIds: string[]): Promise<Contact
       lastContact: toIso(lastActivity),
       value: 0,
       source: 'Contact Registry',
+      metadata: contact.metadata || null,
       notes: cleanText(contact.notes),
       checklist: {},
       clientTasks: (tasksByTenant.get(contact.tenant_id) || []).map((row: any) => rowToClientTask(row)),
