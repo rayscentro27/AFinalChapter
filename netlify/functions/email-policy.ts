@@ -117,7 +117,8 @@ export const handler: Handler = async (event) => {
       policies: policiesRes.data || [],
     });
   } catch (error: any) {
-    return json(500, {
+    const statusCode = Number(error?.statusCode || 500);
+    return json(statusCode, {
       ok: false,
       error: String(error?.message || error || 'email_policy_error'),
     });
