@@ -8,6 +8,7 @@ type LegalFooterLinksProps = {
 const links = [
   { href: '/terms', label: 'Terms' },
   { href: '/privacy', label: 'Privacy' },
+  { href: '/data-deletion', label: 'Data Deletion' },
   { href: '/ai-disclosure', label: 'AI Disclosure' },
   { href: '/refund-policy', label: 'Refund Policy' },
   { href: '/disclaimers', label: 'Disclaimers' },

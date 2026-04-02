@@ -110,6 +110,7 @@ const AdminPolicies = lazy(() => import('./src/pages/AdminPolicies'));
 const InviteAccept = lazy(() => import('./src/pages/InviteAccept'));
 const TermsPage = lazy(() => import('./src/pages/TermsPage'));
 const PrivacyPage = lazy(() => import('./src/pages/PrivacyPage'));
+const DataDeletionPage = lazy(() => import('./src/pages/DataDeletionPage'));
 const AIDisclosurePage = lazy(() => import('./src/pages/AIDisclosurePage'));
 const RefundPolicyPage = lazy(() => import('./src/pages/RefundPolicyPage'));
 const DisclaimersPage = lazy(() => import('./src/pages/DisclaimersPage'));
@@ -196,6 +197,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/invite-accept': ViewMode.INVITE_ACCEPT,
   '/terms': ViewMode.TERMS,
   '/privacy': ViewMode.PRIVACY,
+  '/data-deletion': ViewMode.DATA_DELETION,
   '/ai-disclosure': ViewMode.AI_DISCLOSURE,
   '/refund-policy': ViewMode.REFUND_POLICY,
   '/disclaimers': ViewMode.DISCLAIMERS,
@@ -263,6 +265,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
 const LEGAL_VIEWS: ViewMode[] = [
   ViewMode.TERMS,
   ViewMode.PRIVACY,
+  ViewMode.DATA_DELETION,
   ViewMode.AI_DISCLOSURE,
   ViewMode.REFUND_POLICY,
   ViewMode.DISCLAIMERS,
@@ -719,6 +722,8 @@ export const App = () => {
           return <TermsPage />;
         case ViewMode.PRIVACY:
           return <PrivacyPage />;
+        case ViewMode.DATA_DELETION:
+          return <DataDeletionPage />;
         case ViewMode.AI_DISCLOSURE:
           return <AIDisclosurePage />;
         case ViewMode.REFUND_POLICY:

@@ -67,6 +67,10 @@ function getMessagingEvents(entry) {
   return Array.isArray(entry?.messaging) ? entry.messaging : [];
 }
 
+function isInstagramWebhookObject(payload) {
+  return String(payload?.object || '').trim().toLowerCase() === 'instagram';
+}
+
 async function resolveMetaWebhookTenantHint(payload, deps) {
   const entries = getMetaEntries(payload);
 
@@ -195,6 +199,7 @@ export async function metaRoutes(fastify, opts = {}) {
       }
 
       const entries = getMetaEntries(payload);
+      const instagramWebhookObject = isInstagramWebhookObject(payload);
 
       const statusResult = await deps.handleMetaStatusCallbacks({
         deps,
@@ -218,6 +223,7 @@ export async function metaRoutes(fastify, opts = {}) {
           if (!mid || isEcho) continue;
 
           const body = extractText(event?.message || event);
+          const isInstagramInbound = instagramWebhookObject;
 
           const channel = recipientId
             ? await deps.resolveChannelAccount('meta', recipientId)
@@ -250,12 +256,12 @@ export async function metaRoutes(fastify, opts = {}) {
             tenantId: channel.tenantId,
             phoneE164: null,
             waNumber: null,
-            fbPsid: senderId,
+            fbPsid: isInstagramInbound ? `ig:${senderId}` : senderId,
             displayName: null,
             channelAccountId: channel.channelAccountId,
             metadata: {
               provider: 'meta',
-              channel: 'messenger',
+              channel: isInstagramInbound ? 'instagram' : 'messenger',
               sender_id: senderId,
               recipient_id: recipientId,
             },
@@ -265,8 +271,9 @@ export async function metaRoutes(fastify, opts = {}) {
             tenantId: channel.tenantId,
             channelAccountId: channel.channelAccountId,
             contactId,
-            subject: `Meta ${senderId}`,
+            subject: isInstagramInbound ? `Instagram ${senderId}` : `Meta ${senderId}`,
             provider: 'meta',
+            channelType: isInstagramInbound ? 'instagram_dm' : 'messenger',
           });
 
           await deps.upsertMetaParticipant({
@@ -411,6 +418,7 @@ export async function metaRoutes(fastify, opts = {}) {
               contactId,
               subject: `Instagram ${senderId}`,
               provider: 'meta',
+              channelType: 'instagram_dm',
             });
 
             await deps.upsertMetaParticipant({

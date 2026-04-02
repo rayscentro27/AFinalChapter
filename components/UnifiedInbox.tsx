@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Contact, InboxThread, UnifiedMessage, Message, InboxRouting, MessageAttachment, ViewMode } from '../types';
-import { MessageSquare, Archive, Send, Zap, Bot, Eye, Ghost, Sparkles, FileText, Route, Loader2, Paperclip, X, Building2, Phone, Mail, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { MessageSquare, Archive, Send, Zap, Bot, Eye, Ghost, Sparkles, FileText, Route, Loader2, Paperclip, X, Building2, Phone, Mail, ShieldCheck, SlidersHorizontal, Facebook, Instagram } from 'lucide-react';
 import { sendInboxMessage, SendProvider } from '../lib/inboxSendClient';
 import { claimConversation } from '../lib/claimConversation';
 import { supabase } from '../lib/supabaseClient';
@@ -10,6 +10,7 @@ import TagsPanel from './TagsPanel';
 import QuickActionsBar from './QuickActionsBar';
 import SlaBadges from './SlaBadges';
 import InboxFiltersBar, { InboxFilters } from './InboxFiltersBar';
+import InboxWorkflowPanel from './InboxWorkflowPanel';
 import AuditTimeline from './AuditTimeline';
 import ContactDrawer from './ContactDrawer';
 
@@ -46,8 +47,20 @@ type ConversationSlaMeta = {
   created_at?: string | null;
   updated_at?: string | null;
   last_message_at?: string | null;
+  last_inbound_at?: string | null;
+  last_outbound_at?: string | null;
   priority?: number | null;
   status?: string | null;
+  thread_type?: string | null;
+  thread_status?: string | null;
+  workflow_thread_type?: string | null;
+  owner_user_id?: string | null;
+  ai_mode?: string | null;
+  channel_type?: string | null;
+  assignee_type?: string | null;
+  assignee_user_id?: string | null;
+  assignee_ai_key?: string | null;
+  assigned_staff_user_id?: string | null;
 };
 
 type RoutingRecommendation = {
@@ -65,7 +78,9 @@ const SUMMARY_ENDPOINT = '/.netlify/functions/messaging-summary';
 const ROUTING_RECOMMENDATION_ENDPOINT = '/.netlify/functions/messaging-routing-recommendation';
 function toSendProvider(provider: InboxRouting['provider']): SendProvider | null {
   if (!provider) return null;
-  return provider === 'meta' ? 'meta' : null;
+  if (provider === 'meta') return 'meta';
+  if (provider === 'nexus_chat') return 'nexus_chat';
+  return null;
 }
 
 function resolveOutboundRouting(contact: Contact) {
@@ -175,8 +190,107 @@ function isBreach(meta?: ConversationSlaMeta | null, breachMinutes = 240, priori
   return age != null && age >= breachMinutes && priority <= priorityThreshold;
 }
 
+function deriveWorkflowThreadStatus(meta?: ConversationSlaMeta | null): 'new' | 'active' | 'waiting' | 'qualified' | 'closed' {
+  const value = String(meta?.thread_status || '').toLowerCase();
+  if (value === 'new' || value === 'active' || value === 'waiting' || value === 'qualified' || value === 'closed') return value;
+
+  const legacy = String(meta?.status || '').toLowerCase();
+  if (legacy === 'closed') return 'closed';
+  if (legacy === 'pending_client') return 'waiting';
+  if (legacy === 'pending' || legacy === 'pending_staff' || legacy === 'escalated' || legacy === 'open') return 'active';
+  return 'new';
+}
+
+function deriveWorkflowType(meta?: ConversationSlaMeta | null): 'lead' | 'support' | 'client' | 'general' {
+  const value = String(meta?.workflow_thread_type || '').toLowerCase();
+  if (value === 'lead' || value === 'support' || value === 'client' || value === 'general') return value;
+  if (String(meta?.thread_type || '').toLowerCase() === 'client_portal') return 'client';
+  return 'general';
+}
+
+function deriveEffectiveOwner(meta?: ConversationSlaMeta | null): string {
+  return String(
+    meta?.owner_user_id ||
+    meta?.assigned_staff_user_id ||
+    meta?.assignee_user_id ||
+    ''
+  ).trim();
+}
+
+function workflowStatusTone(status: string) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'new') return 'border-cyan-200 bg-cyan-50 text-cyan-700';
+  if (normalized === 'active') return 'border-blue-200 bg-blue-50 text-blue-700';
+  if (normalized === 'waiting') return 'border-amber-200 bg-amber-50 text-amber-700';
+  if (normalized === 'qualified') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  return 'border-slate-200 bg-slate-50 text-slate-600';
+}
+
+function workflowStatusLabel(status: string) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'qualified') return 'Qualified Lead';
+  if (normalized === 'waiting') return 'Waiting';
+  if (normalized === 'active') return 'Active';
+  if (normalized === 'closed') return 'Closed';
+  if (normalized === 'new') return 'New';
+  return 'New';
+}
+
 function normalizeProviderForFilter(provider: SendProvider | null): string {
   return provider || '';
+}
+
+type InboxSource = 'facebook' | 'instagram' | 'internal';
+
+function resolveInboxSource(contact?: Contact | null, thread?: InboxThread | null): InboxSource {
+  const metaSource = String((contact as any)?.metadata?.source || (contact as any)?.metadata?.channel || '').toLowerCase();
+  const contactSource = String(contact?.source || '').toLowerCase();
+  const routingProvider = String(contact?.inboxRouting?.provider || '').toLowerCase();
+
+  if (thread?.lastMessage?.internalOnly) return 'internal';
+
+  if (metaSource === 'instagram' || contactSource === 'instagram') return 'instagram';
+
+  if (
+    metaSource === 'facebook'
+    || metaSource === 'messenger'
+    || contactSource === 'facebook'
+    || contactSource === 'messenger'
+    || routingProvider === 'meta'
+  ) {
+    return 'facebook';
+  }
+
+  return 'internal';
+}
+
+function InboxSourceBadge({ source }: { source: InboxSource }) {
+  const config = {
+    facebook: {
+      label: 'Facebook Messenger',
+      icon: Facebook,
+      className: 'border-sky-200 bg-sky-50 text-sky-700',
+    },
+    instagram: {
+      label: 'Instagram DM',
+      icon: Instagram,
+      className: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
+    },
+    internal: {
+      label: 'Portal Chat',
+      icon: MessageSquare,
+      className: 'border-amber-200 bg-amber-50 text-amber-800',
+    },
+  }[source];
+
+  const Icon = config.icon;
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.18em] ${config.className}`}>
+      <Icon size={11} />
+      {config.label}
+    </span>
+  );
 }
 
 const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }) => {
@@ -202,6 +316,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
     provider: 'any',
     assigned: 'any',
     sla: 'any',
+    workflow: 'new',
   });
   const [dbUnreadCounts, setDbUnreadCounts] = useState<Record<string, number>>({});
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
@@ -290,6 +405,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
     for (const msg of history) {
       const provider = String(msg.provider || '').toLowerCase();
       if (provider === 'meta') set.add('meta');
+      if (provider === 'nexus_chat') set.add('nexus_chat');
     }
 
     return Array.from(set);
@@ -306,18 +422,167 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
   const selectedConversationPriority = selectedConversationId
     ? (conversationPriorities[selectedConversationId] || 3)
     : 3;
+  const selectedConversationMeta = selectedConversationId
+    ? (conversationSlaMeta[selectedConversationId] || null)
+    : null;
+  const selectedConversationThreadStatus = deriveWorkflowThreadStatus(selectedConversationMeta);
+  const selectedConversationWorkflowType = deriveWorkflowType(selectedConversationMeta);
+  const selectedConversationOwnerUserId = deriveEffectiveOwner(selectedConversationMeta);
+  const selectedConversationAiMode = String(selectedConversationMeta?.ai_mode || 'off') === 'suggest_only' ? 'suggest_only' : 'off';
+  const selectedConversationChannelType = String(selectedConversationMeta?.channel_type || 'nexus_chat');
+  const selectedConversationChannelLabel = selectedConversationChannelType === 'nexus_chat'
+    ? 'Portal Chat'
+    : selectedConversationChannelType.replace(/_/g, ' ');
   const selectedSummary = selectedConversationId ? (summaryByConversation[selectedConversationId] || '') : '';
   const selectedRoutingRecommendation = selectedConversationId
     ? (routingByConversation[selectedConversationId] || null)
     : null;
+  const selectedConversationHasLegacyOwner = Boolean(
+    selectedConversationMeta && !selectedConversationMeta.owner_user_id && (selectedConversationMeta.assigned_staff_user_id || selectedConversationMeta.assignee_user_id)
+  );
+  const selectedRoutingProviderLabel = selectedRouting?.provider === 'nexus_chat'
+    ? 'Portal Chat'
+    : selectedRouting?.provider || '';
 
   const selectedAssignmentLabel = selectedConversationAssignment
     ? selectedConversationAssignment.assignee_type === 'ai'
       ? ('AI' + (selectedConversationAssignment.assignee_ai_key ? ': ' + selectedConversationAssignment.assignee_ai_key : ''))
-      : selectedConversationAssignment.assignee_user_id
-        ? 'Agent Assigned'
+      : selectedConversationOwnerUserId
+        ? (selectedConversationMeta?.owner_user_id ? 'Workflow Assigned' : selectedConversationHasLegacyOwner ? 'Legacy Assigned' : 'Assigned')
         : 'Unassigned'
-    : 'Unassigned';
+    : (selectedConversationOwnerUserId ? 'Assigned' : 'Unassigned');
+
+  const applyConversationMetaRow = (row: any) => {
+    if (!row?.id) return;
+
+    setConversationAssignments((prev) => ({
+      ...prev,
+      [row.id]: {
+        id: row.id,
+        assignee_type: row.assignee_type || null,
+        assignee_user_id: row.assignee_user_id || null,
+        assignee_ai_key: row.assignee_ai_key || null,
+      },
+    }));
+
+    if (Array.isArray(row.tags)) {
+      setConversationTags((prev) => ({
+        ...prev,
+        [row.id]: row.tags as string[],
+      }));
+    }
+
+    if (row.status) {
+      setConversationStatuses((prev) => ({
+        ...prev,
+        [row.id]: String(row.status),
+      }));
+    }
+
+    if (typeof row.priority === 'number') {
+      setConversationPriorities((prev) => ({
+        ...prev,
+        [row.id]: Number(row.priority),
+      }));
+    }
+
+    setConversationSlaMeta((prev) => ({
+      ...prev,
+      [row.id]: {
+        id: row.id,
+        tenant_id: row.tenant_id || null,
+        created_at: row.created_at || null,
+        updated_at: row.updated_at || null,
+        last_message_at: row.last_message_at || null,
+        last_inbound_at: row.last_inbound_at || null,
+        last_outbound_at: row.last_outbound_at || null,
+        priority: typeof row.priority === 'number' ? Number(row.priority) : null,
+        status: row.status || null,
+        thread_type: row.thread_type || null,
+        thread_status: row.thread_status || null,
+        workflow_thread_type: row.workflow_thread_type || null,
+        owner_user_id: row.owner_user_id || row.assigned_staff_user_id || row.assignee_user_id || null,
+        ai_mode: row.ai_mode || null,
+        channel_type: row.channel_type || null,
+        assignee_type: row.assignee_type || null,
+        assignee_user_id: row.assignee_user_id || null,
+        assignee_ai_key: row.assignee_ai_key || null,
+        assigned_staff_user_id: row.assigned_staff_user_id || null,
+      },
+    }));
+  };
+
+  const applyConversationMetaRows = (rows: any[]) => {
+    setConversationAssignments((prev) => {
+      const next = { ...prev };
+      for (const row of rows) {
+        if (!row?.id) continue;
+        next[row.id] = {
+          id: row.id,
+          assignee_type: row.assignee_type || null,
+          assignee_user_id: row.assignee_user_id || null,
+          assignee_ai_key: row.assignee_ai_key || null,
+        };
+      }
+      return next;
+    });
+
+    setConversationTags((prev) => {
+      const next = { ...prev };
+      for (const row of rows) {
+        if (!row?.id || !Array.isArray(row.tags)) continue;
+        next[row.id] = row.tags as string[];
+      }
+      return next;
+    });
+
+    setConversationStatuses((prev) => {
+      const next = { ...prev };
+      for (const row of rows) {
+        if (!row?.id || !row.status) continue;
+        next[row.id] = String(row.status);
+      }
+      return next;
+    });
+
+    setConversationPriorities((prev) => {
+      const next = { ...prev };
+      for (const row of rows) {
+        if (!row?.id || typeof row.priority !== 'number') continue;
+        next[row.id] = Number(row.priority);
+      }
+      return next;
+    });
+
+    setConversationSlaMeta((prev) => {
+      const next = { ...prev };
+      for (const row of rows) {
+        if (!row?.id) continue;
+        next[row.id] = {
+          id: row.id,
+          tenant_id: row.tenant_id || null,
+          created_at: row.created_at || null,
+          updated_at: row.updated_at || null,
+          last_message_at: row.last_message_at || null,
+          last_inbound_at: row.last_inbound_at || null,
+          last_outbound_at: row.last_outbound_at || null,
+          priority: typeof row.priority === 'number' ? Number(row.priority) : null,
+          status: row.status || null,
+          thread_type: row.thread_type || null,
+          thread_status: row.thread_status || null,
+          workflow_thread_type: row.workflow_thread_type || null,
+          owner_user_id: row.owner_user_id || row.assigned_staff_user_id || row.assignee_user_id || null,
+          ai_mode: row.ai_mode || null,
+          channel_type: row.channel_type || null,
+          assignee_type: row.assignee_type || null,
+          assignee_user_id: row.assignee_user_id || null,
+          assignee_ai_key: row.assignee_ai_key || null,
+          assigned_staff_user_id: row.assigned_staff_user_id || null,
+        };
+      }
+      return next;
+    });
+  };
 
   const postAuthedJson = async <T,>(endpoint: string, payload: Record<string, any>): Promise<T> => {
     const { data } = await supabase.auth.getSession();
@@ -529,10 +794,17 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
     let active = true;
 
     const loadConversationMeta = async () => {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('conversations')
-        .select('id, tenant_id, created_at, updated_at, last_message_at, priority, status, tags, assignee_type, assignee_user_id, assignee_ai_key')
+        .select('id, tenant_id, created_at, updated_at, last_message_at, last_inbound_at, last_outbound_at, priority, status, thread_type, thread_status, workflow_thread_type, owner_user_id, ai_mode, channel_type, tags, assignee_type, assignee_user_id, assignee_ai_key, assigned_staff_user_id')
         .in('id', conversationIds);
+
+      if (error && String(error.message || '').toLowerCase().includes('column')) {
+        ({ data, error } = await supabase
+          .from('conversations')
+          .select('id, tenant_id, created_at, updated_at, last_message_at, priority, status, thread_type, tags, assignee_type, assignee_user_id, assignee_ai_key, assigned_staff_user_id')
+          .in('id', conversationIds));
+      }
 
       if (error) {
         console.error('UnifiedInbox: failed to load conversation SLA metadata', error.message);
@@ -540,64 +812,16 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
       }
 
       if (!active || !data) return;
-
-      setConversationAssignments((prev) => {
-        const next = { ...prev };
-        for (const row of data as any[]) {
-          if (!row?.id) continue;
-          next[row.id] = {
-            id: row.id,
-            assignee_type: row.assignee_type || null,
-            assignee_user_id: row.assignee_user_id || null,
-            assignee_ai_key: row.assignee_ai_key || null,
-          };
-        }
-        return next;
-      });
-
-      setConversationTags((prev) => {
-        const next = { ...prev };
-        for (const row of data as any[]) {
-          if (!row?.id || !Array.isArray(row.tags)) continue;
-          next[row.id] = row.tags as string[];
-        }
-        return next;
-      });
-
-      setConversationStatuses((prev) => {
-        const next = { ...prev };
-        for (const row of data as any[]) {
-          if (!row?.id || !row.status) continue;
-          next[row.id] = String(row.status);
-        }
-        return next;
-      });
-
-      setConversationPriorities((prev) => {
-        const next = { ...prev };
-        for (const row of data as any[]) {
-          if (!row?.id || typeof row.priority !== 'number') continue;
-          next[row.id] = Number(row.priority);
-        }
-        return next;
-      });
-
-      setConversationSlaMeta((prev) => {
-        const next = { ...prev };
-        for (const row of data as any[]) {
-          if (!row?.id) continue;
-          next[row.id] = {
-            id: row.id,
-            tenant_id: row.tenant_id || null,
-            created_at: row.created_at || null,
-            updated_at: row.updated_at || null,
-            last_message_at: row.last_message_at || null,
-            priority: typeof row.priority === 'number' ? row.priority : null,
-            status: row.status || null,
-          };
-        }
-        return next;
-      });
+      applyConversationMetaRows(
+        (data as any[]).map((row) => ({
+          ...row,
+          thread_status: row.thread_status || deriveWorkflowThreadStatus(row as any),
+          workflow_thread_type: row.workflow_thread_type || deriveWorkflowType(row as any),
+          owner_user_id: row.owner_user_id || row.assigned_staff_user_id || row.assignee_user_id || null,
+          ai_mode: row.ai_mode || ((row.assignee_type === 'ai' || row.assignee_ai_key) ? 'suggest_only' : 'off'),
+          channel_type: row.channel_type || null,
+        }))
+      );
     };
 
     void loadConversationMeta();
@@ -666,7 +890,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
     const loadAssignment = async () => {
       let query: any = supabase
         .from('conversations')
-        .select('id, tenant_id, created_at, updated_at, last_message_at, assignee_type, assignee_user_id, assignee_ai_key, tags, status, priority')
+        .select('id, tenant_id, created_at, updated_at, last_message_at, last_inbound_at, last_outbound_at, assignee_type, assignee_user_id, assignee_ai_key, assigned_staff_user_id, tags, status, thread_type, thread_status, workflow_thread_type, owner_user_id, ai_mode, channel_type, priority')
         .eq('id', conversationId)
         .limit(1);
 
@@ -676,11 +900,11 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
       let error: any = null;
       ({ data, error } = await query.maybeSingle());
 
-      // Backward compatibility before assignee_ai_key migration is applied.
-      if (error && String(error.message || '').toLowerCase().includes('assignee_ai_key')) {
+      // Backward compatibility before workflow columns are applied.
+      if (error && String(error.message || '').toLowerCase().includes('column')) {
         let fallbackQuery: any = supabase
           .from('conversations')
-          .select('id, tenant_id, created_at, updated_at, last_message_at, assignee_type, assignee_user_id, tags, status, priority')
+          .select('id, tenant_id, created_at, updated_at, last_message_at, assignee_type, assignee_user_id, assignee_ai_key, assigned_staff_user_id, tags, status, thread_type, priority')
           .eq('id', conversationId)
           .limit(1);
         if (tenantId) fallbackQuery = fallbackQuery.eq('tenant_id', tenantId);
@@ -695,7 +919,16 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
         return;
       }
 
-      if (data) applyConversationMeta(data);
+      if (data) {
+        applyConversationMetaRow({
+          ...data,
+          thread_status: data.thread_status || deriveWorkflowThreadStatus(data),
+          workflow_thread_type: data.workflow_thread_type || deriveWorkflowType(data),
+          owner_user_id: data.owner_user_id || data.assigned_staff_user_id || data.assignee_user_id || null,
+          ai_mode: data.ai_mode || ((data.assignee_type === 'ai' || data.assignee_ai_key) ? 'suggest_only' : 'off'),
+          channel_type: data.channel_type || null,
+        });
+      }
     };
 
     void loadAssignment();
@@ -705,7 +938,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `id=eq.${conversationId}` },
-        (payload) => applyConversationMeta((payload as any).new)
+        (payload) => applyConversationMetaRow((payload as any).new)
       )
       .subscribe();
 
@@ -889,6 +1122,10 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
       return;
     }
 
+    const outboundProvider = channelPreference === 'auto'
+      ? (routing.provider || 'meta')
+      : channelPreference;
+
     setIsSending(true);
     try {
       const response = await sendInboxMessage({
@@ -897,12 +1134,13 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
         contact_id: contact.id,
         body_text: trimmed,
         attachments: outboundAttachments.length > 0 ? outboundAttachments : undefined,
+        provider: outboundProvider,
         channel_preference: channelPreference === 'auto' ? undefined : channelPreference,
       });
 
       const latest = contactsRef.current.find((c) => c.id === contact.id);
       const outboundStatus = String(response?.status || 'queued');
-      const outboundProvider = String(response?.provider || (channelPreference === 'auto' ? routing.provider : channelPreference) || routing.provider);
+      const resolvedOutboundProvider = String(response?.provider || outboundProvider || routing.provider);
       if (latest) {
         const upgradedHistory = (latest.messageHistory || []).map((msg) => {
           if (msg.id !== optimisticMessage.id) return msg;
@@ -910,7 +1148,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
             ...msg,
             id: response.message_id ? `db:${response.message_id}` : msg.id,
             deliveryStatus: outboundStatus,
-            provider: outboundProvider,
+            provider: resolvedOutboundProvider,
             conversationId: routing.conversation_id,
             providerMessageIdReal:
               response.provider_message_id_real ||
@@ -1008,6 +1246,10 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
       const slaMeta = conversationId ? conversationSlaMeta[conversationId] : null;
       const provider = normalizeProviderForFilter(threadRouting?.provider || null);
       const status = String(conversationId ? conversationStatuses[conversationId] || slaMeta?.status || '' : '').toLowerCase();
+      const workflowStatus = deriveWorkflowThreadStatus(slaMeta);
+      const workflowType = deriveWorkflowType(slaMeta);
+      const workflowOwner = deriveEffectiveOwner(slaMeta);
+      const workflowPriority = Number(slaMeta?.priority ?? 9999);
 
       if (inboxFilters.status !== 'any' && status !== inboxFilters.status) return false;
       if (inboxFilters.provider !== 'any' && provider !== inboxFilters.provider) return false;
@@ -1030,6 +1272,16 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
 
       if (inboxFilters.sla === 'stale' && !isStale(slaMeta)) return false;
       if (inboxFilters.sla === 'breach' && !isBreach(slaMeta)) return false;
+
+      if (inboxFilters.workflow !== 'all') {
+        if (inboxFilters.workflow === 'new' && workflowStatus !== 'new') return false;
+        if (inboxFilters.workflow === 'active' && workflowStatus !== 'active') return false;
+        if (inboxFilters.workflow === 'waiting' && workflowStatus !== 'waiting') return false;
+        if (inboxFilters.workflow === 'closed' && workflowStatus !== 'closed') return false;
+        if (inboxFilters.workflow === 'qualified' && workflowStatus !== 'qualified' && workflowType !== 'lead') return false;
+        if (inboxFilters.workflow === 'unassigned' && workflowOwner) return false;
+        if (inboxFilters.workflow === 'high_priority' && !(Number.isFinite(workflowPriority) && workflowPriority <= 10)) return false;
+      }
 
       if (inboxFilters.q) {
         const q = inboxFilters.q.toLowerCase();
@@ -1108,9 +1360,24 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
             const threadConversationId = threadRouting?.conversation_id || null;
             const threadSla = threadConversationId ? conversationSlaMeta[threadConversationId] || null : null;
             const threadAssignment = threadConversationId ? conversationAssignments[threadConversationId] || null : null;
-            const alreadyHumanAssigned = Boolean(threadAssignment?.assignee_user_id && threadAssignment?.assignee_type === 'agent');
-            const canClaim = Boolean(threadRouting?.tenant_id && threadConversationId && !alreadyHumanAssigned);
+            const threadWorkflowOwner = deriveEffectiveOwner(threadSla);
+            const alreadyAssigned = Boolean(
+              threadWorkflowOwner ||
+              threadAssignment?.assignee_user_id ||
+              threadAssignment?.assignee_ai_key ||
+              threadAssignment?.assignee_type === 'ai'
+            );
+            const canClaim = Boolean(threadRouting?.tenant_id && threadConversationId && !alreadyAssigned);
             const unreadCount = threadConversationId ? (dbUnreadCounts[threadConversationId] ?? thread.unreadCount) : thread.unreadCount;
+            const threadSource = resolveInboxSource(threadContact || null, thread);
+            const threadWorkflowStatus = deriveWorkflowThreadStatus(threadSla);
+            const threadWorkflowType = deriveWorkflowType(threadSla);
+            const threadPriority = Number(threadSla?.priority ?? 3);
+            const threadAssignmentLabel = threadAssignment?.assignee_type === 'ai'
+              ? 'AI Assigned'
+              : threadWorkflowOwner
+                ? 'Assigned'
+                : 'Unassigned';
 
             return (
               <div
@@ -1123,7 +1390,21 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,#315FD0,#72A3FF)] text-xs font-black text-white shadow-[0_12px_24px_rgba(49,95,208,0.20)] transition-transform group-hover:scale-105">{thread.contactAvatar}</div>
                     <div>
                       <span className="font-black text-sm text-[#17233D] truncate block max-w-[160px]">{thread.contactName}</span>
-                      <span className="text-[10px] font-semibold text-[#91A1BC]">{contactsById.get(thread.contactId)?.company || thread.channel}</span>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-semibold text-[#91A1BC]">{threadContact?.company || thread.channel}</span>
+                        <InboxSourceBadge source={threadSource} />
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.16em] ${workflowStatusTone(threadWorkflowStatus)}`}>
+                          {workflowStatusLabel(threadWorkflowStatus)}
+                        </span>
+                        <span className="rounded-full border border-[#D6E5FF] bg-white px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.16em] text-[#315FD0]">
+                          {threadWorkflowType}
+                        </span>
+                        <span className="rounded-full border border-[#D6E5FF] bg-white px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.16em] text-[#315FD0]">
+                          P{threadPriority || 0}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-col items-end">
@@ -1145,7 +1426,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                 ) : null}
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <span className="text-[10px] font-black uppercase tracking-widest text-[#9AA9C3]">
-                    {threadAssignment?.assignee_type === 'ai' ? 'AI Assigned' : threadAssignment?.assignee_user_id ? 'Agent Assigned' : 'Unassigned'}
+                    {threadAssignmentLabel}
                   </span>
                   <button
                     onClick={(event) => {
@@ -1186,15 +1467,34 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
           <div className="flex h-full min-w-0">
             <div className="flex min-w-0 flex-1 flex-col border-r border-[#E7EDF7]">
           <div className="min-h-24 border-b border-[#E7EDF7] flex justify-between items-center px-8 py-5 bg-white/90 backdrop-blur-md sticky top-0 z-10 shrink-0">
-            <div className="flex items-center gap-5">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,#315FD0,#72A3FF)] text-sm font-black uppercase text-white shadow-[0_14px_28px_rgba(49,95,208,0.22)]">{selectedThread.contactAvatar}</div>
-              <div>
-                <h3 className="font-black text-[1.8rem] tracking-tight text-[#17233D]">{selectedThread.contactName}</h3>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-sm font-semibold text-[#5E7096]">{selectedContact?.company || 'Client account'}</span>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-700">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    System Active • AI Monitoring Conversations
+                <div className="flex items-center gap-5">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,#315FD0,#72A3FF)] text-sm font-black uppercase text-white shadow-[0_14px_28px_rgba(49,95,208,0.22)]">{selectedThread.contactAvatar}</div>
+                  <div>
+                    <h3 className="font-black text-[1.8rem] tracking-tight text-[#17233D]">{selectedThread.contactName}</h3>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-sm font-semibold text-[#5E7096]">{selectedContact?.company || 'Client account'}</span>
+                      <InboxSourceBadge source={resolveInboxSource(selectedContact || null, selectedThread)} />
+                      <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] ${workflowStatusTone(selectedConversationThreadStatus)}`}>
+                        {workflowStatusLabel(selectedConversationThreadStatus)}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-[#D6E5FF] bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#315FD0]">
+                        {selectedConversationWorkflowType}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-[#D6E5FF] bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#315FD0]">
+                        P{selectedConversationPriority || 0}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-[#D6E5FF] bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#315FD0]">
+                        {selectedConversationAiMode === 'suggest_only' ? 'AI Suggest Only' : 'AI Off'}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-[#D6E5FF] bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#315FD0]">
+                        {selectedConversationChannelLabel}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-[#D6E5FF] bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#315FD0]">
+                        Owner: {selectedConversationOwnerUserId ? selectedConversationOwnerUserId.slice(0, 8) : 'Unassigned'}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-700">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        System Active • AI Monitoring Conversations
                   </span>
                   <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
                     {selectedAssignmentLabel}
@@ -1293,7 +1593,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
           <div className="p-6 bg-white border-t border-[#E7EDF7] shadow-[0_-18px_44px_rgba(36,58,114,0.05)]">
             <div className="mb-3 flex items-center justify-between gap-3">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                Sending via: {channelPreference === 'auto' ? `Auto${selectedRouting?.provider ? ` (${selectedRouting.provider})` : ''}` : channelPreference}
+                Sending via: {channelPreference === 'auto' ? `Auto${selectedRoutingProviderLabel ? ` (${selectedRoutingProviderLabel})` : ''}` : (channelPreference === 'nexus_chat' ? 'Portal Chat' : channelPreference)}
               </span>
               {availableSendProviders.length > 1 ? (
                 <select
@@ -1303,7 +1603,7 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                 >
                   <option value="auto">Auto</option>
                   {availableSendProviders.map((provider) => (
-                    <option key={provider} value={provider}>{provider}</option>
+                    <option key={provider} value={provider}>{provider === 'nexus_chat' ? 'Portal Chat' : provider}</option>
                   ))}
                 </select>
               ) : null}
@@ -1400,17 +1700,24 @@ const UnifiedInbox: React.FC<UnifiedInboxProps> = ({ contacts, onUpdateContact }
                     <div className="flex items-center gap-2"><Phone size={15} className="text-[#4677E6]" /> {selectedContact?.phone || 'No phone on file'}</div>
                     <div className="flex items-center gap-2"><Mail size={15} className="text-[#4677E6]" /> {selectedContact?.email || 'No email on file'}</div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Priority</p>
-                      <p className="mt-2 text-base font-black tracking-tight text-[#17233D]">P{selectedConversationPriority || 0}</p>
-                    </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Priority</p>
+                    <p className="mt-2 text-base font-black tracking-tight text-[#17233D]">P{selectedConversationPriority || 0}</p>
+                  </div>
                     <div className="rounded-2xl border border-[#EEF2FA] bg-[#FBFDFF] p-3">
                       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Protection</p>
                       <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-black text-[#178D5B]"><ShieldCheck size={14} /> Verified</p>
                     </div>
                   </div>
                 </div>
+
+                {selectedTenantId && selectedConversationId ? (
+                  <InboxWorkflowPanel
+                    tenantId={selectedTenantId}
+                    conversationId={selectedConversationId}
+                  />
+                ) : null}
 
                 {selectedTenantId && selectedConversationId ? (
                   <div className="rounded-[1.7rem] border border-[#E4ECF8] bg-white p-4 shadow-sm">

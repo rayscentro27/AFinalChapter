@@ -21,6 +21,15 @@ type OutboxRow = {
   created_at: string;
 };
 
+function parseMetaCapabilityWarning(error: string | null) {
+  const text = String(error || '').toLowerCase();
+  if (!text.includes('meta send failed')) return null;
+  if (text.includes('(#3)') || text.includes('does not have the capability')) {
+    return 'Meta app capability missing for Instagram outbound sends';
+  }
+  return null;
+}
+
 export default function AdminOutbox() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -259,7 +268,14 @@ export default function AdminOutbox() {
                       {row.provider_message_id || '-'}
                     </td>
                     <td className="px-6 py-4 text-slate-300 max-w-[360px] truncate" title={row.last_error || ''}>
-                      {row.last_error || '-'}
+                      <div className="space-y-1">
+                        <div>{row.last_error || '-'}</div>
+                        {parseMetaCapabilityWarning(row.last_error) ? (
+                          <div className="inline-flex rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-amber-200">
+                            {parseMetaCapabilityWarning(row.last_error)}
+                          </div>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-6 py-4 space-x-2 whitespace-nowrap">
                       <button

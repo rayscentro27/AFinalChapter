@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -11,6 +11,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { Contact, ViewMode } from '../../types';
+import PortalChatPanel from '../portal/PortalChatPanel';
 
 type ClientHomeV2Props = {
   contact: Contact;
@@ -20,15 +21,21 @@ type ClientHomeV2Props = {
 const modules = [
   {
     key: 'overview',
+    kind: 'panel' as const,
     title: 'Executive Overview',
     description: 'See all major areas in one command view',
     icon: <LayoutDashboard className="h-4 w-4" />,
-    view: ViewMode.PORTAL_OVERVIEW,
-    path: '/portal/overview',
-    active: true,
+  },
+  {
+    key: 'messages',
+    kind: 'panel' as const,
+    title: 'Messages',
+    description: 'Open first-party portal chat and keep conversations durable',
+    icon: <MessageSquare className="h-4 w-4" />,
   },
   {
     key: 'credit',
+    kind: 'route' as const,
     title: 'Credit Optimization',
     description: 'Improve personal & business credit profiles',
     icon: <ShieldCheck className="h-4 w-4" />,
@@ -37,6 +44,7 @@ const modules = [
   },
   {
     key: 'funding',
+    kind: 'route' as const,
     title: 'Funding Engine',
     description: 'Get matched with funding & capital options',
     icon: <Landmark className="h-4 w-4" />,
@@ -45,6 +53,7 @@ const modules = [
   },
   {
     key: 'business',
+    kind: 'route' as const,
     title: 'Business Setup',
     description: 'Build and structure your business correctly',
     icon: <BriefcaseBusiness className="h-4 w-4" />,
@@ -53,6 +62,7 @@ const modules = [
   },
   {
     key: 'grants',
+    kind: 'route' as const,
     title: 'Grants & Opportunities',
     description: 'Discover grants and hidden funding programs',
     icon: <Gift className="h-4 w-4" />,
@@ -78,6 +88,8 @@ const priorityActions = [
 const progressBars = [48, 62, 78, 86, 102, 116];
 
 export default function ClientHomeV2(props: ClientHomeV2Props) {
+  const [selectedSection, setSelectedSection] = useState<'overview' | 'messages'>('overview');
+  const [portalMessages, setPortalMessages] = useState(props.contact.messageHistory || []);
   const displayName = props.contact.name || 'Client';
   const documents = props.contact.documents || [];
   const missingDocuments = documents.filter((document) => document.required && document.status === 'Missing').length;
@@ -86,6 +98,10 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
   const nextTask = pendingTasks[0] || null;
   const nextMilestoneLabel = nextTask?.title || 'Open funding and review your strongest offers';
   const nextMilestoneHelper = nextTask?.description || 'Start with the highest-priority action below so your capital path stays clear.';
+
+  useEffect(() => {
+    setPortalMessages(props.contact.messageHistory || []);
+  }, [props.contact.id]);
 
   const clarityCards = [
     {
@@ -107,6 +123,35 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
       icon: <ArrowRight className="h-4 w-4" />,
     },
   ];
+
+  if (selectedSection === 'messages') {
+    return (
+      <div className="mx-auto max-w-[1320px] space-y-6 pb-10 subpixel-antialiased">
+        <section className="flex flex-col gap-4 rounded-[2rem] border border-[#DFE7F4] bg-white p-6 shadow-[0_16px_44px_rgba(36,58,114,0.05)] lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-[0.72rem] font-black uppercase tracking-[0.22em] text-[#607CC1]">Client dashboard</p>
+            <h1 className="mt-2 text-[2.2rem] font-black tracking-tight text-[#1B2C61]">Messages</h1>
+            <p className="mt-2 max-w-2xl text-base text-[#61769D]">
+              First-party portal chat is durable. Messages are written into the shared Nexus inbox model and rehydrate on reload.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedSection('overview')}
+            className="inline-flex items-center justify-center rounded-full border border-[#D5E4FF] bg-[#EEF4FF] px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#4677E6]"
+          >
+            Back to Overview
+          </button>
+        </section>
+
+        <PortalChatPanel
+          contact={props.contact}
+          messages={portalMessages}
+          onMessagesChange={setPortalMessages}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-[1320px] space-y-6 pb-10 subpixel-antialiased">
@@ -154,13 +199,23 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
 
       <section className="rounded-[2rem] border border-[#DFE7F4] bg-white px-5 py-6 shadow-[0_16px_44px_rgba(36,58,114,0.05)]">
         <h2 className="text-[2rem] font-black tracking-tight text-[#17233D]">Your Nexus Modules</h2>
-        <div className="mt-4 grid gap-3 lg:grid-cols-5">
+        <div className="mt-4 grid gap-3 lg:grid-cols-6">
           {modules.map((module) => (
             <button
               key={module.key}
               type="button"
-              onClick={() => props.onNavigate?.(module.view, module.path)}
-              className={`rounded-[1.35rem] border px-4 py-4 text-left transition-all ${module.active ? 'border-[#24C7F4] bg-[#E9FAFE]' : 'border-[#D9E2F2] bg-white hover:border-[#BFD0EC] hover:bg-[#FCFDFF]'}`}
+              onClick={() => {
+                if (module.kind === 'panel') {
+                  setSelectedSection(module.key === 'messages' ? 'messages' : 'overview');
+                  return;
+                }
+                props.onNavigate?.(module.view, module.path);
+              }}
+              className={`rounded-[1.35rem] border px-4 py-4 text-left transition-all ${
+                (module.key === 'overview' && selectedSection === 'overview') || (module.key === 'messages' && selectedSection === 'messages')
+                  ? 'border-[#24C7F4] bg-[#E9FAFE]'
+                  : 'border-[#D9E2F2] bg-white hover:border-[#BFD0EC] hover:bg-[#FCFDFF]'
+              }`}
             >
               <div className="flex items-start gap-4 overflow-hidden">
                 <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-[#17233D] text-white">

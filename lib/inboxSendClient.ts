@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 
-export type SendProvider = 'meta';
+export type SendProvider = 'meta' | 'nexus_chat';
 
 export type SendMessageInput = {
   tenant_id?: string;
