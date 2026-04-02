@@ -26,7 +26,7 @@ exception when duplicate_object then null; end $$;
 alter table if exists public.conversations
   add column if not exists thread_status public.inbox_thread_status not null default 'new',
   add column if not exists workflow_thread_type public.inbox_workflow_thread_type not null default 'general',
-  add column if not exists owner_user_id uuid null references public.profiles(user_id) on delete set null,
+  add column if not exists owner_user_id uuid null,
   add column if not exists ai_mode public.inbox_ai_mode not null default 'off',
   add column if not exists channel_type public.inbox_channel_type not null default 'nexus_chat',
   add column if not exists last_inbound_at timestamptz null,
@@ -46,46 +46,55 @@ create index if not exists conversations_tenant_workflow_thread_type_idx
 
 -- Backfill new workflow fields conservatively from existing operational data.
 update public.conversations
-set thread_status = case lower(coalesce(status::text, ''))
-  when 'closed' then 'closed'
-  when 'pending_client' then 'waiting'
-  when 'pending' then 'active'
-  when 'pending_staff' then 'active'
-  when 'escalated' then 'active'
-  when 'open' then 'active'
-  else 'active'
-end;
+set thread_status = (
+  case lower(coalesce(status::text, ''))
+    when 'closed' then 'closed'
+    when 'pending_client' then 'waiting'
+    when 'pending' then 'active'
+    when 'pending_staff' then 'active'
+    when 'escalated' then 'active'
+    when 'open' then 'active'
+    else 'active'
+  end
+)::public.inbox_thread_status;
 
 update public.conversations
-set workflow_thread_type = case
-  when lower(coalesce(thread_type, '')) = 'client_portal' then 'client'
-  else 'general'
-end;
+set workflow_thread_type = (
+  case
+    when lower(coalesce(thread_type, '')) = 'client_portal' then 'client'
+    else 'general'
+  end
+)::public.inbox_workflow_thread_type;
 
 update public.conversations
 set owner_user_id = coalesce(owner_user_id, assigned_staff_user_id, assignee_user_id);
 
 update public.conversations c
-set ai_mode = case
-  when c.assignee_type = 'ai' or nullif(trim(coalesce(c.assignee_ai_key, '')), '') is not null then 'suggest_only'
-  else 'off'
-end;
+set ai_mode = (
+  case
+    when c.assignee_type = 'ai' or nullif(trim(coalesce(c.assignee_ai_key, '')), '') is not null then 'suggest_only'
+    else 'off'
+  end
+)::public.inbox_ai_mode;
 
 update public.conversations c
-set channel_type = case
-  when lower(coalesce(c.thread_type, '')) = 'client_portal' then 'nexus_chat'
-  when lower(coalesce(ca.provider, '')) = 'meta'
-       and (
-         lower(coalesce(ct.metadata->>'source', ct.metadata->>'channel', '')) = 'instagram'
-         or coalesce(ct.fb_psid, '') like 'ig:%'
-         or nullif(trim(coalesce(ct.ig_handle, '')), '') is not null
-       ) then 'instagram_dm'
-  when lower(coalesce(ca.provider, '')) = 'meta' then 'messenger'
-  else 'nexus_chat'
-end
-from public.channel_accounts ca
-left join public.contacts ct on ct.id = c.contact_id
-where ca.id = c.channel_account_id;
+set channel_type = (
+  case
+    when lower(coalesce(c.thread_type, '')) = 'client_portal' then 'nexus_chat'
+    when lower(coalesce(ca.provider, '')) = 'meta'
+         and (
+           lower(coalesce(ct.metadata->>'source', ct.metadata->>'channel', '')) = 'instagram'
+           or coalesce(ct.fb_psid, '') like 'ig:%'
+           or nullif(trim(coalesce(ct.ig_handle, '')), '') is not null
+         ) then 'instagram_dm'
+    when lower(coalesce(ca.provider, '')) = 'meta' then 'messenger'
+    else 'nexus_chat'
+  end
+)::public.inbox_channel_type
+from public.channel_accounts ca,
+     public.contacts ct
+where ca.id = c.channel_account_id
+  and ct.id = c.contact_id;
 
 update public.conversations c
 set last_inbound_at = stats.last_inbound_at,
