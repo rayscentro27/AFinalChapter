@@ -62,7 +62,28 @@ export type ExistingBusinessLaunchResult = {
   funding_readiness_relevance: string;
   opportunity_relevance: string;
   grant_relevance: string;
+  website_preview: {
+    hero: string;
+    about: string;
+    services: string[];
+    contact: string;
+  };
+  domain_suggestions: string[];
+  business_email_suggestions: string[];
   next_best_action: string;
+};
+
+export type BusinessIdentityPreview = {
+  path: BusinessFoundationPath;
+  business_name: string;
+  website_preview: {
+    hero: string;
+    about: string;
+    services: string[];
+    contact: string;
+  };
+  domain_suggestions: string[];
+  business_email_suggestions: string[];
 };
 
 export type LaunchModeSnapshot = {
@@ -71,6 +92,17 @@ export type LaunchModeSnapshot = {
   new_business_result?: NewBusinessLaunchResult;
   existing_business_input?: ExistingBusinessLaunchInput;
   existing_business_result?: ExistingBusinessLaunchResult;
+  website_identity?: {
+    selected_domain?: string;
+    selected_email?: string;
+    website_preview?: {
+      hero?: string;
+      about?: string;
+      services?: string[];
+      contact?: string;
+    };
+    last_updated_at?: string;
+  };
 };
 
 function titleCase(value: string) {
@@ -188,6 +220,14 @@ export function buildExistingBusinessLaunchResult(input: ExistingBusinessLaunchI
       ? 'Current NAICS looks weaker for funding fit. Review a lower-risk service category if the business model allows it.'
       : 'Current NAICS is present. Validate whether it still reflects the most fundable version of the business.'
     : 'No NAICS is stored yet, so category alignment is still missing.';
+  const name = titleCase(input.business_name || 'Existing Business');
+  const industry = titleCase(input.industry || 'Professional Services');
+  const slug = slugify(name) || 'existingbusiness';
+  const services = [
+    `${industry} advisory`,
+    `${industry} implementation support`,
+    'Ongoing client service and fulfillment',
+  ];
 
   return {
     generated_at: new Date().toISOString(),
@@ -197,8 +237,61 @@ export function buildExistingBusinessLaunchResult(input: ExistingBusinessLaunchI
     funding_readiness_relevance: revenueBandText(input.monthly_revenue_range || ''),
     opportunity_relevance: 'Once the business identity is aligned, Nexus can connect this company to opportunity, funding, and growth paths that fit its current operating stage.',
     grant_relevance: 'Grant fit improves once the business description, mission, NAICS, and website are consistent enough to support narrative-based applications.',
+    website_preview: {
+      hero: `${name} helps clients move forward with clear ${industry.toLowerCase()} support and a more credible operating presence.`,
+      about: `${name} is positioned as a focused ${industry.toLowerCase()} business with a cleaner identity layer built for credibility, funding readiness, and client trust.`,
+      services,
+      contact: `Connect with ${name} to review goals, current operations, and the next business readiness move.`,
+    },
+    domain_suggestions: [
+      `${slug}.com`,
+      `${slug}co.com`,
+      `workwith${slug}.com`,
+    ],
+    business_email_suggestions: [
+      `hello@${slug}.com`,
+      `support@${slug}.com`,
+      `team@${slug}.com`,
+    ],
     next_best_action: missing.length > 0
       ? `Complete ${missing[0]} first, then continue through the remaining foundation gaps.`
       : 'Profile data is mostly present. Continue into funding readiness review and opportunity matching.',
   };
+}
+
+export function deriveIdentityPreview(data: BusinessFoundationProfileResponse | null): BusinessIdentityPreview | null {
+  const snapshot = readLaunchSnapshot(data);
+  if (!snapshot) return null;
+
+  if (snapshot.mode === 'new_business' && snapshot.new_business_result) {
+    return {
+      path: 'new_business',
+      business_name: snapshot.new_business_result.business_name,
+      website_preview: {
+        ...snapshot.new_business_result.website_preview,
+        ...snapshot.website_identity?.website_preview,
+      },
+      domain_suggestions: snapshot.new_business_result.domain_suggestions,
+      business_email_suggestions: snapshot.new_business_result.business_email_suggestions,
+    };
+  }
+
+  if (snapshot.mode === 'existing_business_optimization' && snapshot.existing_business_result) {
+    return {
+      path: 'existing_business_optimization',
+      business_name: String(
+        snapshot.existing_business_input?.business_name
+        || data?.profile?.legal_name
+        || 'Existing Business'
+      ),
+      website_preview: {
+        ...snapshot.existing_business_result.website_preview,
+        ...snapshot.website_identity?.website_preview,
+      },
+      domain_suggestions: snapshot.existing_business_result.domain_suggestions,
+      business_email_suggestions: snapshot.existing_business_result.business_email_suggestions,
+    };
+  }
+
+  return null;
 }

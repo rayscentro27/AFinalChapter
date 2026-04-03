@@ -35,6 +35,7 @@ import {
   fintechSecondaryButton,
 } from './fintechStyles';
 import BusinessFoundationChecklist from './BusinessFoundationChecklist';
+import BusinessIdentityPreviewCard from './BusinessIdentityPreviewCard';
 import LaunchModeStudio from './LaunchModeStudio';
 
 type PortalModuleKey = 'overview' | 'credit' | 'funding' | 'business' | 'grants';
@@ -665,6 +666,14 @@ export default function ClientPortalV2(props: {
           onChoosePath={async (path) => {
             await business.setPath(path);
           }}
+          onSaveProfile={async (payload) => {
+            await business.updateProfile(payload);
+          }}
+        />
+
+        <BusinessIdentityPreviewCard
+          data={business.data}
+          saving={business.saving}
           onSaveProfile={async (payload) => {
             await business.updateProfile(payload);
           }}

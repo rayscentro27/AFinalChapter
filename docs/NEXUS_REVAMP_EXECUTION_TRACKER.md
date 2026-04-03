@@ -17,7 +17,7 @@ Single source of truth for phased Nexus portal/client revamp execution.
 | 1 | Client Command Center | In progress | Hero, journey progress, badges, funding range, and trading unlock implemented in the client command center. |
 | 2 | Business Foundation System | Complete | Business foundation is now a clickable, gated first step tied to command center state. |
 | 3 | 1-Click Launch Mode | In progress | New business path + existing business intake path. |
-| 4 | Auto Website + Identity Preview | Pending | Preview-first website/domain/email generation. |
+| 4 | Auto Website + Identity Preview | In progress | Preview-first website/domain/email generation. |
 | 5 | 1-Click Credit Analysis + Dispute Engine | Pending | Upload -> analyze -> letters -> DocuPost send. |
 | 6 | Opportunity Database + Matching | Pending | Business opportunity storage and rule-based matching. |
 | 7 | Opportunity UI Layer | Pending | Featured opportunity, top recommendations, connected next steps. |
@@ -29,17 +29,16 @@ Single source of truth for phased Nexus portal/client revamp execution.
 
 ## Current Focus
 
-### Phase 3 Goals
+### Phase 4 Goals
 
-- Add a 1-click launch layer above Business Foundation.
-- Support both new-business generation and existing-business intake.
-- Stage launch drafts into live business profile metadata without silent overwrite.
-- Converge both paths back into the same Business Foundation and readiness flow.
+- Add a preview-first website and identity layer above Business Foundation.
+- Generate website structure, domain suggestions, and business email suggestions from launch-mode data.
+- Let users carry selected domain/email/content into the live identity fields.
+- Keep the next steps tied to setup and credibility, not a paid deploy.
 
 ### Exit Criteria
 
-- Users can choose Build A New Business or Use My Existing Business.
-- Both paths save staged launch data in the current tenant-safe profile model.
-- New business path generates a launch draft and can apply it into foundation.
-- Existing business path collects intake and generates a fundability review.
-- Both paths converge into the same Business Foundation checklist and readiness flow.
+- Users see a website and identity preview after launch-mode staging.
+- Domain and business email selections can be applied into the live business profile.
+- Website copy stays editable and preview-first.
+- The preview connects back to Business Foundation and readiness instead of ending in a dead card.
