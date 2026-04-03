@@ -567,6 +567,117 @@ export async function setBusinessProgress(
   });
 }
 
+export async function setBusinessProfile(
+  supabase: SupabaseClient,
+  params: {
+    tenantId: string;
+    userId: string;
+    legalName?: string | null;
+    entityType?: string | null;
+    ein?: string | null;
+    businessAddress?: string | null;
+    businessPhone?: string | null;
+    businessWebsite?: string | null;
+    naicsCode?: string | null;
+    businessEmail?: string | null;
+    missionStatement?: string | null;
+    businessPlanSummary?: string | null;
+    bankName?: string | null;
+    accountType?: string | null;
+    profileStatus?: 'not_started' | 'in_progress' | 'ready' | 'completed' | null;
+  }
+) {
+  const existing = await resolveSingle<BusinessProfileRow>(
+    supabase
+      .from('business_profiles')
+      .select('id,business_path,legal_name,entity_type,ein,business_address,business_phone,business_website,naics_code,profile_status,metadata,created_at,updated_at')
+      .eq('tenant_id', params.tenantId)
+      .eq('user_id', params.userId)
+      .maybeSingle()
+  );
+
+  const mergedMetadata = {
+    ...safeObject(existing?.metadata),
+    ...(params.businessEmail !== undefined ? { business_email: params.businessEmail || null } : {}),
+    ...(params.missionStatement !== undefined ? { mission_statement: params.missionStatement || null } : {}),
+    ...(params.businessPlanSummary !== undefined ? { business_plan_summary: params.businessPlanSummary || null } : {}),
+  };
+
+  const profilePayload = {
+    tenant_id: params.tenantId,
+    user_id: params.userId,
+    legal_name: params.legalName ?? existing?.legal_name ?? null,
+    entity_type: params.entityType ?? existing?.entity_type ?? null,
+    ein: params.ein ?? existing?.ein ?? null,
+    business_address: params.businessAddress ?? existing?.business_address ?? null,
+    business_phone: params.businessPhone ?? existing?.business_phone ?? null,
+    business_website: params.businessWebsite ?? existing?.business_website ?? null,
+    naics_code: params.naicsCode ?? existing?.naics_code ?? null,
+    profile_status: params.profileStatus ?? existing?.profile_status ?? 'in_progress',
+    metadata: mergedMetadata,
+  };
+
+  const profileRes = await supabase
+    .from('business_profiles')
+    .upsert(profilePayload as any, { onConflict: 'tenant_id,user_id' });
+
+  if (profileRes.error && !shouldIgnoreRelationError(profileRes.error)) {
+    throw new Error(profileRes.error.message || 'Unable to update business foundation profile');
+  }
+
+  if (params.ein !== undefined) {
+    const taxRes = await supabase
+      .from('business_tax_profile')
+      .upsert({
+        tenant_id: params.tenantId,
+        user_id: params.userId,
+        ein: params.ein || null,
+        irs_alignment_status: params.ein ? 'completed' : 'in_progress',
+        status: params.ein ? 'completed' : 'in_progress',
+        tax_metadata: { source: 'portal_business_foundation' },
+      } as any, { onConflict: 'tenant_id,user_id' });
+    if (taxRes.error && !shouldIgnoreRelationError(taxRes.error)) {
+      throw new Error(taxRes.error.message || 'Unable to update business tax profile');
+    }
+  }
+
+  if (params.naicsCode !== undefined) {
+    const classificationRes = await supabase
+      .from('business_classification')
+      .upsert({
+        tenant_id: params.tenantId,
+        user_id: params.userId,
+        naics_code: params.naicsCode || null,
+        classification_status: params.naicsCode ? 'completed' : 'in_progress',
+        metadata: { source: 'portal_business_foundation' },
+      } as any, { onConflict: 'tenant_id,user_id' });
+    if (classificationRes.error && !shouldIgnoreRelationError(classificationRes.error)) {
+      throw new Error(classificationRes.error.message || 'Unable to update business classification');
+    }
+  }
+
+  if (params.bankName !== undefined || params.accountType !== undefined) {
+    const bankingRes = await supabase
+      .from('business_banking_profile')
+      .upsert({
+        tenant_id: params.tenantId,
+        user_id: params.userId,
+        bank_name: params.bankName ?? null,
+        account_type: params.accountType ?? null,
+        bank_profile_status: params.bankName || params.accountType ? 'completed' : 'in_progress',
+        metadata: { source: 'portal_business_foundation' },
+      } as any, { onConflict: 'tenant_id,user_id' });
+    if (bankingRes.error && !shouldIgnoreRelationError(bankingRes.error)) {
+      throw new Error(bankingRes.error.message || 'Unable to update business banking profile');
+    }
+  }
+
+  return getBusinessFoundationData(supabase, {
+    tenantId: params.tenantId,
+    userId: params.userId,
+  });
+}
+
 function inferFundingStage(input: {
   approvedCount: number;
   pendingCount: number;

@@ -1,17 +1,30 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
   BriefcaseBusiness,
   FileText,
   Gift,
-  LayoutDashboard,
-  ShieldCheck,
   Landmark,
+  LayoutDashboard,
   MessageSquare,
+  ShieldCheck,
 } from 'lucide-react';
 import { Contact, ViewMode } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
+import { BACKEND_CONFIG } from '../../adapters/config';
+import useFundingRoadmap from '../../hooks/useFundingRoadmap';
+import useCreditCenter from '../../hooks/useCreditCenter';
+import useBusinessFoundation from '../../hooks/useBusinessFoundation';
+import useCapitalReadiness from '../../hooks/useCapitalReadiness';
+import useTradingAccess from '../../hooks/useTradingAccess';
+import AchievementBadges from '../portal/AchievementBadges';
+import EstimatedFundingRangeCard from '../portal/EstimatedFundingRangeCard';
+import FundingJourneyHero from '../portal/FundingJourneyHero';
+import FundingProgressBar from '../portal/FundingProgressBar';
 import PortalChatPanel from '../portal/PortalChatPanel';
+import TradingAcademyUnlockCard from '../portal/TradingAcademyUnlockCard';
+import { deriveClientJourneyState } from '../portal/clientJourneyState';
 
 type ClientHomeV2Props = {
   contact: Contact;
@@ -37,7 +50,7 @@ const modules = [
     key: 'credit',
     kind: 'route' as const,
     title: 'Credit Optimization',
-    description: 'Improve personal & business credit profiles',
+    description: 'Improve personal and business credit profiles',
     icon: <ShieldCheck className="h-4 w-4" />,
     view: ViewMode.PORTAL_CREDIT,
     path: '/portal/credit',
@@ -46,7 +59,7 @@ const modules = [
     key: 'funding',
     kind: 'route' as const,
     title: 'Funding Engine',
-    description: 'Get matched with funding & capital options',
+    description: 'Review readiness, funding path, and next offers',
     icon: <Landmark className="h-4 w-4" />,
     view: ViewMode.PORTAL_FUNDING,
     path: '/portal/funding',
@@ -55,7 +68,7 @@ const modules = [
     key: 'business',
     kind: 'route' as const,
     title: 'Business Setup',
-    description: 'Build and structure your business correctly',
+    description: 'Keep structure, compliance, and foundations in order',
     icon: <BriefcaseBusiness className="h-4 w-4" />,
     view: ViewMode.PORTAL_BUSINESS,
     path: '/portal/business',
@@ -63,19 +76,12 @@ const modules = [
   {
     key: 'grants',
     kind: 'route' as const,
-    title: 'Grants & Opportunities',
+    title: 'Grants and Opportunities',
     description: 'Discover grants and hidden funding programs',
     icon: <Gift className="h-4 w-4" />,
     view: ViewMode.PORTAL_GRANTS,
     path: '/portal/grants',
   },
-];
-
-const overviewMetrics = [
-  { label: 'Credit', value: '684', helper: 'Personal + business', tone: 'bg-[#EAF7FB]' },
-  { label: 'Funding', value: '78%', helper: '$25k-$75k range', tone: 'bg-[#EDF9EE]' },
-  { label: 'Business', value: '82%', helper: 'LLC active', tone: 'bg-[#F2EFFF]' },
-  { label: 'Grants', value: '$145k', helper: '9 matched opportunities', tone: 'bg-[#FFF8E8]' },
 ];
 
 const priorityActions = [
@@ -88,26 +94,88 @@ const priorityActions = [
 const progressBars = [48, 62, 78, 86, 102, 116];
 
 export default function ClientHomeV2(props: ClientHomeV2Props) {
+  const { user } = useAuth();
   const [selectedSection, setSelectedSection] = useState<'overview' | 'messages'>('overview');
   const [portalMessages, setPortalMessages] = useState(props.contact.messageHistory || []);
   const displayName = props.contact.name || 'Client';
+  const tenantId =
+    props.contact.tenantId
+    || user?.tenantId
+    || props.contact.inboxRouting?.tenant_id
+    || props.contact.inboxRouting?.tenantId
+    || '';
+  const demoMode = !user || BACKEND_CONFIG.mode === 'mvp_mock' || !tenantId;
+  const funding = useFundingRoadmap(demoMode ? undefined : tenantId, true);
+  const credit = useCreditCenter(demoMode ? undefined : tenantId);
+  const business = useBusinessFoundation(demoMode ? undefined : tenantId);
+  const capital = useCapitalReadiness(demoMode ? undefined : tenantId, true);
+  const trading = useTradingAccess(demoMode ? undefined : tenantId, { reconcileOnFetch: true });
   const documents = props.contact.documents || [];
   const missingDocuments = documents.filter((document) => document.required && document.status === 'Missing').length;
   const unreadMessages = portalMessages.filter((message) => message.sender !== 'client' && !message.read).length;
   const pendingTasks = (props.contact.clientTasks || []).filter((task) => task.status === 'pending');
   const nextTask = pendingTasks[0] || null;
-  const nextMilestoneLabel = nextTask?.title || 'Open funding and review your strongest offers';
-  const nextMilestoneHelper = nextTask?.description || 'Start with the highest-priority action below so your capital path stays clear.';
 
   useEffect(() => {
     setPortalMessages(props.contact.messageHistory || []);
   }, [props.contact.id, props.contact.messageHistory]);
 
+  const journey = useMemo(
+    () =>
+      deriveClientJourneyState({
+        contact: props.contact,
+        demoMode,
+        credit: credit.data,
+        funding: funding.data,
+        business: business.data,
+        capital: capital.data,
+        trading: trading.snapshot,
+      }),
+    [props.contact, demoMode, credit.data, funding.data, business.data, capital.data, trading.snapshot]
+  );
+
+  const overviewMetrics = [
+    {
+      label: 'Credit',
+      value: demoMode
+        ? '684'
+        : String(
+            credit.data.analysis?.latest_report?.personal_score
+            || credit.data.analysis?.latest_report?.business_score
+            || credit.data.recommendations?.recommendations?.length
+            || 0
+          ),
+      helper: journey.summary.hasCreditAnalysis ? 'Analysis active' : 'Upload + analysis needed',
+      tone: 'bg-[#EAF7FB]',
+    },
+    {
+      label: 'Funding',
+      value: `${journey.progress.percent}%`,
+      helper:
+        journey.fundingRange.unlocked && journey.fundingRange.min !== null && journey.fundingRange.max !== null
+          ? `$${journey.fundingRange.min.toLocaleString()}-$${journey.fundingRange.max.toLocaleString()} range`
+          : 'Estimate locked',
+      tone: 'bg-[#EDF9EE]',
+    },
+    {
+      label: 'Business',
+      value: `${journey.summary.businessProgressPercent}%`,
+      helper: business.data?.readiness.ready ? 'Foundation ready' : 'Readiness in progress',
+      tone: 'bg-[#F2EFFF]',
+    },
+    {
+      label: 'Unlocks',
+      value: `${journey.badges.filter((badge) => badge.earned).length}`,
+      helper: journey.tradingAcademy.unlocked ? 'Trading academy unlocked' : 'More rewards ahead',
+      tone: 'bg-[#FFF8E8]',
+    },
+  ];
+
   const clarityCards = [
     {
       label: 'Where am I?',
-      title: 'Executive overview',
-      helper: 'You are looking at the cross-module command view for credit, funding, business setup, and grants.',
+      title: 'Guided command center',
+      helper: 'Your dashboard now leads with one story across credit, funding, rewards, and unlocks.',
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
     {
@@ -118,8 +186,8 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
     },
     {
       label: 'What do I do next?',
-      title: nextTask?.title || 'Review your top funding and credit actions',
-      helper: nextTask?.description || 'Start with the highest-priority action below so your next milestone stays obvious.',
+      title: nextTask?.title || journey.hero.ctaLabel,
+      helper: nextTask?.description || journey.hero.subtitle,
       icon: <ArrowRight className="h-4 w-4" />,
     },
   ];
@@ -155,50 +223,65 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
 
   return (
     <div className="mx-auto max-w-[1320px] space-y-6 pb-10 subpixel-antialiased">
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-3">
-          <p className="text-[0.72rem] font-black uppercase tracking-[0.22em] text-[#607CC1]">Client dashboard</p>
-          <h1 className="text-[2.6rem] font-black tracking-tight text-[#1B2C61] sm:text-[3.1rem]">Welcome Back, {displayName}</h1>
-          <p className="text-base text-[#61769D]">Your command view for credit, funding, business setup, and grants.</p>
-        </div>
-
-        <div className="rounded-[2rem] border border-[#DFE7F4] bg-white p-5 shadow-[0_16px_44px_rgba(36,58,114,0.05)]">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#607CC1]">Next milestone</p>
-              <h2 className="mt-2 text-[1.55rem] font-black tracking-tight text-[#17233D]">Keep your funding path moving</h2>
-            </div>
-            <span className="rounded-full border border-[#D5E4FF] bg-[#EEF4FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#4677E6]">
-              {pendingTasks.length} pending
-            </span>
+      <section className="space-y-3">
+        <p className="text-[0.72rem] font-black uppercase tracking-[0.22em] text-[#607CC1]">Client dashboard</p>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-[2.6rem] font-black tracking-tight text-[#1B2C61] sm:text-[3.1rem]">Welcome Back, {displayName}</h1>
+            <p className="mt-2 text-base text-[#61769D]">One guided journey for credit, funding readiness, rewards, and next unlocks.</p>
           </div>
-          <div className="mt-5 space-y-3">
-            <div className="rounded-[1.4rem] border border-[#DCE5F4] bg-[#F9FBFE] p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Do this next</p>
-              <p className="mt-2 text-base font-black tracking-tight text-[#17233D]">{nextMilestoneLabel}</p>
-              <p className="mt-1 text-sm text-[#61769D]">{nextMilestoneHelper}</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding')}
-                className="rounded-[1.2rem] bg-[#17233D] px-4 py-3 text-left text-white shadow-[0_14px_28px_rgba(23,35,61,0.18)] transition-all hover:bg-[#4677E6]"
-              >
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/70">Primary action</p>
-                <p className="mt-2 text-sm font-black tracking-tight">Open Funding</p>
-              </button>
-              <div className="rounded-[1.2rem] border border-[#E4ECF8] bg-[#FBFDFF] px-4 py-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">Attention</p>
-                <p className="mt-2 text-sm font-black tracking-tight text-[#17233D]">{unreadMessages} unread updates</p>
-                <p className="mt-1 text-sm text-[#61769D]">{missingDocuments} missing required docs</p>
-              </div>
-            </div>
+          <div className="inline-flex items-center gap-3 rounded-full border border-[#DDE7F7] bg-white px-4 py-2 text-sm text-[#61769D] shadow-[0_10px_30px_rgba(36,58,114,0.05)]">
+            <span className="font-black text-[#17233D]">{journey.summary.readinessScore}% readiness</span>
+            <span>•</span>
+            <span>{pendingTasks.length} pending tasks</span>
           </div>
         </div>
       </section>
 
+      <FundingJourneyHero
+        eyebrow={journey.hero.eyebrow}
+        title={journey.hero.title}
+        subtitle={journey.hero.subtitle}
+        ctaLabel={journey.hero.ctaLabel}
+        supportText={journey.hero.supportText}
+        onAction={() => props.onNavigate?.(journey.hero.ctaView, journey.hero.ctaPath)}
+      />
+
+      <FundingProgressBar
+        percent={journey.progress.percent}
+        activeStepLabel={journey.progress.activeStepLabel}
+        steps={journey.progress.steps}
+      />
+
+      <AchievementBadges badges={journey.badges} />
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <EstimatedFundingRangeCard
+          unlocked={journey.fundingRange.unlocked}
+          min={journey.fundingRange.min}
+          max={journey.fundingRange.max}
+          helper={journey.fundingRange.helper}
+        />
+        <TradingAcademyUnlockCard
+          unlocked={journey.tradingAcademy.unlocked}
+          statusLabel={journey.tradingAcademy.statusLabel}
+          title={journey.tradingAcademy.title}
+          subtitle={journey.tradingAcademy.subtitle}
+          helper={journey.tradingAcademy.helper}
+          ctaLabel={journey.tradingAcademy.ctaLabel}
+          checklist={journey.tradingAcademy.checklist}
+          onAction={() => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding')}
+        />
+      </section>
+
       <section className="rounded-[2rem] border border-[#DFE7F4] bg-white px-5 py-6 shadow-[0_16px_44px_rgba(36,58,114,0.05)]">
-        <h2 className="text-[2rem] font-black tracking-tight text-[#17233D]">Your Nexus Modules</h2>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#91A1BC]">Existing modules</p>
+            <h2 className="mt-2 text-[2rem] font-black tracking-tight text-[#17233D]">Portal Modules</h2>
+          </div>
+          <p className="text-sm text-[#61769D]">All existing features remain connected below the guided journey.</p>
+        </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-6">
           {modules.map((module) => (
             <button
@@ -233,8 +316,9 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
 
       <section className="space-y-5">
         <div>
-          <h2 className="text-[2.4rem] font-black tracking-tight text-[#17233D]">Nexus Command View</h2>
-          <p className="mt-2 text-lg text-[#61769D]">A cross-module snapshot of credit, funding, business setup, and grants.</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#91A1BC]">Supporting detail</p>
+          <h2 className="mt-2 text-[2.4rem] font-black tracking-tight text-[#17233D]">Nexus Command View</h2>
+          <p className="mt-2 text-lg text-[#61769D]">Existing cross-module tools stay available beneath the journey layer.</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -311,7 +395,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
             <MessageSquare className="mt-0.5 h-4 w-4 text-[#4677E6]" />
             <div>
               <p className="text-sm font-black tracking-tight text-[#17233D]">Messaging is your workflow hub</p>
-              <p className="mt-1 text-sm text-[#61769D]">Use advisor updates to clarify missing items and confirm your next milestone.</p>
+              <p className="mt-1 text-sm text-[#61769D]">{unreadMessages} unread updates are waiting in the portal inbox.</p>
             </div>
           </div>
         </div>

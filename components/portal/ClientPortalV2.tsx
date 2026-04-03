@@ -34,6 +34,7 @@ import {
   fintechPrimaryButton,
   fintechSecondaryButton,
 } from './fintechStyles';
+import BusinessFoundationChecklist from './BusinessFoundationChecklist';
 
 type PortalModuleKey = 'overview' | 'credit' | 'funding' | 'business' | 'grants';
 
@@ -655,6 +656,42 @@ export default function ClientPortalV2(props: {
           <MetricCard label="Current Path" value={formatPathLabel(business.data?.readiness.path)} helper="Business-foundation path currently selected for the tenant." tone="info" />
           <MetricCard label="Completed Steps" value={String(businessCompleted.length)} helper="Steps marked complete in the business foundation tracker." tone="success" />
           <MetricCard label="Missing Steps" value={String(businessMissing.length)} helper="Remaining steps preventing business-readiness completion." tone={businessMissing.length > 0 ? 'warning' : 'success'} />
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+          <BusinessFoundationChecklist
+            data={business.data}
+            saving={business.saving}
+            error={business.error}
+            onChoosePath={async (path) => {
+              await business.setPath(path);
+            }}
+            onSaveProfile={async (payload) => {
+              await business.updateProfile({
+                legal_name: payload.legal_name,
+                entity_type: payload.entity_type,
+                ein: payload.ein,
+                business_address: payload.business_address,
+                business_phone: payload.business_phone,
+                business_website: payload.business_website,
+                naics_code: payload.naics_code,
+                business_email: payload.business_email,
+                mission_statement: payload.mission_statement,
+                business_plan_summary: payload.business_plan_summary,
+                bank_name: payload.bank_name,
+                account_type: payload.account_type,
+                profile_status: 'in_progress',
+              });
+            }}
+            onSetStepStatus={async (stepKey, stepStatus, notes) => {
+              await business.setProgress({
+                step_key: stepKey,
+                step_status: stepStatus,
+                notes,
+              });
+            }}
+          />
+
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
