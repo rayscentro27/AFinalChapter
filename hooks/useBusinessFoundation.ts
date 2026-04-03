@@ -100,6 +100,7 @@ export default function useBusinessFoundation(tenantId?: string) {
       bank_name?: string | null;
       account_type?: string | null;
       profile_status?: 'not_started' | 'in_progress' | 'ready' | 'completed' | null;
+      metadata_patch?: Record<string, unknown> | null;
     }) => {
       if (!tenantId) return null;
       setSaving(true);

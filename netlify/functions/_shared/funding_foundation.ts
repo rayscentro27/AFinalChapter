@@ -585,6 +585,7 @@ export async function setBusinessProfile(
     bankName?: string | null;
     accountType?: string | null;
     profileStatus?: 'not_started' | 'in_progress' | 'ready' | 'completed' | null;
+    metadataPatch?: Record<string, unknown> | null;
   }
 ) {
   const existing = await resolveSingle<BusinessProfileRow>(
@@ -598,6 +599,7 @@ export async function setBusinessProfile(
 
   const mergedMetadata = {
     ...safeObject(existing?.metadata),
+    ...safeObject(params.metadataPatch),
     ...(params.businessEmail !== undefined ? { business_email: params.businessEmail || null } : {}),
     ...(params.missionStatement !== undefined ? { mission_statement: params.missionStatement || null } : {}),
     ...(params.businessPlanSummary !== undefined ? { business_plan_summary: params.businessPlanSummary || null } : {}),

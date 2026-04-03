@@ -15,8 +15,8 @@ Single source of truth for phased Nexus portal/client revamp execution.
 | Phase | Name | Status | Notes |
 | --- | --- | --- | --- |
 | 1 | Client Command Center | In progress | Hero, journey progress, badges, funding range, and trading unlock implemented in the client command center. |
-| 2 | Business Foundation System | In progress | Current phase. Make business foundation a clickable, gated first step. |
-| 3 | 1-Click Launch Mode | Pending | New business path + existing business intake path. |
+| 2 | Business Foundation System | Complete | Business foundation is now a clickable, gated first step tied to command center state. |
+| 3 | 1-Click Launch Mode | In progress | New business path + existing business intake path. |
 | 4 | Auto Website + Identity Preview | Pending | Preview-first website/domain/email generation. |
 | 5 | 1-Click Credit Analysis + Dispute Engine | Pending | Upload -> analyze -> letters -> DocuPost send. |
 | 6 | Opportunity Database + Matching | Pending | Business opportunity storage and rule-based matching. |
@@ -29,18 +29,17 @@ Single source of truth for phased Nexus portal/client revamp execution.
 
 ## Current Focus
 
-### Phase 2 Goals
+### Phase 3 Goals
 
-- Make Business Foundation a real first-step system.
-- Keep it additive on top of the current portal and readiness services.
-- Ensure checklist items are clickable and open a real guided interaction.
-- Connect completion state to command-center gating so deeper funding steps do not fully unlock too early.
+- Add a 1-click launch layer above Business Foundation.
+- Support both new-business generation and existing-business intake.
+- Stage launch drafts into live business profile metadata without silent overwrite.
+- Converge both paths back into the same Business Foundation and readiness flow.
 
 ### Exit Criteria
 
-- Business path is selectable in-portal.
-- Core and optional foundation items are clickable.
-- Each item opens a contextual action drawer.
-- Core profile fields can be saved in the existing tenant-safe data model.
-- Command center hero/gating reflects incomplete business foundation.
-
+- Users can choose Build A New Business or Use My Existing Business.
+- Both paths save staged launch data in the current tenant-safe profile model.
+- New business path generates a launch draft and can apply it into foundation.
+- Existing business path collects intake and generates a fundability review.
+- Both paths converge into the same Business Foundation checklist and readiness flow.

@@ -35,6 +35,7 @@ import {
   fintechSecondaryButton,
 } from './fintechStyles';
 import BusinessFoundationChecklist from './BusinessFoundationChecklist';
+import LaunchModeStudio from './LaunchModeStudio';
 
 type PortalModuleKey = 'overview' | 'credit' | 'funding' | 'business' | 'grants';
 
@@ -657,6 +658,17 @@ export default function ClientPortalV2(props: {
           <MetricCard label="Completed Steps" value={String(businessCompleted.length)} helper="Steps marked complete in the business foundation tracker." tone="success" />
           <MetricCard label="Missing Steps" value={String(businessMissing.length)} helper="Remaining steps preventing business-readiness completion." tone={businessMissing.length > 0 ? 'warning' : 'success'} />
         </div>
+
+        <LaunchModeStudio
+          data={business.data}
+          saving={business.saving}
+          onChoosePath={async (path) => {
+            await business.setPath(path);
+          }}
+          onSaveProfile={async (payload) => {
+            await business.updateProfile(payload);
+          }}
+        />
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
           <BusinessFoundationChecklist

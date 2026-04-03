@@ -23,6 +23,7 @@ const BodySchema = z.object({
   bank_name: z.string().max(200).nullable().optional(),
   account_type: z.string().max(100).nullable().optional(),
   profile_status: z.enum(['not_started', 'in_progress', 'ready', 'completed']).nullable().optional(),
+  metadata_patch: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 export const handler: Handler = async (event) => {
@@ -50,6 +51,7 @@ export const handler: Handler = async (event) => {
       bankName: body.bank_name,
       accountType: body.account_type,
       profileStatus: body.profile_status ?? null,
+      metadataPatch: body.metadata_patch ?? null,
     });
 
     return json(200, {
