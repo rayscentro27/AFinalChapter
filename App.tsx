@@ -760,6 +760,26 @@ export const App = () => {
       );
     }
 
+    const resolvePortalContact = (): Contact => {
+      let myContact = contacts.find(c => c.email.toLowerCase() === user.email.toLowerCase());
+      if (!myContact && contacts.length > 0) myContact = contacts[0];
+
+      return myContact || {
+        id: 'new',
+        name: user.name || 'New Client',
+        email: user.email,
+        phone: '',
+        company: 'New Business',
+        status: 'Lead',
+        lastContact: 'Just now',
+        value: 0,
+        source: 'Registration',
+        notes: 'Setup in progress.',
+        checklist: {},
+        clientTasks: [],
+      };
+    };
+
     if (isPortalRouteViewMode(currentView)) {
       const previewContact: Contact = {
         id: 'portal-preview',
@@ -816,27 +836,6 @@ export const App = () => {
         if (currentView === ViewMode.ADMIN_COMMISSIONS) return <AdminCommissionsPage />;
         return <ClientLandingPage onNavigate={navigate} />;
     }
-
-    const resolvePortalContact = (): Contact => {
-      let myContact = contacts.find(c => c.email.toLowerCase() === user.email.toLowerCase());
-      if (!myContact && contacts.length > 0) myContact = contacts[0];
-
-      return myContact || {
-        id: 'new',
-        name: user.name || 'New Client',
-        email: user.email,
-        phone: '',
-        company: 'New Business',
-        status: 'Lead',
-        lastContact: 'Just now',
-        value: 0,
-        source: 'Registration',
-        notes: 'Setup in progress.',
-        checklist: {},
-        clientTasks: [],
-      };
-    };
-
 
     if (currentView === ViewMode.CLIENT_ONBOARDING) {
       return <ClientOnboarding />;
