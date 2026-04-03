@@ -766,6 +766,7 @@ export const App = () => {
 
       return myContact || {
         id: 'new',
+        tenantId: user.tenantId,
         name: user.name || 'New Client',
         email: user.email,
         phone: '',

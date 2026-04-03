@@ -251,7 +251,12 @@ export default function ClientPortalV2(props: {
   onOpenLegacyPortal: () => void;
 }) {
   const { user } = useAuth();
-  const demoMode = !user || BACKEND_CONFIG.mode === 'mvp_mock';
+  const tenantId = props.contact.tenantId
+    || user?.tenantId
+    || props.contact.inboxRouting?.tenant_id
+    || props.contact.inboxRouting?.tenantId
+    || '';
+  const demoMode = !user || BACKEND_CONFIG.mode === 'mvp_mock' || !tenantId;
   const activeModuleKey = getActiveModule(props.currentView);
   const activeModule = MODULES.find((module) => module.key === activeModuleKey) || MODULES[0];
   const headerTitle = activeModuleKey === 'overview' ? 'NexusOne client portal' : activeModule.title;
@@ -260,10 +265,10 @@ export default function ClientPortalV2(props: {
       ? 'Parallel route group using current services and additive routing.'
       : activeModule.description;
 
-  const funding = useFundingRoadmap(demoMode ? undefined : props.contact.id, true);
-  const tasks = usePortalTasks(demoMode ? undefined : props.contact.id, true);
-  const credit = useCreditCenter(demoMode ? undefined : props.contact.id);
-  const business = useBusinessFoundation(demoMode ? undefined : props.contact.id);
+  const funding = useFundingRoadmap(demoMode ? undefined : tenantId, true);
+  const tasks = usePortalTasks(demoMode ? undefined : tenantId, true);
+  const credit = useCreditCenter(demoMode ? undefined : tenantId);
+  const business = useBusinessFoundation(demoMode ? undefined : tenantId);
   const [grantState, setGrantState] = useState<PortalGrantState>({
     catalog: [],
     matches: [],
