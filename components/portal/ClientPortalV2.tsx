@@ -254,6 +254,11 @@ export default function ClientPortalV2(props: {
   const demoMode = !user || BACKEND_CONFIG.mode === 'mvp_mock';
   const activeModuleKey = getActiveModule(props.currentView);
   const activeModule = MODULES.find((module) => module.key === activeModuleKey) || MODULES[0];
+  const headerTitle = activeModuleKey === 'overview' ? 'NexusOne client portal' : activeModule.title;
+  const headerDescription =
+    activeModuleKey === 'overview'
+      ? 'Parallel route group using current services and additive routing.'
+      : activeModule.description;
 
   const funding = useFundingRoadmap(demoMode ? undefined : props.contact.id, true);
   const tasks = usePortalTasks(demoMode ? undefined : props.contact.id, true);
@@ -767,8 +772,8 @@ export default function ClientPortalV2(props: {
       <div className="mx-auto max-w-[1400px] space-y-6">
         <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-[#607CC1]">NexusOne client portal</p>
-            <p className="mt-2 text-base text-[#61769D]">{demoMode ? 'Light-mode shell preview with representative data.' : 'Parallel route group using current services and additive routing.'}</p>
+            <p className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-[#607CC1]">{headerTitle}</p>
+            <p className="mt-2 text-base text-[#61769D]">{demoMode ? 'Light-mode shell preview with representative data.' : headerDescription}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <StatusChip tone={demoMode ? 'success' : moduleError ? 'warning' : 'success'}>{demoMode ? 'Demo data active' : moduleError ? 'Stable fallback mode' : 'Live data connected'}</StatusChip>
