@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import useBusinessFoundation from '../../hooks/useBusinessFoundation';
 import useCreditCenter from '../../hooks/useCreditCenter';
+import useCreditWorkflow from '../../hooks/useCreditWorkflow';
 import useFundingRoadmap from '../../hooks/useFundingRoadmap';
 import usePortalTasks from '../../hooks/usePortalTasks';
 import { BACKEND_CONFIG } from '../../adapters/config';
@@ -35,6 +36,7 @@ import {
   fintechSecondaryButton,
 } from './fintechStyles';
 import BusinessFoundationChecklist from './BusinessFoundationChecklist';
+import CreditWorkflowActionCenter from './CreditWorkflowActionCenter';
 import BusinessIdentityPreviewCard from './BusinessIdentityPreviewCard';
 import LaunchModeStudio from './LaunchModeStudio';
 
@@ -271,6 +273,7 @@ export default function ClientPortalV2(props: {
   const funding = useFundingRoadmap(demoMode ? undefined : tenantId, true);
   const tasks = usePortalTasks(demoMode ? undefined : tenantId, true);
   const credit = useCreditCenter(demoMode ? undefined : tenantId);
+  const creditWorkflow = useCreditWorkflow({ tenantId: demoMode ? undefined : tenantId, userId: user?.id });
   const business = useBusinessFoundation(demoMode ? undefined : tenantId);
   const [grantState, setGrantState] = useState<PortalGrantState>({
     catalog: [],
@@ -458,9 +461,48 @@ export default function ClientPortalV2(props: {
     });
     const profileBalance = demoMode ? '$3,500' : formatCurrencyShort((latestReport as any)?.total_balance || (latestAnalysis as any)?.total_balance || 3500);
     const utilization = demoMode ? 'Very Good' : creditRecommendations.length > 2 ? 'Improving' : 'Stable';
+    const handleGenerateLetters = async () => {
+      const recommendation = creditRecommendations[0];
+      await credit.createLetter({
+        recommendation_id: recommendation?.id,
+        title: recommendation?.title || 'Dispute Letter Draft',
+        summary: recommendation?.recommended_action || recommendation?.reasoning || 'Draft requested from the portal credit workflow.',
+      });
+      await creditWorkflow.refresh();
+    };
+    const handleDownloadLetter = (letter: any) => {
+      const text = String(letter?.letter_text || letter?.summary || '');
+      if (!text) return;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${String(letter?.title || 'dispute-letter').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+    };
 
     return (
       <div className="space-y-6">
+        <CreditWorkflowActionCenter
+          data={{
+            latestReport,
+            latestAnalysis,
+            recommendations: creditRecommendations,
+            letters: creditLetters,
+            packets: creditWorkflow.data.packets,
+            finalizedLetters: creditWorkflow.data.finalizedLetters,
+            mailEvents: creditWorkflow.data.mailEvents,
+            mailPackets: creditWorkflow.data.mailPackets,
+          }}
+          loading={credit.loading || creditWorkflow.loading}
+          saving={credit.saving}
+          error={credit.error || creditWorkflow.error}
+          onNavigate={props.onNavigate}
+          onGenerateLetters={handleGenerateLetters}
+          onDownloadLetter={handleDownloadLetter}
+        />
+
         <section className={`${flatShellClass} p-6`}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>

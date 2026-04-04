@@ -18,7 +18,7 @@ Single source of truth for phased Nexus portal/client revamp execution.
 | 2 | Business Foundation System | Complete | Business foundation is now a clickable, gated first step tied to command center state. |
 | 3 | 1-Click Launch Mode | In progress | New business path + existing business intake path. |
 | 4 | Auto Website + Identity Preview | In progress | Preview-first website/domain/email generation. |
-| 5 | 1-Click Credit Analysis + Dispute Engine | Pending | Upload -> analyze -> letters -> DocuPost send. |
+| 5 | 1-Click Credit Analysis + Dispute Engine | In progress | Upload -> analyze -> letters -> DocuPost send. |
 | 6 | Opportunity Database + Matching | Pending | Business opportunity storage and rule-based matching. |
 | 7 | Opportunity UI Layer | Pending | Featured opportunity, top recommendations, connected next steps. |
 | 8 | Global Tile Interaction System | Pending | Enforce non-dead-end interaction rules across portal surfaces. |
@@ -42,3 +42,10 @@ Single source of truth for phased Nexus portal/client revamp execution.
 - Domain and business email selections can be applied into the live business profile.
 - Website copy stays editable and preview-first.
 - The preview connects back to Business Foundation and readiness instead of ending in a dead card.
+
+### Phase 5 Goals
+
+- Turn the credit module into one connected action center.
+- Show upload, analysis, letters, finalized packet, and certified-mail state in one place.
+- Reuse the current upload page, recommendation fetch, draft-letter generation, and DocuPost preview/send path.
+- Keep status/history visible to the client so the workflow feels operational rather than static.
