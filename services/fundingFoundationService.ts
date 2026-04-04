@@ -80,6 +80,24 @@ export type BusinessFoundationProfileResponse = {
   supporting?: Record<string, unknown>;
 };
 
+export type BusinessFoundationProfileUpdateInput = {
+  tenant_id?: string;
+  legal_name?: string | null;
+  entity_type?: string | null;
+  ein?: string | null;
+  business_address?: string | null;
+  business_phone?: string | null;
+  business_website?: string | null;
+  naics_code?: string | null;
+  business_email?: string | null;
+  mission_statement?: string | null;
+  business_plan_summary?: string | null;
+  bank_name?: string | null;
+  account_type?: string | null;
+  profile_status?: 'not_started' | 'in_progress' | 'ready' | 'completed' | null;
+  metadata_patch?: Record<string, unknown> | null;
+};
+
 export type FundingHistoryResponse = {
   ok: boolean;
   tenant_id: string;
@@ -261,6 +279,19 @@ export async function getBusinessFoundationReadiness(tenantId?: string): Promise
     { method: 'GET', headers }
   );
   return ensureOk(payload, 'Unable to load business foundation readiness.');
+}
+
+export async function updateBusinessFoundationProfile(input: BusinessFoundationProfileUpdateInput): Promise<BusinessFoundationProfileResponse> {
+  const headers = await authHeaders();
+  const payload = await requestJson<BusinessFoundationProfileResponse>(`${BASE}/business-foundation-profile-update`, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+  return ensureOk(payload, 'Unable to update business foundation profile.');
 }
 
 export async function getFundingRoadmap(tenantId?: string, reconcile = false): Promise<FundingRoadmapResponse> {

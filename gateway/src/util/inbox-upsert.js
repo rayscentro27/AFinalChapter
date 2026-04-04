@@ -274,6 +274,11 @@ export async function getOrCreateConversation({
   contactId,
   subject,
   provider,
+  channelType,
+  workflowThreadType = 'general',
+  threadStatus = 'new',
+  ownerUserId = null,
+  aiMode = 'off',
 }) {
   if (!tenantId || !channelAccountId) return null;
 
@@ -296,6 +301,11 @@ export async function getOrCreateConversation({
     contact_id: contactId,
     status: 'open',
     subject: cleanText(subject),
+    thread_status: threadStatus || 'new',
+    workflow_thread_type: workflowThreadType || 'general',
+    owner_user_id: ownerUserId || null,
+    ai_mode: aiMode || 'off',
+    channel_type: channelType || 'nexus_chat',
   };
 
   const normalizedProvider = cleanText(provider);
@@ -309,6 +319,16 @@ export async function getOrCreateConversation({
 
   if (result.error && normalizedProvider && isMissingProviderColumn(result.error)) {
     delete row.provider;
+    result = await supabaseAdmin
+      .from('conversations')
+      .insert(row)
+      .select('id')
+      .single();
+  }
+
+  const workflowColumns = ['thread_status', 'workflow_thread_type', 'owner_user_id', 'ai_mode', 'channel_type'];
+  if (result.error && workflowColumns.some((column) => isMissingColumn(result.error, column))) {
+    for (const key of workflowColumns) delete row[key];
     result = await supabaseAdmin
       .from('conversations')
       .insert(row)

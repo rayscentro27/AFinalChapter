@@ -22,13 +22,13 @@ import {
   releaseTenantOutboxLock,
 } from '../util/outbox-lock.js';
 import { resolveBestIdentityForQueue, resolveBestIdentityForSend } from '../util/send-route-selector.js';
+import { computeMetaOutboxRetryPlan } from '../util/meta-send-error.js';
 import { recordSendFailure, recordSendSuccess } from '../lib/health/channelHealth.js';
 import { checkLimit } from '../lib/billing/planEnforcer.js';
 import { logAudit } from '../lib/audit/auditLog.js';
 import { buildWebhookEventKey, queueOutgoingWebhookEvent } from '../lib/public-api/webhookDispatcher.js';
 
 const SUPPORTED_PROVIDERS = new Set(['meta']);
-const BACKOFF_MINUTES = [1, 5, 15, 60, 360];
 const NO_HEALTHY_ROUTE_BACKOFF_MINUTES = 5;
 
 function requireApiKey(req, reply) {
@@ -93,11 +93,6 @@ function isMissingColumnProjection(error) {
   const msg = String(error?.message || '').toLowerCase();
   return msg.includes('column')
     && (msg.includes('does not exist') || msg.includes('schema cache') || msg.includes("could not find the '"));
-}
-
-function computeBackoffMinutes(attempts) {
-  const index = Math.max(0, Math.min(BACKOFF_MINUTES.length - 1, Number(attempts || 1) - 1));
-  return BACKOFF_MINUTES[index];
 }
 
 function toJsonString(value) {
@@ -526,16 +521,19 @@ async function attemptSendOnce(outbox) {
     };
   } catch (error) {
     const attempts = Number(claimedWithRoute.attempts || 0) + 1;
-    const nextRetryMinutes = computeBackoffMinutes(attempts);
+    const retryPlan = computeMetaOutboxRetryPlan(error, attempts, new Date());
     const redactedError = redactText(String(error?.message || error)).slice(0, 5000);
+    const lastError = retryPlan.classification
+      ? `${retryPlan.classification.summary}: ${redactedError}`
+      : redactedError;
 
     const { data: failedRow, error: failError } = await supabaseAdmin
       .from('outbox_messages')
       .update({
         status: 'failed',
         attempts,
-        last_error: redactedError,
-        next_attempt_at: new Date(Date.now() + nextRetryMinutes * 60000).toISOString(),
+        last_error: lastError,
+        next_attempt_at: retryPlan.nextRetryAt,
         updated_at: new Date().toISOString(),
       })
       .eq('id', claimedWithRoute.id)
@@ -551,11 +549,15 @@ async function attemptSendOnce(outbox) {
           tenant_id: claimedWithRoute.tenant_id,
           channel_account_id: claimedWithRoute.channel_account_id,
           provider: claimedWithRoute.provider,
-          error: redactedError,
+          error: lastError,
           context: {
             outbox_id: claimedWithRoute.id,
             attempts,
             route_health_status: route.health_status || null,
+            meta_error_category: retryPlan.classification?.category || null,
+            meta_error_code: retryPlan.classification?.providerCode || null,
+            meta_error_http_status: retryPlan.classification?.httpStatus || null,
+            meta_error_retryable: retryPlan.retryable,
           },
         });
       } catch {
@@ -567,6 +569,10 @@ async function attemptSendOnce(outbox) {
       outbox: failedRow,
       sent: false,
       error: String(error?.message || error),
+      error_category: retryPlan.classification?.category || null,
+      error_code: retryPlan.classification?.providerCode || null,
+      retryable: retryPlan.retryable,
+      next_retry_at: retryPlan.nextRetryAt,
     };
   }
 }
@@ -1025,6 +1031,10 @@ export async function outboxRoutes(fastify) {
           send_attempted: true,
           outbox: attempt.outbox,
           error: attempt.error || 'Provider send failed',
+          error_category: attempt.error_category || null,
+          error_code: attempt.error_code || null,
+          retryable: attempt.retryable ?? null,
+          next_retry_at: attempt.next_retry_at || null,
         });
       }
 

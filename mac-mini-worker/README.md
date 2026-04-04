@@ -51,7 +51,8 @@ Output:
 [INFO] [MacMiniWorker] Worker starting
   worker_id: mac-mini-worker-1
   pool_size: 2
-  supported_job_types: sentiment_triage,neural_scout_batch,scenario_runner,...
+  supported_job_types: sentiment_triage,admin_command_execute
+  planned_job_types: neural_scout_batch,scenario_runner,grants_matcher,content_factory
 ✅ Worker pool started successfully
 ```
 
@@ -89,6 +90,9 @@ This will:
 ```
 
 **Output:** `messages.ai_sentiment`, `messages.ai_intent`, `messages.ai_urgency`
+
+### admin_command_execute (✅ Complete)
+- Executes internal admin command actions from the queue
 
 ### neural_scout_batch (🔄 Coming)
 Research contacts and opportunities

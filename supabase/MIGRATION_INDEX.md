@@ -89,6 +89,11 @@ These legacy SQL files informed naming/semantics, but the exact table set reques
 - Adds indexes, triggers, and RLS policies for integration readiness tracking.
 - Seeds integration-readiness rows for all tenants without exposing raw secrets.
 
+8. `20260402193000_trading_access_v2_and_lab.sql`
+- Extends `user_advanced_access` with Trading Access V2 fields (tier/stage/admin-lab flags).
+- Creates Mac Mini strategy lab storage tables and Hermes review surfaces.
+- Adds tenant-scoped and admin-only RLS policies for the new trading data.
+
 ## Current Ordering Notes
 
 - Activation and command-lifecycle migrations build on the existing operational tables and should be applied before the newer integration-readiness snapshot layer.

@@ -75,6 +75,8 @@ const AdminFunnelControlCenterPage = lazy(() => import('./src/pages/AdminFunnelC
 const AdminWhiteLabelSettingsPage = lazy(() => import('./src/pages/AdminWhiteLabelSettingsPage'));
 const AdminExecutiveDashboardPage = lazy(() => import('./src/pages/AdminExecutiveDashboardPage'));
 const AdminActivationCenterPage = lazy(() => import('./src/pages/AdminActivationCenterPage'));
+const AdminHermesPage = lazy(() => import('./src/pages/AdminHermesPage'));
+const AdminTradingLabPage = lazy(() => import('./src/pages/AdminTradingLabPage'));
 const AdminCredentialManagementPage = lazy(() => import('./src/pages/AdminCredentialManagementPage'));
 const AdminDealEscalationsPage = lazy(() => import('./src/pages/AdminDealEscalationsPage'));
 const LifecycleAutomationPage = lazy(() => import('./src/pages/LifecycleAutomationPage'));
@@ -110,6 +112,7 @@ const AdminPolicies = lazy(() => import('./src/pages/AdminPolicies'));
 const InviteAccept = lazy(() => import('./src/pages/InviteAccept'));
 const TermsPage = lazy(() => import('./src/pages/TermsPage'));
 const PrivacyPage = lazy(() => import('./src/pages/PrivacyPage'));
+const DataDeletionPage = lazy(() => import('./src/pages/DataDeletionPage'));
 const AIDisclosurePage = lazy(() => import('./src/pages/AIDisclosurePage'));
 const RefundPolicyPage = lazy(() => import('./src/pages/RefundPolicyPage'));
 const DisclaimersPage = lazy(() => import('./src/pages/DisclaimersPage'));
@@ -136,6 +139,7 @@ const AdminLegalPublisher = lazy(() => import('./src/pages/AdminLegalPublisher')
 const AdminEmailProvidersPage = lazy(() => import('./src/pages/AdminEmailProvidersPage'));
 const AdminEmailRoutingPage = lazy(() => import('./src/pages/AdminEmailRoutingPage'));
 const AdminEmailLogsPage = lazy(() => import('./src/pages/AdminEmailLogsPage'));
+const AdminEmailPolicyViewerPage = lazy(() => import('./src/pages/AdminEmailPolicyViewerPage'));
 const WorkflowDetailPage = lazy(() => import('./src/pages/WorkflowDetailPage'));
 const AdminWorkflowsPage = lazy(() => import('./src/pages/AdminWorkflowsPage'));
 const FreeScorePage = lazy(() => import('./src/pages/FreeScorePage'));
@@ -196,6 +200,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/invite-accept': ViewMode.INVITE_ACCEPT,
   '/terms': ViewMode.TERMS,
   '/privacy': ViewMode.PRIVACY,
+  '/data-deletion': ViewMode.DATA_DELETION,
   '/ai-disclosure': ViewMode.AI_DISCLOSURE,
   '/refund-policy': ViewMode.REFUND_POLICY,
   '/disclaimers': ViewMode.DISCLAIMERS,
@@ -216,6 +221,8 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/funnel-control': ViewMode.ADMIN_FUNNEL_CONTROL_CENTER,
   '/admin/white-label': ViewMode.ADMIN_WHITE_LABEL_SETTINGS,
   '/admin/executive-dashboard': ViewMode.ADMIN_EXECUTIVE_DASHBOARD,
+  '/admin/hermes': ViewMode.ADMIN_HERMES,
+  '/admin/trading-lab': ViewMode.ADMIN_TRADING_LAB,
   '/admin/nexus-one': ViewMode.ADMIN_NEXUS_ONE,
   '/admin/credentials': ViewMode.ADMIN_CREDENTIALS,
   '/admin/deal-escalations': ViewMode.ADMIN_DEAL_ESCALATIONS,
@@ -244,6 +251,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/admin/email/providers': ViewMode.ADMIN_EMAIL_PROVIDERS,
   '/admin/email/routing': ViewMode.ADMIN_EMAIL_ROUTING,
   '/admin/email/logs': ViewMode.ADMIN_EMAIL_LOGS,
+  '/admin/email/policies': ViewMode.ADMIN_EMAIL_POLICY_VIEWER,
   '/admin/workflows': ViewMode.ADMIN_WORKFLOWS,
   '/admin/funding/catalog': ViewMode.ADMIN_FUNDING_CATALOG,
   '/admin/grants/catalog': ViewMode.ADMIN_GRANTS_CATALOG,
@@ -263,6 +271,7 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
 const LEGAL_VIEWS: ViewMode[] = [
   ViewMode.TERMS,
   ViewMode.PRIVACY,
+  ViewMode.DATA_DELETION,
   ViewMode.AI_DISCLOSURE,
   ViewMode.REFUND_POLICY,
   ViewMode.DISCLAIMERS,
@@ -719,6 +728,8 @@ export const App = () => {
           return <TermsPage />;
         case ViewMode.PRIVACY:
           return <PrivacyPage />;
+        case ViewMode.DATA_DELETION:
+          return <DataDeletionPage />;
         case ViewMode.AI_DISCLOSURE:
           return <AIDisclosurePage />;
         case ViewMode.REFUND_POLICY:
@@ -748,6 +759,27 @@ export const App = () => {
         </div>
       );
     }
+
+    const resolvePortalContact = (): Contact => {
+      let myContact = contacts.find(c => c.email.toLowerCase() === user.email.toLowerCase());
+      if (!myContact && contacts.length > 0) myContact = contacts[0];
+
+      return myContact || {
+        id: 'new',
+        tenantId: user.tenantId,
+        name: user.name || 'New Client',
+        email: user.email,
+        phone: '',
+        company: 'New Business',
+        status: 'Lead',
+        lastContact: 'Just now',
+        value: 0,
+        source: 'Registration',
+        notes: 'Setup in progress.',
+        checklist: {},
+        clientTasks: [],
+      };
+    };
 
     if (isPortalRouteViewMode(currentView)) {
       const previewContact: Contact = {
@@ -805,27 +837,6 @@ export const App = () => {
         if (currentView === ViewMode.ADMIN_COMMISSIONS) return <AdminCommissionsPage />;
         return <ClientLandingPage onNavigate={navigate} />;
     }
-
-    const resolvePortalContact = (): Contact => {
-      let myContact = contacts.find(c => c.email.toLowerCase() === user.email.toLowerCase());
-      if (!myContact && contacts.length > 0) myContact = contacts[0];
-
-      return myContact || {
-        id: 'new',
-        name: user.name || 'New Client',
-        email: user.email,
-        phone: '',
-        company: 'New Business',
-        status: 'Lead',
-        lastContact: 'Just now',
-        value: 0,
-        source: 'Registration',
-        notes: 'Setup in progress.',
-        checklist: {},
-        clientTasks: [],
-      };
-    };
-
 
     if (currentView === ViewMode.CLIENT_ONBOARDING) {
       return <ClientOnboarding />;
@@ -913,6 +924,8 @@ export const App = () => {
                     case ViewMode.ADMIN_FUNNEL_CONTROL_CENTER: return <AdminFunnelControlCenterPage />;
                     case ViewMode.ADMIN_WHITE_LABEL_SETTINGS: return <AdminWhiteLabelSettingsPage />;
                     case ViewMode.ADMIN_EXECUTIVE_DASHBOARD: return <AdminExecutiveDashboardPage />;
+                    case ViewMode.ADMIN_HERMES: return <AdminHermesPage />;
+                    case ViewMode.ADMIN_TRADING_LAB: return <AdminTradingLabPage />;
                     case ViewMode.ADMIN_NEXUS_ONE: return <AdminActivationCenterPage />;
                     case ViewMode.ADMIN_CREDENTIALS: return <AdminCredentialManagementPage />;
                     case ViewMode.ADMIN_DEAL_ESCALATIONS: return <AdminDealEscalationsPage />;
@@ -965,6 +978,7 @@ export const App = () => {
                     case ViewMode.ADMIN_EMAIL_PROVIDERS: return <AdminEmailProvidersPage />;
                     case ViewMode.ADMIN_EMAIL_ROUTING: return <AdminEmailRoutingPage />;
                     case ViewMode.ADMIN_EMAIL_LOGS: return <AdminEmailLogsPage />;
+                    case ViewMode.ADMIN_EMAIL_POLICY_VIEWER: return <AdminEmailPolicyViewerPage />;
                     case ViewMode.ADMIN_WORKFLOWS: return <AdminWorkflowsPage />;
                     case ViewMode.ADMIN_FUNNEL_SEQUENCES: return <AdminFunnelSequencesPage />;
                     case ViewMode.ADMIN_FUNNEL_LEADS: return <AdminFunnelLeadsPage />;

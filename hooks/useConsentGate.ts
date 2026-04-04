@@ -448,9 +448,11 @@ export default function useConsentGate(userId: string | null): UseConsentGateRes
         };
       });
 
-      const { error: auditError } = await supabase.from('audit_events').insert(auditRows);
-      if (auditError) {
-        throw new Error(auditError.message || 'Unable to write consent audit logs.');
+      if (tenantId) {
+        const { error: auditError } = await supabase.from('audit_events').insert(auditRows);
+        if (auditError) {
+          throw new Error(auditError.message || 'Unable to write consent audit logs.');
+        }
       }
 
       await refresh();

@@ -69,7 +69,39 @@ const Sidebar: React.FC<SidebarProps> = ({
   });
   const isAdmin = ['admin', 'super_admin'].includes(String(userRole || '').toLowerCase());
 
+  const resolveClientPath = (view: ViewMode): string | null => {
+    switch (view) {
+      case ViewMode.PORTAL:
+      case ViewMode.PORTAL_OVERVIEW:
+        return '/portal/overview';
+      case ViewMode.PORTAL_CREDIT:
+        return '/portal/credit';
+      case ViewMode.PORTAL_FUNDING:
+        return '/portal/funding';
+      case ViewMode.PORTAL_BUSINESS:
+        return '/portal/business';
+      case ViewMode.PORTAL_GRANTS:
+        return '/portal/grants';
+      case ViewMode.DOCUMENTS:
+        return '/documents';
+      case ViewMode.BILLING:
+        return '/billing';
+      case ViewMode.COMMUNICATION_PREFERENCES:
+        return '/communication-preferences';
+      case ViewMode.SECURITY_SETTINGS:
+        return '/settings/security';
+      default:
+        return null;
+    }
+  };
+
   const handleNav = (view: ViewMode) => {
+    if (userRole === 'client') {
+      const path = resolveClientPath(view);
+      if (path) {
+        window.history.pushState({}, '', path);
+      }
+    }
     onViewChange(view);
     setIsMobileOpen(false);
   };
@@ -84,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {
           label: 'Portal',
           items: [
-            { view: ViewMode.PORTAL, label: 'Next Action', icon: Home },
+            { view: ViewMode.PORTAL_OVERVIEW, label: 'Next Action', icon: Home },
             { view: ViewMode.PORTAL_BUSINESS, label: 'Business Setup', icon: Building2 },
             { view: ViewMode.PORTAL_CREDIT, label: 'Credit Profile', icon: ShieldCheck },
             { view: ViewMode.PORTAL_FUNDING, label: 'Funding Readiness', icon: WalletCards },

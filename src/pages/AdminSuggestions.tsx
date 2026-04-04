@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import useGrowthSuggestions from '../hooks/useGrowthSuggestions';
 
 type Tenant = { id: string; name: string };
 
@@ -70,6 +71,8 @@ export default function AdminSuggestions() {
   const [limit, setLimit] = useState(100);
 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [view, setView] = useState<'identity' | 'growth'>('identity');
+  const growthSuggestions = useGrowthSuggestions(tenantId);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -130,9 +133,9 @@ export default function AdminSuggestions() {
   }, []);
 
   useEffect(() => {
-    if (!tenantId) return;
+    if (!tenantId || view !== 'identity') return;
     void loadSuggestions(true);
-  }, [tenantId, typeFilter, statusFilter, limit]);
+  }, [tenantId, typeFilter, statusFilter, limit, view]);
 
   async function loadSuggestions(refresh = false) {
     if (!tenantId) return;
@@ -240,104 +243,164 @@ export default function AdminSuggestions() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">AI Suggestions</h1>
-        <p className="text-slate-400 text-sm mt-1">Review ranked contact merge/link suggestions and approve or reject with evidence.</p>
-      </div>
-
-      <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 grid gap-3 md:grid-cols-6">
-        <select className="bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm text-slate-100" value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
-          {tenants.map((tenant) => (
-            <option key={tenant.id} value={tenant.id}>{tenant.name || tenant.id}</option>
-          ))}
-        </select>
-
-        <select className="bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm text-slate-100" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)}>
-          <option value="all">All types</option>
-          <option value="merge_contacts">Merge contacts</option>
-          <option value="link_identity">Link identity</option>
-        </select>
-
-        <select className="bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm text-slate-100" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
-          <option value="open">Open</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="all">All</option>
-        </select>
-
-        <input
-          className="md:col-span-2 bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm text-slate-100"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search names, evidence, reasons"
-        />
-
-        <div className="flex gap-2">
-          <input
-            className="w-20 bg-slate-800 border border-slate-600 rounded-md px-2 py-2 text-sm text-slate-100"
-            value={limit}
-            type="number"
-            min={1}
-            max={200}
-            onChange={(e) => setLimit(Math.max(1, Math.min(200, Number(e.target.value || 100))))}
-          />
-          <button className="flex-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-sm px-3 py-2 disabled:opacity-50" onClick={() => void loadSuggestions(true)} disabled={refreshing || !tenantId}>
-            {refreshing ? 'Refreshing...' : 'Refresh'}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">AI Suggestions</h1>
+          <p className="text-slate-400 text-sm mt-1">Review ranked contact merge/link suggestions and approve or reject with evidence.</p>
+        </div>
+        <div className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setView('identity')}
+            className={`rounded-full px-4 py-2 font-black uppercase tracking-[0.18em] ${view === 'identity' ? 'bg-white text-slate-900' : 'text-slate-300'}`}
+          >
+            Identity
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('growth')}
+            className={`rounded-full px-4 py-2 font-black uppercase tracking-[0.18em] ${view === 'growth' ? 'bg-white text-slate-900' : 'text-slate-300'}`}
+          >
+            Growth
           </button>
         </div>
       </div>
 
-      {error ? <div className="rounded-md border border-rose-500/50 bg-rose-950/30 text-rose-200 text-sm px-4 py-3">{error}</div> : null}
-      {success ? <div className="rounded-md border border-emerald-500/50 bg-emerald-950/30 text-emerald-200 text-sm px-4 py-3">{success}</div> : null}
-
-      <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="p-6 text-slate-400 text-sm">No suggestions for this filter.</div>
-        ) : (
-          <div className="divide-y divide-slate-800">
-            {filtered.map((row) => (
-              <div key={row.id} className="p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${badgeClass(row.strength)}`}>{row.strength}</span>
-                    <span className="text-xs text-slate-400">score {row.score}</span>
-                    <span className="text-xs text-slate-400">{row.suggestion_type}</span>
-                    <span className="text-xs text-slate-500">{row.status}</span>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      className="rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 disabled:opacity-50"
-                      disabled={actionBusy || row.status !== 'open'}
-                      onClick={() => void approveSuggestion(row.id)}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      className="rounded bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-1.5 disabled:opacity-50"
-                      disabled={actionBusy || row.status !== 'open'}
-                      onClick={() => void rejectSuggestion(row.id)}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-sm text-slate-200">
-                  <div><span className="text-slate-400">Source:</span> {label(row.source_contact)}</div>
-                  <div><span className="text-slate-400">Target:</span> {label(row.target_contact)}</div>
-                </div>
-
-                <div className="text-xs text-slate-300">
-                  {(row.reasons || []).slice(0, 5).map((reason, index) => (
-                    <div key={`${row.id}-${index}`}>• {asReasonText(reason)}</div>
-                  ))}
-                </div>
-              </div>
+      {view === 'identity' ? (
+        <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 grid gap-3 md:grid-cols-6">
+          <select className="bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm text-slate-100" value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
+            {tenants.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>{tenant.name || tenant.id}</option>
             ))}
+          </select>
+
+          <select className="bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm text-slate-100" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)}>
+            <option value="all">All types</option>
+            <option value="merge_contacts">Merge contacts</option>
+            <option value="link_identity">Link identity</option>
+          </select>
+
+          <select className="bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm text-slate-100" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
+            <option value="open">Open</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="all">All</option>
+          </select>
+
+          <input
+            className="md:col-span-2 bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-sm text-slate-100"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search names, evidence, reasons"
+          />
+
+          <div className="flex gap-2">
+            <input
+              className="w-20 bg-slate-800 border border-slate-600 rounded-md px-2 py-2 text-sm text-slate-100"
+              value={limit}
+              type="number"
+              min={1}
+              max={200}
+              onChange={(e) => setLimit(Math.max(1, Math.min(200, Number(e.target.value || 100))))}
+            />
+            <button className="flex-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-sm px-3 py-2 disabled:opacity-50" onClick={() => void loadSuggestions(true)} disabled={refreshing || !tenantId}>
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 flex items-center justify-between gap-3">
+          <div className="text-sm text-slate-400">Growth suggestions are computed from funding, retention, and referral signals.</div>
+          <button
+            type="button"
+            onClick={() => growthSuggestions.refresh()}
+            className="rounded-lg border border-slate-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-200"
+          >
+            Refresh
+          </button>
+        </div>
+      )}
+
+      {view === 'identity' ? (
+        <>
+          {error ? <div className="rounded-md border border-rose-500/50 bg-rose-950/30 text-rose-200 text-sm px-4 py-3">{error}</div> : null}
+          {success ? <div className="rounded-md border border-emerald-500/50 bg-emerald-950/30 text-emerald-200 text-sm px-4 py-3">{success}</div> : null}
+
+          <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
+            {filtered.length === 0 ? (
+              <div className="p-6 text-slate-400 text-sm">No suggestions for this filter.</div>
+            ) : (
+              <div className="divide-y divide-slate-800">
+                {filtered.map((row) => (
+                  <div key={row.id} className="p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${badgeClass(row.strength)}`}>{row.strength}</span>
+                        <span className="text-xs text-slate-400">score {row.score}</span>
+                        <span className="text-xs text-slate-400">{row.suggestion_type}</span>
+                        <span className="text-xs text-slate-500">{row.status}</span>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          className="rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 disabled:opacity-50"
+                          disabled={actionBusy || row.status !== 'open'}
+                          onClick={() => void approveSuggestion(row.id)}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          className="rounded bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-1.5 disabled:opacity-50"
+                          disabled={actionBusy || row.status !== 'open'}
+                          onClick={() => void rejectSuggestion(row.id)}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-sm text-slate-200">
+                      <div><span className="text-slate-400">Source:</span> {label(row.source_contact)}</div>
+                      <div><span className="text-slate-400">Target:</span> {label(row.target_contact)}</div>
+                    </div>
+
+                    <div className="text-xs text-slate-300">
+                      {(row.reasons || []).slice(0, 5).map((reason, index) => (
+                        <div key={`${row.id}-${index}`}>• {asReasonText(reason)}</div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
+          {growthSuggestions.loading ? <div className="p-4 text-xs text-slate-400">Loading growth suggestions...</div> : null}
+          {growthSuggestions.error ? <div className="p-4 text-sm text-rose-200">{growthSuggestions.error}</div> : null}
+          {!growthSuggestions.loading && growthSuggestions.items.length === 0 ? (
+            <div className="p-6 text-slate-400 text-sm">No growth suggestions yet for this tenant window.</div>
+          ) : null}
+          {growthSuggestions.items.map((item) => (
+            <div key={item.id} className="border-t border-slate-800 p-6 grid gap-4 md:grid-cols-[1fr_auto]">
+              <div>
+                <div className="flex items-center gap-3">
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.urgency === 'high' ? 'bg-rose-500/20 text-rose-200 border border-rose-500/40' : item.urgency === 'medium' ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40' : 'bg-slate-500/20 text-slate-200 border border-slate-400/40'}`}>{item.urgency}</span>
+                  <span className="text-xs text-slate-400">{item.suggestion_type}</span>
+                </div>
+                <div className="mt-3 text-lg font-semibold text-white">{item.title}</div>
+                <div className="mt-2 text-sm text-slate-400">{item.explanation}</div>
+                <div className="mt-3 text-xs text-slate-500">Confidence: {item.confidence} · Tenant: {item.tenant_id.slice(0, 8)} · Created {new Date(item.created_at).toLocaleString()}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-700 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Recommended next action</p>
+                <p className="mt-2">{item.recommended_action}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
