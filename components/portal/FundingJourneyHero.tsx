@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, Rocket, Sparkles } from 'lucide-react';
+import JourneyInteractionBar from './JourneyInteractionBar';
 
 type FundingJourneyHeroProps = {
   eyebrow: string;
@@ -8,6 +9,7 @@ type FundingJourneyHeroProps = {
   ctaLabel: string;
   supportText: string;
   onAction: () => void;
+  onSecondaryAction: () => void;
 };
 
 export default function FundingJourneyHero(props: FundingJourneyHeroProps) {
@@ -31,6 +33,16 @@ export default function FundingJourneyHero(props: FundingJourneyHeroProps) {
             <ArrowRight className="h-4 w-4" />
           </button>
           <p className="mt-4 text-sm font-medium text-[#6480AA]">{props.supportText}</p>
+
+          <JourneyInteractionBar
+            statusLabel={props.title}
+            whyItMatters={props.subtitle}
+            nextStepPreview="Next step preview: complete this milestone to unlock the next funding action"
+            primaryLabel={props.ctaLabel}
+            onPrimaryAction={props.onAction}
+            secondaryLabel="Open Messages"
+            onSecondaryAction={props.onSecondaryAction}
+          />
         </div>
 
         <div className="rounded-[1.9rem] border border-white/70 bg-white/80 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] backdrop-blur">

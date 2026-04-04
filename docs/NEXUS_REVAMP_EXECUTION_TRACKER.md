@@ -20,8 +20,8 @@ Single source of truth for phased Nexus portal/client revamp execution.
 | 4 | Auto Website + Identity Preview | In progress | Preview-first website/domain/email generation. |
 | 5 | 1-Click Credit Analysis + Dispute Engine | In progress | Upload -> analyze -> letters -> DocuPost send. |
 | 6 | Opportunity Database + Matching | Complete | Business opportunity storage, starter catalog, and rule-based matching are in place. |
-| 7 | Opportunity UI Layer | In progress | Featured opportunity, top recommendations, detail panel, and connected next steps are being layered into the command center. |
-| 8 | Global Tile Interaction System | Pending | Enforce non-dead-end interaction rules across portal surfaces. |
+| 7 | Opportunity UI Layer | Complete | Featured opportunity, top recommendations, detail panel, and connected next steps now render in the client command center. |
+| 8 | Global Tile Interaction System | In progress | Core journey surfaces are being standardized around status, action, progress, reward, and next-step previews. |
 | 9 | Affiliate + Revenue Loop | Pending | Invite and earn, earnings tracking, journey-triggered prompts. |
 | 10 | Retention Tracking | Pending | Event model, progression/drop-off metrics, admin visibility. |
 | 11 | CEO Revenue Dashboard | Pending | Executive revenue, funnel, referral, and retention reporting. |
@@ -63,3 +63,10 @@ Single source of truth for phased Nexus portal/client revamp execution.
 - Show the top three recommendation cards with connected CTAs.
 - Add an opportunity details panel that explains match reasons, requirements, risks, and next steps.
 - Keep setup, funding, and grants directly reachable from every opportunity card.
+
+### Phase 8 Goals
+
+- Standardize the journey cards around one interaction pattern.
+- Add clear status, primary action, and next-step preview to the major dashboard surfaces.
+- Reduce dead-end reading states by pushing users directly into business, credit, funding, grants, or messages.
+- Keep the interaction system additive and production-safe without breaking current routes.

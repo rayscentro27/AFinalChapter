@@ -87,10 +87,10 @@ const modules = [
 ];
 
 const priorityActions = [
-  { module: 'Credit', title: 'Reduce utilization on 2 revolving accounts', signal: 'High' },
-  { module: 'Funding', title: 'Upload bank statements for strongest offers', signal: 'High' },
-  { module: 'Business', title: 'Complete annual report filing', signal: 'Medium' },
-  { module: 'Grants', title: 'Prepare narrative for Growth Catalyst Grant', signal: 'Medium' },
+  { module: 'Credit', title: 'Reduce utilization on 2 revolving accounts', signal: 'High', view: ViewMode.PORTAL_CREDIT, path: '/portal/credit', next: 'Next step: update credit actions and review analysis.' },
+  { module: 'Funding', title: 'Upload bank statements for strongest offers', signal: 'High', view: ViewMode.PORTAL_FUNDING, path: '/portal/funding', next: 'Next step: move stronger offers into review.' },
+  { module: 'Business', title: 'Complete annual report filing', signal: 'Medium', view: ViewMode.PORTAL_BUSINESS, path: '/portal/business', next: 'Next step: clear compliance blockers in business setup.' },
+  { module: 'Grants', title: 'Prepare narrative for Growth Catalyst Grant', signal: 'Medium', view: ViewMode.PORTAL_GRANTS, path: '/portal/grants', next: 'Next step: improve grant application readiness.' },
 ];
 
 const progressBars = [48, 62, 78, 86, 102, 116];
@@ -150,6 +150,9 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
           ),
       helper: journey.summary.hasCreditAnalysis ? 'Analysis active' : 'Upload + analysis needed',
       tone: 'bg-[#EAF7FB]',
+      view: ViewMode.PORTAL_CREDIT,
+      path: '/portal/credit',
+      action: journey.summary.hasCreditAnalysis ? 'Open Credit Analysis' : 'Upload Credit Report',
     },
     {
       label: 'Funding',
@@ -159,18 +162,27 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
           ? `$${journey.fundingRange.min.toLocaleString()}-$${journey.fundingRange.max.toLocaleString()} range`
           : 'Estimate locked',
       tone: 'bg-[#EDF9EE]',
+      view: ViewMode.PORTAL_FUNDING,
+      path: '/portal/funding',
+      action: 'Open Funding Engine',
     },
     {
       label: 'Business',
       value: `${journey.summary.businessProgressPercent}%`,
       helper: business.data?.readiness.ready ? 'Foundation ready' : 'Readiness in progress',
       tone: 'bg-[#F2EFFF]',
+      view: ViewMode.PORTAL_BUSINESS,
+      path: '/portal/business',
+      action: 'Continue Setup',
     },
     {
       label: 'Unlocks',
       value: `${journey.badges.filter((badge) => badge.earned).length}`,
       helper: journey.tradingAcademy.unlocked ? 'Trading academy unlocked' : 'More rewards ahead',
       tone: 'bg-[#FFF8E8]',
+      view: ViewMode.PORTAL_FUNDING,
+      path: '/portal/funding',
+      action: journey.tradingAcademy.unlocked ? 'Open Unlock Path' : 'View Unlock Path',
     },
   ];
 
@@ -180,18 +192,27 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
       title: 'Guided command center',
       helper: 'Your dashboard now leads with one story across credit, funding, rewards, and unlocks.',
       icon: <LayoutDashboard className="h-4 w-4" />,
+      actionLabel: 'Open Funding Path',
+      next: 'Next step: follow the highest-priority milestone.',
+      onAction: () => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding'),
     },
     {
       label: 'What is blocking me?',
       title: missingDocuments ? `${missingDocuments} required document${missingDocuments === 1 ? '' : 's'} missing` : 'No document blockers right now',
       helper: missingDocuments ? 'Upload the missing records to keep funding and grant workflows moving.' : 'Your document requirements look clear for the current stage.',
       icon: <FileText className="h-4 w-4" />,
+      actionLabel: missingDocuments ? 'Review Documents' : 'Open Business Setup',
+      next: missingDocuments ? 'Next step: clear upload blockers before funding review.' : 'Next step: keep readiness current in business setup.',
+      onAction: () => props.onNavigate?.(missingDocuments ? ViewMode.PORTAL_CREDIT : ViewMode.PORTAL_BUSINESS, missingDocuments ? '/portal/credit' : '/portal/business'),
     },
     {
       label: 'What do I do next?',
       title: nextTask?.title || journey.hero.ctaLabel,
       helper: nextTask?.description || journey.hero.subtitle,
       icon: <ArrowRight className="h-4 w-4" />,
+      actionLabel: journey.hero.ctaLabel,
+      next: 'Next step: complete this action to unlock the next milestone.',
+      onAction: () => props.onNavigate?.(journey.hero.ctaView, journey.hero.ctaPath),
     },
   ];
 
@@ -248,15 +269,21 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
         ctaLabel={journey.hero.ctaLabel}
         supportText={journey.hero.supportText}
         onAction={() => props.onNavigate?.(journey.hero.ctaView, journey.hero.ctaPath)}
+        onSecondaryAction={() => setSelectedSection('messages')}
       />
 
       <FundingProgressBar
         percent={journey.progress.percent}
         activeStepLabel={journey.progress.activeStepLabel}
         steps={journey.progress.steps}
+        onStepAction={(step) => props.onNavigate?.(step.ctaView, step.ctaPath)}
+        onOverviewAction={() => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding')}
       />
 
-      <AchievementBadges badges={journey.badges} />
+      <AchievementBadges
+        badges={journey.badges}
+        onBadgeAction={(badge) => props.onNavigate?.(badge.ctaView, badge.ctaPath)}
+      />
 
       <section className="grid gap-6 xl:grid-cols-2">
         <EstimatedFundingRangeCard
@@ -264,6 +291,13 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
           min={journey.fundingRange.min}
           max={journey.fundingRange.max}
           helper={journey.fundingRange.helper}
+          onPrimaryAction={() =>
+            props.onNavigate?.(
+              journey.fundingRange.unlocked ? ViewMode.PORTAL_FUNDING : ViewMode.UPLOAD_CREDIT_REPORT,
+              journey.fundingRange.unlocked ? '/portal/funding' : '/credit-report-upload'
+            )
+          }
+          onSecondaryAction={() => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding')}
         />
         <TradingAcademyUnlockCard
           unlocked={journey.tradingAcademy.unlocked}
@@ -319,6 +353,9 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
                 <div className="min-w-0">
                   <p className="truncate text-[1rem] font-black tracking-tight text-[#17233D] xl:text-[1.1rem]">{module.title}</p>
                   <p className="mt-1 line-clamp-2 text-[0.84rem] leading-6 text-[#61769D] xl:text-[0.95rem]">{module.description}</p>
+                  <p className="mt-3 text-[10px] font-black uppercase tracking-[0.16em] text-[#5C77BD]">
+                    Next step: {module.kind === 'route' ? 'open module workflow' : 'switch dashboard context'}
+                  </p>
                 </div>
               </div>
             </button>
@@ -339,6 +376,13 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
               <p className="text-lg font-black text-[#29417E]">{metric.label}</p>
               <p className="mt-5 text-[3rem] font-black leading-none tracking-tight text-[#17233D]">{metric.value}</p>
               <p className="mt-10 text-sm font-medium text-[#61769D]">{metric.helper}</p>
+              <button
+                type="button"
+                onClick={() => props.onNavigate?.(metric.view, metric.path)}
+                className="mt-4 inline-flex items-center rounded-full border border-[#D5E4FF] bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#4677E6]"
+              >
+                {metric.action}
+              </button>
             </article>
           ))}
         </div>
@@ -349,18 +393,24 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
           <h2 className="text-[2rem] font-black tracking-tight text-[#17233D]">Priority actions across all modules</h2>
           <div className="mt-8 space-y-3">
             {priorityActions.map((item, index) => (
-              <div key={item.title} className="flex items-center justify-between gap-4 rounded-[1.2rem] border border-[#DCE5F4] bg-[#F9FBFE] px-4 py-3">
+              <button
+                key={item.title}
+                type="button"
+                onClick={() => props.onNavigate?.(item.view, item.path)}
+                className="flex w-full items-center justify-between gap-4 rounded-[1.2rem] border border-[#DCE5F4] bg-[#F9FBFE] px-4 py-3 text-left transition-all hover:border-[#BFD0EC] hover:bg-[#FCFDFF]"
+              >
                 <div className="flex min-w-0 items-center gap-4">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#18233D] text-xs font-black text-white">{index + 1}</div>
                   <div className="min-w-0">
                     <p className="text-[0.78rem] font-medium text-[#7185A9]">{item.module}</p>
                     <p className="truncate text-[1.05rem] font-bold tracking-tight text-[#17233D]">{item.title}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#5C77BD]">{item.next}</p>
                   </div>
                 </div>
                 <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${item.signal === 'High' ? 'bg-[#FFECEF] text-[#E25A74]' : 'bg-[#FFF3DD] text-[#C27A24]'}`}>
                   {item.signal}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -389,6 +439,14 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
             <p className="mt-4 text-[10px] font-black uppercase tracking-[0.16em] text-[#91A1BC]">{card.label}</p>
             <p className="mt-2 text-[1.05rem] font-black tracking-tight text-[#17233D]">{card.title}</p>
             <p className="mt-2 text-sm text-[#61769D]">{card.helper}</p>
+            <p className="mt-3 text-[10px] font-black uppercase tracking-[0.16em] text-[#5C77BD]">{card.next}</p>
+            <button
+              type="button"
+              onClick={card.onAction}
+              className="mt-4 inline-flex items-center rounded-full border border-[#D5E4FF] bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#4677E6]"
+            >
+              {card.actionLabel}
+            </button>
           </article>
         ))}
       </section>
@@ -396,20 +454,30 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
       <section className="rounded-[2rem] border border-[#DFE7F4] bg-white p-6 shadow-[0_16px_44px_rgba(36,58,114,0.05)]">
         <h2 className="text-[1.55rem] font-black tracking-tight text-[#17233D]">Attention rail</h2>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
-          <div className="flex items-start gap-3 rounded-[1.2rem] border border-[#FFE1E7] bg-[#FFF6F8] px-4 py-3">
+          <button
+            type="button"
+            onClick={() => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding')}
+            className="flex items-start gap-3 rounded-[1.2rem] border border-[#FFE1E7] bg-[#FFF6F8] px-4 py-3 text-left transition-all hover:border-[#FFC9D5]"
+          >
             <AlertCircle className="mt-0.5 h-4 w-4 text-[#E25A74]" />
             <div>
               <p className="text-sm font-black tracking-tight text-[#17233D]">Funding is strongest after required uploads are complete</p>
               <p className="mt-1 text-sm text-[#61769D]">Missing statements and identity records will slow lender and grant progress.</p>
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#C75873]">Next step: open funding blockers and clear uploads</p>
             </div>
-          </div>
-          <div className="flex items-start gap-3 rounded-[1.2rem] border border-[#E4ECF8] bg-[#FBFDFF] px-4 py-3">
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedSection('messages')}
+            className="flex items-start gap-3 rounded-[1.2rem] border border-[#E4ECF8] bg-[#FBFDFF] px-4 py-3 text-left transition-all hover:border-[#C8D8F4]"
+          >
             <MessageSquare className="mt-0.5 h-4 w-4 text-[#4677E6]" />
             <div>
               <p className="text-sm font-black tracking-tight text-[#17233D]">Messaging is your workflow hub</p>
               <p className="mt-1 text-sm text-[#61769D]">{unreadMessages} unread updates are waiting in the portal inbox.</p>
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#5C77BD]">Next step: open messages and respond to updates</p>
             </div>
-          </div>
+          </button>
         </div>
       </section>
     </div>

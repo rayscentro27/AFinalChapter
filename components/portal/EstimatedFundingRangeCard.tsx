@@ -1,11 +1,14 @@
 import React from 'react';
 import { Landmark, LockKeyhole, Sparkles } from 'lucide-react';
+import JourneyInteractionBar from './JourneyInteractionBar';
 
 type EstimatedFundingRangeCardProps = {
   unlocked: boolean;
   min: number | null;
   max: number | null;
   helper: string;
+  onPrimaryAction: () => void;
+  onSecondaryAction: () => void;
 };
 
 function formatCurrency(value: number) {
@@ -42,6 +45,16 @@ export default function EstimatedFundingRangeCard(props: EstimatedFundingRangeCa
         <Sparkles className="mt-0.5 h-4 w-4 text-[#46A2E7]" />
         <p className="text-sm leading-6 text-[#61769D]">{props.helper}</p>
       </div>
+
+      <JourneyInteractionBar
+        statusLabel={props.unlocked && props.min !== null && props.max !== null ? 'Educational funding estimate unlocked' : 'Funding estimate still gated'}
+        whyItMatters="This estimate helps clients understand realistic funding direction before applications begin. It is motivational guidance, not an approval."
+        nextStepPreview={props.unlocked ? 'Next step: improve approval odds in Funding Engine' : 'Next step: complete credit upload and analysis'}
+        primaryLabel={props.unlocked ? 'Improve Approval Odds' : 'Unlock Estimate'}
+        onPrimaryAction={props.onPrimaryAction}
+        secondaryLabel="Review Funding Strategy"
+        onSecondaryAction={props.onSecondaryAction}
+      />
     </article>
   );
 }

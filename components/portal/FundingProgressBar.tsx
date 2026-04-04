@@ -1,14 +1,18 @@
 import React from 'react';
 import { Check, Circle } from 'lucide-react';
 import { JourneyStep } from './clientJourneyState';
+import JourneyInteractionBar from './JourneyInteractionBar';
 
 type FundingProgressBarProps = {
   percent: number;
   activeStepLabel: string;
   steps: JourneyStep[];
+  onStepAction: (step: JourneyStep) => void;
+  onOverviewAction: () => void;
 };
 
 export default function FundingProgressBar(props: FundingProgressBarProps) {
+  const activeStep = props.steps.find((step) => step.active) || props.steps[0];
   return (
     <section className="rounded-[2rem] border border-[#DFE7F4] bg-white p-6 shadow-[0_16px_44px_rgba(36,58,114,0.05)]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -65,9 +69,28 @@ export default function FundingProgressBar(props: FundingProgressBarProps) {
             >
               {step.complete ? 'Completed' : step.active ? 'Active now' : 'Locked ahead'}
             </p>
+            <button
+              type="button"
+              onClick={() => props.onStepAction(step)}
+              className="mt-4 inline-flex items-center rounded-full border border-[#D5E4FF] bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#4677E6]"
+            >
+              {step.ctaLabel}
+            </button>
           </article>
         ))}
       </div>
+
+      {activeStep ? (
+        <JourneyInteractionBar
+          statusLabel={`Current focus: ${activeStep.label}`}
+          whyItMatters={activeStep.helper}
+          nextStepPreview={activeStep.nextStepPreview}
+          primaryLabel={activeStep.ctaLabel}
+          onPrimaryAction={() => props.onStepAction(activeStep)}
+          secondaryLabel="View Full Funding Path"
+          onSecondaryAction={props.onOverviewAction}
+        />
+      ) : null}
     </section>
   );
 }

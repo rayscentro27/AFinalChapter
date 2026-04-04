@@ -4,6 +4,7 @@ import { JourneyBadge } from './clientJourneyState';
 
 type AchievementBadgesProps = {
   badges: JourneyBadge[];
+  onBadgeAction: (badge: JourneyBadge) => void;
 };
 
 const toneClasses: Record<JourneyBadge['tone'], string> = {
@@ -52,6 +53,18 @@ export default function AchievementBadges(props: AchievementBadgesProps) {
             </div>
             <p className="mt-4 text-[1.1rem] font-black tracking-tight">{badge.label}</p>
             <p className="mt-2 text-sm leading-6">{badge.helper}</p>
+            <p className="mt-3 text-[11px] font-black uppercase tracking-[0.16em]">{badge.nextStepPreview}</p>
+            <button
+              type="button"
+              onClick={() => props.onBadgeAction(badge)}
+              className={`mt-4 inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
+                badge.earned
+                  ? 'border border-white/80 bg-white/70 text-[#29417E]'
+                  : 'border border-[#D9E4F6] bg-white text-[#6D81A7]'
+              }`}
+            >
+              {badge.ctaLabel}
+            </button>
           </article>
         ))}
       </div>

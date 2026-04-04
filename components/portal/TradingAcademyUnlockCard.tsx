@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, CheckCircle2, LockKeyhole, TrendingUp } from 'lucide-react';
+import JourneyInteractionBar from './JourneyInteractionBar';
 
 type TradingAcademyUnlockCardProps = {
   unlocked: boolean;
@@ -65,6 +66,16 @@ export default function TradingAcademyUnlockCard(props: TradingAcademyUnlockCard
         {props.ctaLabel}
         <ArrowRight className="h-4 w-4" />
       </button>
+
+      <JourneyInteractionBar
+        statusLabel={props.unlocked ? 'Educational academy milestone earned' : 'Academy remains locked behind progression milestones'}
+        whyItMatters="Trading stays education-first here. The unlock is meant to reward readiness progress, not expose live execution."
+        nextStepPreview={props.unlocked ? 'Next step: continue into educational trading tools' : 'Next step: finish funding readiness milestones'}
+        primaryLabel={props.ctaLabel}
+        onPrimaryAction={props.onAction}
+        secondaryLabel="Review Funding Readiness"
+        onSecondaryAction={props.onAction}
+      />
     </article>
   );
 }

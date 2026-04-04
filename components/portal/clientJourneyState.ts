@@ -23,6 +23,10 @@ export type JourneyStep = {
   helper: string;
   complete: boolean;
   active: boolean;
+  ctaLabel: string;
+  ctaView: ViewMode;
+  ctaPath?: string;
+  nextStepPreview: string;
 };
 
 export type JourneyBadge = {
@@ -31,6 +35,10 @@ export type JourneyBadge = {
   helper: string;
   earned: boolean;
   tone: 'sky' | 'violet' | 'emerald' | 'amber';
+  ctaLabel: string;
+  ctaView: ViewMode;
+  ctaPath?: string;
+  nextStepPreview: string;
 };
 
 export type ClientJourneyState = {
@@ -261,6 +269,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'Securely add your report to start readiness scoring.',
       complete: hasCreditReport,
       active: false,
+      ctaLabel: hasCreditReport ? 'Review Credit Module' : 'Upload Report',
+      ctaView: hasCreditReport ? ViewMode.PORTAL_CREDIT : ViewMode.UPLOAD_CREDIT_REPORT,
+      ctaPath: hasCreditReport ? '/portal/credit' : '/credit-report-upload',
+      nextStepPreview: 'Next unlock: AI Credit Analysis',
     },
     {
       key: 'credit_analysis',
@@ -268,6 +280,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'Review analysis, recommendations, and bureau signals.',
       complete: hasCreditAnalysis,
       active: false,
+      ctaLabel: 'Open Credit Analysis',
+      ctaView: ViewMode.PORTAL_CREDIT,
+      ctaPath: '/portal/credit',
+      nextStepPreview: 'Next unlock: Funding Strategy',
     },
     {
       key: 'funding_strategy',
@@ -275,6 +291,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'Sequence next actions and funding readiness moves.',
       complete: hasFundingStrategy,
       active: false,
+      ctaLabel: 'Review Funding Strategy',
+      ctaView: ViewMode.PORTAL_FUNDING,
+      ctaPath: '/portal/funding',
+      nextStepPreview: 'Next unlock: Apply for Funding',
     },
     {
       key: 'apply_for_funding',
@@ -282,6 +302,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'Track application movement and logged outcomes.',
       complete: hasFundingApplication,
       active: false,
+      ctaLabel: 'Open Funding Engine',
+      ctaView: ViewMode.PORTAL_FUNDING,
+      ctaPath: '/portal/funding',
+      nextStepPreview: 'Next unlock: Optimize & Grow',
     },
     {
       key: 'optimize_grow',
@@ -289,6 +313,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'Advance post-readiness growth and educational unlocks.',
       complete: hasApprovedFunding,
       active: false,
+      ctaLabel: 'Review Growth Path',
+      ctaView: ViewMode.PORTAL_FUNDING,
+      ctaPath: '/portal/funding',
+      nextStepPreview: 'Next unlock: Trading Academy and deeper tools',
     },
   ];
 
@@ -384,6 +412,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'A report is on file and your journey has started.',
       earned: hasCreditReport,
       tone: 'sky',
+      ctaLabel: hasCreditReport ? 'Open Credit Module' : 'Upload Report',
+      ctaView: hasCreditReport ? ViewMode.PORTAL_CREDIT : ViewMode.UPLOAD_CREDIT_REPORT,
+      ctaPath: hasCreditReport ? '/portal/credit' : '/credit-report-upload',
+      nextStepPreview: 'Next step: turn the report into analysis',
     },
     {
       key: 'analysis_ready',
@@ -391,6 +423,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'Analysis and actionable guidance are available.',
       earned: hasCreditAnalysis,
       tone: 'violet',
+      ctaLabel: 'View Analysis',
+      ctaView: ViewMode.PORTAL_CREDIT,
+      ctaPath: '/portal/credit',
+      nextStepPreview: 'Next step: use it to shape funding strategy',
     },
     {
       key: 'funding_strategy_ready',
@@ -398,6 +434,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'Funding roadmap steps are available for review.',
       earned: hasFundingStrategy,
       tone: 'emerald',
+      ctaLabel: 'Open Funding Strategy',
+      ctaView: ViewMode.PORTAL_FUNDING,
+      ctaPath: '/portal/funding',
+      nextStepPreview: 'Next step: move into active funding actions',
     },
     {
       key: 'funding_profile_improved',
@@ -405,6 +445,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'Your readiness score reached the milestone threshold.',
       earned: (readinessScore >= 70 && businessReady) || fundingReady,
       tone: 'amber',
+      ctaLabel: 'Review Readiness',
+      ctaView: ViewMode.PORTAL_FUNDING,
+      ctaPath: '/portal/funding',
+      nextStepPreview: 'Next step: unlock stronger approvals and opportunities',
     },
     {
       key: 'first_approval',
@@ -412,6 +456,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'An approved outcome has been logged.',
       earned: hasApprovedFunding,
       tone: 'emerald',
+      ctaLabel: 'View Funding Outcome',
+      ctaView: ViewMode.PORTAL_FUNDING,
+      ctaPath: '/portal/funding',
+      nextStepPreview: 'Next step: optimize and grow with approved capital',
     },
     {
       key: 'trading_academy_unlocked',
@@ -419,6 +467,10 @@ export function deriveClientJourneyState(input: DeriveClientJourneyStateInput): 
       helper: 'Educational trading progression is now available.',
       earned: tradingUnlocked,
       tone: 'violet',
+      ctaLabel: tradingUnlocked ? 'Open Trading Path' : 'View Unlock Path',
+      ctaView: ViewMode.PORTAL_FUNDING,
+      ctaPath: '/portal/funding',
+      nextStepPreview: 'Next step: continue with educational-only trading tools',
     },
   ];
 
