@@ -23,7 +23,7 @@ Single source of truth for phased Nexus portal/client revamp execution.
 | 7 | Opportunity UI Layer | Complete | Featured opportunity, top recommendations, detail panel, and connected next steps now render in the client command center. |
 | 8 | Global Tile Interaction System | In progress | Core journey surfaces are being standardized around status, action, progress, reward, and next-step previews. |
 | 9 | Affiliate + Revenue Loop | In progress | Invite-and-earn card, referral progress, and earnings tracking are being connected to post-estimate and post-approval moments. |
-| 10 | Retention Tracking | Pending | Event model, progression/drop-off metrics, admin visibility. |
+| 10 | Retention Tracking | In progress | Journey milestone events, referral prompt tracking, and retention summary aggregation are being added through the existing audit event path. |
 | 11 | CEO Revenue Dashboard | Pending | Executive revenue, funnel, referral, and retention reporting. |
 | 12 | AI Growth Suggestion Layer | Pending | Internal growth suggestions for upsell/referral/re-engagement. |
 
@@ -77,3 +77,10 @@ Single source of truth for phased Nexus portal/client revamp execution.
 - Add a client-facing invite-and-earn card with referral link, earnings, and tier progress.
 - Reuse existing referral and commission data where available, with safe fallback behavior where it does not exist yet.
 - Keep referral tracking framed as a reward loop rather than a payout or sales engine.
+
+### Phase 10 Goals
+
+- Track core client-journey milestone events through an additive event model.
+- Reuse the current audit event path instead of introducing a heavy analytics dependency.
+- Log progression and referral events that can later support founder/admin drop-off reporting.
+- Add a lightweight retention aggregation helper for per-user journey summaries.

@@ -19,6 +19,7 @@ type ReferralCardProps = {
   nextTierLabel: string;
   loading?: boolean;
   error?: string;
+  onCopyLink?: () => void;
 };
 
 function formatCurrency(value: number) {
@@ -39,6 +40,7 @@ export default function ReferralCard(props: ReferralCardProps) {
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(props.referralLink);
+    props.onCopyLink?.();
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };

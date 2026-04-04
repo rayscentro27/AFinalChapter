@@ -26,9 +26,12 @@ import FundingProgressBar from '../portal/FundingProgressBar';
 import PortalChatPanel from '../portal/PortalChatPanel';
 import ReferralCard from '../portal/ReferralCard';
 import TradingAcademyUnlockCard from '../portal/TradingAcademyUnlockCard';
+import JourneyRetentionCard from '../portal/JourneyRetentionCard';
 import { deriveClientJourneyState } from '../portal/clientJourneyState';
 import useBusinessOpportunityMatches from '../../hooks/useBusinessOpportunityMatches';
 import useReferralJourney from '../../hooks/useReferralJourney';
+import { JourneyRetentionEventType, logJourneyRetentionEvent } from '../../src/services/journeyRetentionService';
+import useJourneyRetentionSummary from '../../hooks/useJourneyRetentionSummary';
 
 type ClientHomeV2Props = {
   contact: Contact;
@@ -145,6 +148,67 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
     userId: user?.id,
     promptUnlocked: referralPromptUnlocked,
   });
+  const retentionSummary = useJourneyRetentionSummary(demoMode ? undefined : tenantId, user?.id);
+
+  const handlePortalNavigate = (view?: ViewMode, pathname?: string) => {
+    if (!view) return;
+    if (!demoMode && tenantId && pathname?.startsWith('/portal/grants')) {
+      void logJourneyRetentionEvent({
+        tenantId,
+        userId: user?.id,
+        eventType: 'grant_section_viewed',
+        metadata: {
+          route: pathname,
+          source: 'client_home',
+        },
+      });
+    }
+    props.onNavigate?.(view, pathname);
+  };
+
+  useEffect(() => {
+    if (demoMode || !tenantId) return;
+    if (typeof window === 'undefined') return;
+
+    const eventChecks: Array<[JourneyRetentionEventType, boolean, Record<string, unknown>]> = [
+      ['first_login', true, { route: '/portal' }],
+      ['credit_report_uploaded', journey.summary.hasCreditReport, { route: '/portal', readiness_score: journey.summary.readinessScore }],
+      ['analysis_viewed', journey.summary.hasCreditAnalysis, { route: '/portal/credit', readiness_score: journey.summary.readinessScore }],
+      ['funding_strategy_viewed', journey.summary.hasFundingStrategy, { route: '/portal/funding', readiness_score: journey.summary.readinessScore }],
+      ['funding_readiness_viewed', journey.fundingRange.unlocked, { route: '/portal/funding', funding_range_unlocked: true }],
+      ['application_started', journey.summary.hasFundingApplication, { route: '/portal/funding' }],
+      ['application_outcome_logged', journey.summary.hasApprovedFunding, { route: '/portal/funding', approved: true }],
+      ['trading_academy_unlocked', journey.tradingAcademy.unlocked, { route: '/portal/funding', unlocked: true }],
+      ['referral_prompt_shown', referralData.data.promptUnlocked, { route: '/portal', trigger: referralData.data.triggerLabel }],
+    ];
+
+    eventChecks.forEach(([eventType, condition, metadata]) => {
+      if (!condition) return;
+      const storageKey = `journey-retention:${tenantId}:${user?.id || 'anon'}:${eventType}`;
+      if (window.localStorage.getItem(storageKey) === '1') return;
+      window.localStorage.setItem(storageKey, '1');
+      void logJourneyRetentionEvent({
+        tenantId,
+        userId: user?.id,
+        eventType,
+        metadata,
+      });
+    });
+  }, [
+    demoMode,
+    tenantId,
+    user?.id,
+    journey.summary.hasCreditReport,
+    journey.summary.hasCreditAnalysis,
+    journey.summary.hasFundingStrategy,
+    journey.summary.hasFundingApplication,
+    journey.summary.hasApprovedFunding,
+    journey.summary.readinessScore,
+    journey.fundingRange.unlocked,
+    journey.tradingAcademy.unlocked,
+    referralData.data.promptUnlocked,
+    referralData.data.triggerLabel,
+  ]);
 
   const overviewMetrics = [
     {
@@ -277,7 +341,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
         subtitle={journey.hero.subtitle}
         ctaLabel={journey.hero.ctaLabel}
         supportText={journey.hero.supportText}
-        onAction={() => props.onNavigate?.(journey.hero.ctaView, journey.hero.ctaPath)}
+        onAction={() => handlePortalNavigate(journey.hero.ctaView, journey.hero.ctaPath)}
         onSecondaryAction={() => setSelectedSection('messages')}
       />
 
@@ -285,13 +349,13 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
         percent={journey.progress.percent}
         activeStepLabel={journey.progress.activeStepLabel}
         steps={journey.progress.steps}
-        onStepAction={(step) => props.onNavigate?.(step.ctaView, step.ctaPath)}
-        onOverviewAction={() => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding')}
+        onStepAction={(step) => handlePortalNavigate(step.ctaView, step.ctaPath)}
+        onOverviewAction={() => handlePortalNavigate(ViewMode.PORTAL_FUNDING, '/portal/funding')}
       />
 
       <AchievementBadges
         badges={journey.badges}
-        onBadgeAction={(badge) => props.onNavigate?.(badge.ctaView, badge.ctaPath)}
+        onBadgeAction={(badge) => handlePortalNavigate(badge.ctaView, badge.ctaPath)}
       />
 
       <section className="grid gap-6 xl:grid-cols-2">
@@ -301,12 +365,12 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
           max={journey.fundingRange.max}
           helper={journey.fundingRange.helper}
           onPrimaryAction={() =>
-            props.onNavigate?.(
+            handlePortalNavigate(
               journey.fundingRange.unlocked ? ViewMode.PORTAL_FUNDING : ViewMode.UPLOAD_CREDIT_REPORT,
               journey.fundingRange.unlocked ? '/portal/funding' : '/credit-report-upload'
             )
           }
-          onSecondaryAction={() => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding')}
+          onSecondaryAction={() => handlePortalNavigate(ViewMode.PORTAL_FUNDING, '/portal/funding')}
         />
         <TradingAcademyUnlockCard
           unlocked={journey.tradingAcademy.unlocked}
@@ -316,7 +380,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
           helper={journey.tradingAcademy.helper}
           ctaLabel={journey.tradingAcademy.ctaLabel}
           checklist={journey.tradingAcademy.checklist}
-          onAction={() => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding')}
+          onAction={() => handlePortalNavigate(ViewMode.PORTAL_FUNDING, '/portal/funding')}
         />
       </section>
 
@@ -326,7 +390,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
         error={opportunities.error}
         readinessScore={journey.summary.readinessScore}
         estimatedFundingUnlocked={journey.fundingRange.unlocked}
-        onNavigate={props.onNavigate}
+        onNavigate={handlePortalNavigate}
       />
 
       <ReferralCard
@@ -345,6 +409,18 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
         nextTierLabel={referralData.data.nextTierLabel}
         loading={referralData.loading}
         error={referralData.error}
+        onCopyLink={() => {
+          if (demoMode || !tenantId) return;
+          void logJourneyRetentionEvent({
+            tenantId,
+            userId: user?.id,
+            eventType: 'referral_link_copied',
+            metadata: {
+              route: '/portal',
+              referral_level: referralData.data.level,
+            },
+          });
+        }}
       />
 
       <section className="rounded-[2rem] border border-[#DFE7F4] bg-white px-5 py-6 shadow-[0_16px_44px_rgba(36,58,114,0.05)]">
@@ -365,7 +441,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
                   setSelectedSection(module.key === 'messages' ? 'messages' : 'overview');
                   return;
                 }
-                props.onNavigate?.(module.view, module.path);
+                handlePortalNavigate(module.view, module.path);
               }}
               className={`rounded-[1.35rem] border px-4 py-4 text-left transition-all ${
                 (module.key === 'overview' && selectedSection === 'overview') || (module.key === 'messages' && selectedSection === 'messages')
@@ -405,7 +481,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
               <p className="mt-10 text-sm font-medium text-[#61769D]">{metric.helper}</p>
               <button
                 type="button"
-                onClick={() => props.onNavigate?.(metric.view, metric.path)}
+                onClick={() => handlePortalNavigate(metric.view, metric.path)}
                 className="mt-4 inline-flex items-center rounded-full border border-[#D5E4FF] bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#4677E6]"
               >
                 {metric.action}
@@ -423,7 +499,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
               <button
                 key={item.title}
                 type="button"
-                onClick={() => props.onNavigate?.(item.view, item.path)}
+                onClick={() => handlePortalNavigate(item.view, item.path)}
                 className="flex w-full items-center justify-between gap-4 rounded-[1.2rem] border border-[#DCE5F4] bg-[#F9FBFE] px-4 py-3 text-left transition-all hover:border-[#BFD0EC] hover:bg-[#FCFDFF]"
               >
                 <div className="flex min-w-0 items-center gap-4">
@@ -457,7 +533,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {clarityCards.map((card) => (
           <article key={card.label} className="rounded-[1.7rem] border border-[#DFE7F4] bg-white p-5 shadow-[0_16px_44px_rgba(36,58,114,0.04)]">
             <div className="flex h-10 w-10 items-center justify-center rounded-[1rem] bg-[#EEF4FF] text-[#4677E6]">
@@ -476,6 +552,11 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
             </button>
           </article>
         ))}
+        <JourneyRetentionCard
+          summary={retentionSummary.data}
+          loading={retentionSummary.loading}
+          error={retentionSummary.error}
+        />
       </section>
 
       <section className="rounded-[2rem] border border-[#DFE7F4] bg-white p-6 shadow-[0_16px_44px_rgba(36,58,114,0.05)]">
@@ -483,7 +564,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           <button
             type="button"
-            onClick={() => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding')}
+            onClick={() => handlePortalNavigate(ViewMode.PORTAL_FUNDING, '/portal/funding')}
             className="flex items-start gap-3 rounded-[1.2rem] border border-[#FFE1E7] bg-[#FFF6F8] px-4 py-3 text-left transition-all hover:border-[#FFC9D5]"
           >
             <AlertCircle className="mt-0.5 h-4 w-4 text-[#E25A74]" />
