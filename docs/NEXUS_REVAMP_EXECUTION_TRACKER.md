@@ -24,7 +24,7 @@ Single source of truth for phased Nexus portal/client revamp execution.
 | 8 | Global Tile Interaction System | In progress | Core journey surfaces are being standardized around status, action, progress, reward, and next-step previews. |
 | 9 | Affiliate + Revenue Loop | In progress | Invite-and-earn card, referral progress, and earnings tracking are being connected to post-estimate and post-approval moments. |
 | 10 | Retention Tracking | In progress | Journey milestone events, referral prompt tracking, and retention summary aggregation are being added through the existing audit event path. |
-| 11 | CEO Revenue Dashboard | Pending | Executive revenue, funnel, referral, and retention reporting. |
+| 11 | CEO Revenue Dashboard | In progress | Founder revenue summary, pipeline value, referral visibility, retention funnel, and drop-off insights are being layered onto the internal CEO briefing route. |
 | 12 | AI Growth Suggestion Layer | Pending | Internal growth suggestions for upsell/referral/re-engagement. |
 
 ## Current Focus
