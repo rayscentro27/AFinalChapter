@@ -22,7 +22,7 @@ Single source of truth for phased Nexus portal/client revamp execution.
 | 6 | Opportunity Database + Matching | Complete | Business opportunity storage, starter catalog, and rule-based matching are in place. |
 | 7 | Opportunity UI Layer | Complete | Featured opportunity, top recommendations, detail panel, and connected next steps now render in the client command center. |
 | 8 | Global Tile Interaction System | In progress | Core journey surfaces are being standardized around status, action, progress, reward, and next-step previews. |
-| 9 | Affiliate + Revenue Loop | Pending | Invite and earn, earnings tracking, journey-triggered prompts. |
+| 9 | Affiliate + Revenue Loop | In progress | Invite-and-earn card, referral progress, and earnings tracking are being connected to post-estimate and post-approval moments. |
 | 10 | Retention Tracking | Pending | Event model, progression/drop-off metrics, admin visibility. |
 | 11 | CEO Revenue Dashboard | Pending | Executive revenue, funnel, referral, and retention reporting. |
 | 12 | AI Growth Suggestion Layer | Pending | Internal growth suggestions for upsell/referral/re-engagement. |
@@ -70,3 +70,10 @@ Single source of truth for phased Nexus portal/client revamp execution.
 - Add clear status, primary action, and next-step preview to the major dashboard surfaces.
 - Reduce dead-end reading states by pushing users directly into business, credit, funding, grants, or messages.
 - Keep the interaction system additive and production-safe without breaking current routes.
+
+### Phase 9 Goals
+
+- Show the referral prompt only after a meaningful progress moment such as funding estimate unlock or approval.
+- Add a client-facing invite-and-earn card with referral link, earnings, and tier progress.
+- Reuse existing referral and commission data where available, with safe fallback behavior where it does not exist yet.
+- Keep referral tracking framed as a reward loop rather than a payout or sales engine.

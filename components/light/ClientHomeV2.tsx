@@ -24,9 +24,11 @@ import EstimatedFundingRangeCard from '../portal/EstimatedFundingRangeCard';
 import FundingJourneyHero from '../portal/FundingJourneyHero';
 import FundingProgressBar from '../portal/FundingProgressBar';
 import PortalChatPanel from '../portal/PortalChatPanel';
+import ReferralCard from '../portal/ReferralCard';
 import TradingAcademyUnlockCard from '../portal/TradingAcademyUnlockCard';
 import { deriveClientJourneyState } from '../portal/clientJourneyState';
 import useBusinessOpportunityMatches from '../../hooks/useBusinessOpportunityMatches';
+import useReferralJourney from '../../hooks/useReferralJourney';
 
 type ClientHomeV2Props = {
   contact: Contact;
@@ -136,6 +138,13 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
       }),
     [props.contact, demoMode, credit.data, funding.data, business.data, capital.data, trading.snapshot]
   );
+
+  const referralPromptUnlocked = journey.fundingRange.unlocked || journey.summary.hasApprovedFunding;
+  const referralData = useReferralJourney({
+    contact: props.contact,
+    userId: user?.id,
+    promptUnlocked: referralPromptUnlocked,
+  });
 
   const overviewMetrics = [
     {
@@ -318,6 +327,24 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
         readinessScore={journey.summary.readinessScore}
         estimatedFundingUnlocked={journey.fundingRange.unlocked}
         onNavigate={props.onNavigate}
+      />
+
+      <ReferralCard
+        unlocked={referralData.data.promptUnlocked}
+        triggerLabel={referralData.data.triggerLabel}
+        referralLink={referralData.data.referralLink}
+        totalClicks={referralData.data.totalClicks}
+        totalSignups={referralData.data.totalSignups}
+        fundedReferrals={referralData.data.fundedReferrals}
+        activeReferrals={referralData.data.activeReferrals}
+        commissionPending={referralData.data.commissionPending}
+        commissionPaid={referralData.data.commissionPaid}
+        estimatedEarnings={referralData.data.estimatedEarnings}
+        level={referralData.data.level}
+        progressPercent={referralData.data.progressPercent}
+        nextTierLabel={referralData.data.nextTierLabel}
+        loading={referralData.loading}
+        error={referralData.error}
       />
 
       <section className="rounded-[2rem] border border-[#DFE7F4] bg-white px-5 py-6 shadow-[0_16px_44px_rgba(36,58,114,0.05)]">
