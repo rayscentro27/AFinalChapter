@@ -1,7 +1,6 @@
 import React from 'react';
 import { Check, Circle } from 'lucide-react';
 import { JourneyStep } from './clientJourneyState';
-import JourneyInteractionBar from './JourneyInteractionBar';
 
 type FundingProgressBarProps = {
   percent: number;
@@ -14,7 +13,7 @@ type FundingProgressBarProps = {
 export default function FundingProgressBar(props: FundingProgressBarProps) {
   const activeStep = props.steps.find((step) => step.active) || props.steps[0];
   return (
-    <section className="rounded-[2rem] border border-[#DFE7F4] bg-white p-6 shadow-[0_16px_44px_rgba(36,58,114,0.05)]">
+    <section className="rounded-[2rem] border border-[#DFE7F4] bg-white p-6 shadow-[0_18px_48px_rgba(36,58,114,0.06)]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#607CC1]">Funding journey progress</p>
@@ -34,7 +33,7 @@ export default function FundingProgressBar(props: FundingProgressBarProps) {
         />
       </div>
 
-      <div className="mt-6 grid gap-3 xl:grid-cols-5">
+      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {props.steps.map((step, index) => (
           <article
             key={step.key}
@@ -79,17 +78,20 @@ export default function FundingProgressBar(props: FundingProgressBarProps) {
           </article>
         ))}
       </div>
-
       {activeStep ? (
-        <JourneyInteractionBar
-          statusLabel={`Current focus: ${activeStep.label}`}
-          whyItMatters={activeStep.helper}
-          nextStepPreview={activeStep.nextStepPreview}
-          primaryLabel={activeStep.ctaLabel}
-          onPrimaryAction={() => props.onStepAction(activeStep)}
-          secondaryLabel="View Full Funding Path"
-          onSecondaryAction={props.onOverviewAction}
-        />
+        <div className="mt-6 flex flex-col gap-3 rounded-[1.4rem] border border-[#E1E8F4] bg-[#F9FBFF] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-black text-[#17233D]">Next step: {activeStep.label}</p>
+            <p className="mt-1 text-sm text-[#61769D]">{activeStep.helper}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => props.onOverviewAction()}
+            className="inline-flex items-center rounded-full border border-[#D5E4FF] bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#4677E6]"
+          >
+            View Full Funding Path
+          </button>
+        </div>
       ) : null}
     </section>
   );

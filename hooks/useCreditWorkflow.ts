@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getCreditWorkflowSnapshot, CreditWorkflowSnapshot } from '../services/creditWorkflowService';
 
 export default function useCreditWorkflow(input: { tenantId?: string; userId?: string }) {
+  const { tenantId, userId } = input;
   const [data, setData] = useState<CreditWorkflowSnapshot>({
     packets: [],
     finalizedLetters: [],
@@ -12,7 +13,7 @@ export default function useCreditWorkflow(input: { tenantId?: string; userId?: s
   const [error, setError] = useState('');
 
   const refresh = useCallback(async () => {
-    if (!input.userId) {
+    if (!userId) {
       setData({ packets: [], finalizedLetters: [], mailEvents: [], mailPackets: [] });
       return null;
     }
@@ -20,7 +21,7 @@ export default function useCreditWorkflow(input: { tenantId?: string; userId?: s
     setLoading(true);
     setError('');
     try {
-      const snapshot = await getCreditWorkflowSnapshot(input);
+      const snapshot = await getCreditWorkflowSnapshot({ tenantId, userId });
       setData(snapshot);
       return snapshot;
     } catch (err: any) {
@@ -29,7 +30,7 @@ export default function useCreditWorkflow(input: { tenantId?: string; userId?: s
     } finally {
       setLoading(false);
     }
-  }, [input]);
+  }, [tenantId, userId]);
 
   useEffect(() => {
     void refresh();

@@ -23,6 +23,7 @@ import BusinessOpportunitiesSection from '../portal/BusinessOpportunitiesSection
 import EstimatedFundingRangeCard from '../portal/EstimatedFundingRangeCard';
 import FundingJourneyHero from '../portal/FundingJourneyHero';
 import FundingProgressBar from '../portal/FundingProgressBar';
+import FundingProgressSection from '../portal/FundingProgressSection';
 import PortalChatPanel from '../portal/PortalChatPanel';
 import ReferralCard from '../portal/ReferralCard';
 import TradingAcademyUnlockCard from '../portal/TradingAcademyUnlockCard';
@@ -104,7 +105,6 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
   const { user } = useAuth();
   const [selectedSection, setSelectedSection] = useState<'overview' | 'messages'>('overview');
   const [portalMessages, setPortalMessages] = useState(props.contact.messageHistory || []);
-  const displayName = props.contact.name || 'Client';
   const tenantId =
     props.contact.tenantId
     || user?.tenantId
@@ -149,6 +149,41 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
     promptUnlocked: referralPromptUnlocked,
   });
   const retentionSummary = useJourneyRetentionSummary(demoMode ? undefined : tenantId, user?.id);
+
+  const fundingRangeLabel =
+    journey.fundingRange.unlocked && journey.fundingRange.min !== null && journey.fundingRange.max !== null
+      ? `$${journey.fundingRange.min.toLocaleString()} – $${journey.fundingRange.max.toLocaleString()}`
+      : 'Complete credit upload to unlock estimate';
+  const fundingRangeHelper = journey.fundingRange.unlocked
+    ? 'Approval odds are based on readiness and profile signals.'
+    : 'Upload a report to unlock the educational funding estimate.';
+  const fundingHighlights = journey.summary.hasCreditAnalysis
+    ? [
+        `${credit.data?.recommendations?.recommendations?.length || 3} dispute opportunities identified`,
+        'Utilization signals flagged for improvement',
+        'Accounts to validate before applications',
+        'Funding readiness cues are now active',
+      ]
+    : journey.summary.hasCreditReport
+      ? [
+          'Report received and queued for AI analysis',
+          'Next: review your funding strategy',
+          'Dispute opportunities will appear here',
+          'Funding estimate unlocks after analysis',
+        ]
+      : [
+          'Upload a report to unlock analysis',
+          'Secure and encrypted workflow',
+          'Phone or desktop friendly',
+          'Funding strategy unlocks next',
+        ];
+  const primaryFundingAction = !journey.summary.hasCreditReport
+    ? { label: 'Upload Credit Report', view: ViewMode.UPLOAD_CREDIT_REPORT, path: '/credit-report-upload' }
+    : journey.summary.hasCreditAnalysis
+      ? { label: 'Generate My Dispute Letters', view: ViewMode.PORTAL_CREDIT, path: '/portal/credit' }
+      : { label: 'View Credit Analysis', view: ViewMode.PORTAL_CREDIT, path: '/portal/credit' };
+  const secondaryFundingAction = journey.summary.hasCreditAnalysis ? 'Download Letters' : undefined;
+  const tertiaryFundingAction = journey.summary.hasCreditAnalysis ? 'Send Certified via DocuPost' : undefined;
 
   const handlePortalNavigate = (view?: ViewMode, pathname?: string) => {
     if (!view) return;
@@ -320,21 +355,6 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
 
   return (
     <div className="mx-auto max-w-[1320px] space-y-6 pb-10 subpixel-antialiased">
-      <section className="space-y-3">
-        <p className="text-[0.72rem] font-black uppercase tracking-[0.22em] text-[#607CC1]">Client dashboard</p>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-[2.6rem] font-black tracking-tight text-[#1B2C61] sm:text-[3.1rem]">Welcome Back, {displayName}</h1>
-            <p className="mt-2 text-base text-[#61769D]">One guided journey for credit, funding readiness, rewards, and next unlocks.</p>
-          </div>
-          <div className="inline-flex items-center gap-3 rounded-full border border-[#DDE7F7] bg-white px-4 py-2 text-sm text-[#61769D] shadow-[0_10px_30px_rgba(36,58,114,0.05)]">
-            <span className="font-black text-[#17233D]">{journey.summary.readinessScore}% readiness</span>
-            <span>•</span>
-            <span>{pendingTasks.length} pending tasks</span>
-          </div>
-        </div>
-      </section>
-
       <FundingJourneyHero
         eyebrow={journey.hero.eyebrow}
         title={journey.hero.title}
@@ -356,6 +376,34 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
       <AchievementBadges
         badges={journey.badges}
         onBadgeAction={(badge) => handlePortalNavigate(badge.ctaView, badge.ctaPath)}
+      />
+
+      <FundingProgressSection
+        title={journey.summary.hasCreditAnalysis ? 'Your Credit Analysis Is Ready' : journey.summary.hasCreditReport ? 'Credit Report Uploaded' : 'Step 1: Upload Your Credit Report'}
+        subtitle={journey.summary.hasCreditAnalysis
+          ? 'Review your findings, generate dispute letters, and keep funding readiness moving.'
+          : journey.summary.hasCreditReport
+            ? 'Analysis is processing. Funding strategy and estimate unlock next.'
+            : 'This unlocks your funding strategy, estimated funding range, and next approvals.'}
+        readinessPercent={journey.summary.readinessScore}
+        rangeLabel={fundingRangeLabel}
+        rangeHelper={fundingRangeHelper}
+        highlights={fundingHighlights}
+        primaryActionLabel={primaryFundingAction.label}
+        secondaryActionLabel={secondaryFundingAction}
+        tertiaryActionLabel={tertiaryFundingAction}
+        onPrimaryAction={() => handlePortalNavigate(primaryFundingAction.view, primaryFundingAction.path)}
+        onSecondaryAction={secondaryFundingAction ? () => handlePortalNavigate(ViewMode.PORTAL_CREDIT, '/portal/credit') : undefined}
+        onTertiaryAction={tertiaryFundingAction ? () => handlePortalNavigate(ViewMode.PORTAL_CREDIT, '/portal/credit') : undefined}
+      />
+
+      <BusinessOpportunitiesSection
+        matches={opportunities.data?.matches || []}
+        loading={opportunities.loading}
+        error={opportunities.error}
+        readinessScore={journey.summary.readinessScore}
+        estimatedFundingUnlocked={journey.fundingRange.unlocked}
+        onNavigate={handlePortalNavigate}
       />
 
       <section className="grid gap-6 xl:grid-cols-2">
@@ -383,15 +431,6 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
           onAction={() => handlePortalNavigate(ViewMode.PORTAL_FUNDING, '/portal/funding')}
         />
       </section>
-
-      <BusinessOpportunitiesSection
-        matches={opportunities.data?.matches || []}
-        loading={opportunities.loading}
-        error={opportunities.error}
-        readinessScore={journey.summary.readinessScore}
-        estimatedFundingUnlocked={journey.fundingRange.unlocked}
-        onNavigate={handlePortalNavigate}
-      />
 
       <ReferralCard
         unlocked={referralData.data.promptUnlocked}
