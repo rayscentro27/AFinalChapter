@@ -25,7 +25,7 @@ Single source of truth for phased Nexus portal/client revamp execution.
 | 9 | Affiliate + Revenue Loop | In progress | Invite-and-earn card, referral progress, and earnings tracking are being connected to post-estimate and post-approval moments. |
 | 10 | Retention Tracking | In progress | Journey milestone events, referral prompt tracking, and retention summary aggregation are being added through the existing audit event path. |
 | 11 | CEO Revenue Dashboard | In progress | Founder revenue summary, pipeline value, referral visibility, retention funnel, and drop-off insights are being layered onto the internal CEO briefing route. |
-| 12 | AI Growth Suggestion Layer | Pending | Internal growth suggestions for upsell/referral/re-engagement. |
+| 12 | AI Growth Suggestion Layer | In progress | Internal growth suggestions for upsell/referral/re-engagement are being added to the admin suggestions surface. |
 
 ## Current Focus
 
