@@ -19,8 +19,8 @@ Single source of truth for phased Nexus portal/client revamp execution.
 | 3 | 1-Click Launch Mode | In progress | New business path + existing business intake path. |
 | 4 | Auto Website + Identity Preview | In progress | Preview-first website/domain/email generation. |
 | 5 | 1-Click Credit Analysis + Dispute Engine | In progress | Upload -> analyze -> letters -> DocuPost send. |
-| 6 | Opportunity Database + Matching | In progress | Business opportunity storage and rule-based matching. |
-| 7 | Opportunity UI Layer | Pending | Featured opportunity, top recommendations, connected next steps. |
+| 6 | Opportunity Database + Matching | Complete | Business opportunity storage, starter catalog, and rule-based matching are in place. |
+| 7 | Opportunity UI Layer | In progress | Featured opportunity, top recommendations, detail panel, and connected next steps are being layered into the command center. |
 | 8 | Global Tile Interaction System | Pending | Enforce non-dead-end interaction rules across portal surfaces. |
 | 9 | Affiliate + Revenue Loop | Pending | Invite and earn, earnings tracking, journey-triggered prompts. |
 | 10 | Retention Tracking | Pending | Event model, progression/drop-off metrics, admin visibility. |
@@ -56,3 +56,10 @@ Single source of truth for phased Nexus portal/client revamp execution.
 - Seed a small opportunity catalog that is connected to setup, funding, and grants.
 - Create a rule-based matching function using readiness, funding estimate, business progress, path, and grant fit.
 - Persist tenant-safe client opportunity matches so the next UI phase can render live recommendation cards.
+
+### Phase 7 Goals
+
+- Surface a featured business opportunity below the funding range widget.
+- Show the top three recommendation cards with connected CTAs.
+- Add an opportunity details panel that explains match reasons, requirements, risks, and next steps.
+- Keep setup, funding, and grants directly reachable from every opportunity card.

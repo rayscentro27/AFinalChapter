@@ -32,6 +32,29 @@ export type BusinessOpportunityMatchRow = {
     recommended_funding_min_cents: number | null;
     recommended_funding_max_cents: number | null;
     metadata: Record<string, unknown>;
+    business_opportunity_requirements?: Array<{
+      id: string;
+      requirement_key: string;
+      label: string;
+      description: string;
+      is_required: boolean;
+      sort_order: number;
+    }>;
+    business_opportunity_steps?: Array<{
+      id: string;
+      step_key: string;
+      label: string;
+      description: string;
+      action_path: string | null;
+      sort_order: number;
+      is_required: boolean;
+      metadata: Record<string, unknown>;
+    }>;
+    business_opportunity_grants?: Array<{
+      id: string;
+      grant_id: string | null;
+      notes_md: string | null;
+    }>;
   } | null;
 };
 

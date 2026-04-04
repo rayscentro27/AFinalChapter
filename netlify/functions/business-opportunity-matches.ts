@@ -331,7 +331,10 @@ export const handler: Handler = async (event) => {
         business_opportunities(
           id,slug,name,category,opportunity_type,summary_md,difficulty_level,
           startup_cost_min_cents,startup_cost_max_cents,time_to_revenue_days,
-          recommended_funding_min_cents,recommended_funding_max_cents,metadata
+          recommended_funding_min_cents,recommended_funding_max_cents,metadata,
+          business_opportunity_requirements(id,requirement_key,label,description,is_required,sort_order),
+          business_opportunity_steps(id,step_key,label,description,action_path,sort_order,is_required,metadata),
+          business_opportunity_grants(id,grant_id,notes_md)
         )
       `)
       .eq('tenant_id', tenantId)

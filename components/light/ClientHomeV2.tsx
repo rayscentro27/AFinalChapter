@@ -19,12 +19,14 @@ import useBusinessFoundation from '../../hooks/useBusinessFoundation';
 import useCapitalReadiness from '../../hooks/useCapitalReadiness';
 import useTradingAccess from '../../hooks/useTradingAccess';
 import AchievementBadges from '../portal/AchievementBadges';
+import BusinessOpportunitiesSection from '../portal/BusinessOpportunitiesSection';
 import EstimatedFundingRangeCard from '../portal/EstimatedFundingRangeCard';
 import FundingJourneyHero from '../portal/FundingJourneyHero';
 import FundingProgressBar from '../portal/FundingProgressBar';
 import PortalChatPanel from '../portal/PortalChatPanel';
 import TradingAcademyUnlockCard from '../portal/TradingAcademyUnlockCard';
 import { deriveClientJourneyState } from '../portal/clientJourneyState';
+import useBusinessOpportunityMatches from '../../hooks/useBusinessOpportunityMatches';
 
 type ClientHomeV2Props = {
   contact: Contact;
@@ -110,6 +112,7 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
   const business = useBusinessFoundation(demoMode ? undefined : tenantId);
   const capital = useCapitalReadiness(demoMode ? undefined : tenantId, true);
   const trading = useTradingAccess(demoMode ? undefined : tenantId, { reconcileOnFetch: true });
+  const opportunities = useBusinessOpportunityMatches(demoMode ? undefined : tenantId);
   const documents = props.contact.documents || [];
   const missingDocuments = documents.filter((document) => document.required && document.status === 'Missing').length;
   const unreadMessages = portalMessages.filter((message) => message.sender !== 'client' && !message.read).length;
@@ -273,6 +276,15 @@ export default function ClientHomeV2(props: ClientHomeV2Props) {
           onAction={() => props.onNavigate?.(ViewMode.PORTAL_FUNDING, '/portal/funding')}
         />
       </section>
+
+      <BusinessOpportunitiesSection
+        matches={opportunities.data?.matches || []}
+        loading={opportunities.loading}
+        error={opportunities.error}
+        readinessScore={journey.summary.readinessScore}
+        estimatedFundingUnlocked={journey.fundingRange.unlocked}
+        onNavigate={props.onNavigate}
+      />
 
       <section className="rounded-[2rem] border border-[#DFE7F4] bg-white px-5 py-6 shadow-[0_16px_44px_rgba(36,58,114,0.05)]">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
