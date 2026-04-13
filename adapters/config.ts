@@ -14,6 +14,29 @@ const isNetlifyDraftHost = (hostname: string): boolean => {
   return hostname.includes('--') && hostname.endsWith('.netlify.app');
 };
 
+const isLocalhost = () => {
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1';
+  }
+  if (typeof process !== 'undefined' && process.env && process.env.HOSTNAME) {
+    const host = process.env.HOSTNAME;
+    return host === 'localhost' || host === '127.0.0.1';
+  }
+  return false;
+};
+
+const isProduction = () => {
+  if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env.MODE === 'string') {
+    return import.meta.env.MODE === 'production';
+  }
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const host = window.location.hostname;
+    return host !== 'localhost' && host !== '127.0.0.1';
+  }
+  return false;
+};
+
 const getEnvVar = (key: string, fallback: string): string => {
   try {
     // Check for Vite specific env vars first
@@ -23,14 +46,29 @@ const getEnvVar = (key: string, fallback: string): string => {
       const rawValue = env[viteKey] ?? env[key];
       if (typeof rawValue === 'string') return rawValue;
       if (typeof rawValue === 'boolean') return String(rawValue);
+      // If missing, only allow fallback in dev
+      if (isProduction() && !isLocalhost()) {
+        console.error('[NEXUS_WARNING] Missing Supabase production configuration for', key);
+        return '';
+      }
       return fallback;
     }
-    
     // Fallback to process.env (handled by vite.config define)
     if (typeof process !== 'undefined' && process.env) {
-        return (process.env as any)[key] || fallback;
+      const val = (process.env as any)[key];
+      if (val) return val;
+      if (isProduction() && !isLocalhost()) {
+        console.error('[NEXUS_WARNING] Missing Supabase production configuration for', key);
+        return '';
+      }
+      return fallback;
     }
   } catch (e) {}
+  // If all else fails, only allow fallback in dev
+  if (isProduction() && !isLocalhost()) {
+    console.error('[NEXUS_WARNING] Missing Supabase production configuration for', key);
+    return '';
+  }
   return fallback;
 };
 
