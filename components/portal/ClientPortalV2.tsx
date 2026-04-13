@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import useBusinessFoundation from '../../hooks/useBusinessFoundation';
 import useCreditCenter from '../../hooks/useCreditCenter';
+import useCreditWorkflow from '../../hooks/useCreditWorkflow';
 import useFundingRoadmap from '../../hooks/useFundingRoadmap';
 import usePortalTasks from '../../hooks/usePortalTasks';
 import { BACKEND_CONFIG } from '../../adapters/config';
@@ -34,6 +35,10 @@ import {
   fintechPrimaryButton,
   fintechSecondaryButton,
 } from './fintechStyles';
+import BusinessFoundationChecklist from './BusinessFoundationChecklist';
+import CreditWorkflowActionCenter from './CreditWorkflowActionCenter';
+import BusinessIdentityPreviewCard from './BusinessIdentityPreviewCard';
+import LaunchModeStudio from './LaunchModeStudio';
 
 type PortalModuleKey = 'overview' | 'credit' | 'funding' | 'business' | 'grants';
 
@@ -251,14 +256,25 @@ export default function ClientPortalV2(props: {
   onOpenLegacyPortal: () => void;
 }) {
   const { user } = useAuth();
-  const demoMode = !user || BACKEND_CONFIG.mode === 'mvp_mock';
+  const tenantId = props.contact.tenantId
+    || user?.tenantId
+    || props.contact.inboxRouting?.tenant_id
+    || props.contact.inboxRouting?.tenantId
+    || '';
+  const demoMode = !user || BACKEND_CONFIG.mode === 'mvp_mock' || !tenantId;
   const activeModuleKey = getActiveModule(props.currentView);
   const activeModule = MODULES.find((module) => module.key === activeModuleKey) || MODULES[0];
+  const headerTitle = activeModuleKey === 'overview' ? 'NexusOne client portal' : activeModule.title;
+  const headerDescription =
+    activeModuleKey === 'overview'
+      ? 'Parallel route group using current services and additive routing.'
+      : activeModule.description;
 
-  const funding = useFundingRoadmap(demoMode ? undefined : props.contact.id, true);
-  const tasks = usePortalTasks(demoMode ? undefined : props.contact.id, true);
-  const credit = useCreditCenter(demoMode ? undefined : props.contact.id);
-  const business = useBusinessFoundation(demoMode ? undefined : props.contact.id);
+  const funding = useFundingRoadmap(demoMode ? undefined : tenantId, true);
+  const tasks = usePortalTasks(demoMode ? undefined : tenantId, true);
+  const credit = useCreditCenter(demoMode ? undefined : tenantId);
+  const creditWorkflow = useCreditWorkflow({ tenantId: demoMode ? undefined : tenantId, userId: user?.id });
+  const business = useBusinessFoundation(demoMode ? undefined : tenantId);
   const [grantState, setGrantState] = useState<PortalGrantState>({
     catalog: [],
     matches: [],
@@ -445,9 +461,48 @@ export default function ClientPortalV2(props: {
     });
     const profileBalance = demoMode ? '$3,500' : formatCurrencyShort((latestReport as any)?.total_balance || (latestAnalysis as any)?.total_balance || 3500);
     const utilization = demoMode ? 'Very Good' : creditRecommendations.length > 2 ? 'Improving' : 'Stable';
+    const handleGenerateLetters = async () => {
+      const recommendation = creditRecommendations[0];
+      await credit.createLetter({
+        recommendation_id: recommendation?.id,
+        title: recommendation?.title || 'Dispute Letter Draft',
+        summary: recommendation?.recommended_action || recommendation?.reasoning || 'Draft requested from the portal credit workflow.',
+      });
+      await creditWorkflow.refresh();
+    };
+    const handleDownloadLetter = (letter: any) => {
+      const text = String(letter?.letter_text || letter?.summary || '');
+      if (!text) return;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${String(letter?.title || 'dispute-letter').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+    };
 
     return (
       <div className="space-y-6">
+        <CreditWorkflowActionCenter
+          data={{
+            latestReport,
+            latestAnalysis,
+            recommendations: creditRecommendations,
+            letters: creditLetters,
+            packets: creditWorkflow.data.packets,
+            finalizedLetters: creditWorkflow.data.finalizedLetters,
+            mailEvents: creditWorkflow.data.mailEvents,
+            mailPackets: creditWorkflow.data.mailPackets,
+          }}
+          loading={credit.loading || creditWorkflow.loading}
+          saving={credit.saving}
+          error={credit.error || creditWorkflow.error}
+          onNavigate={props.onNavigate}
+          onGenerateLetters={handleGenerateLetters}
+          onDownloadLetter={handleDownloadLetter}
+        />
+
         <section className={`${flatShellClass} p-6`}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -647,6 +702,61 @@ export default function ClientPortalV2(props: {
           <MetricCard label="Missing Steps" value={String(businessMissing.length)} helper="Remaining steps preventing business-readiness completion." tone={businessMissing.length > 0 ? 'warning' : 'success'} />
         </div>
 
+        <LaunchModeStudio
+          data={business.data}
+          saving={business.saving}
+          onChoosePath={async (path) => {
+            await business.setPath(path);
+          }}
+          onSaveProfile={async (payload) => {
+            await business.updateProfile(payload);
+          }}
+        />
+
+        <BusinessIdentityPreviewCard
+          data={business.data}
+          saving={business.saving}
+          onSaveProfile={async (payload) => {
+            await business.updateProfile(payload);
+          }}
+        />
+
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+          <BusinessFoundationChecklist
+            data={business.data}
+            saving={business.saving}
+            error={business.error}
+            onChoosePath={async (path) => {
+              await business.setPath(path);
+            }}
+            onSaveProfile={async (payload) => {
+              await business.updateProfile({
+                legal_name: payload.legal_name,
+                entity_type: payload.entity_type,
+                ein: payload.ein,
+                business_address: payload.business_address,
+                business_phone: payload.business_phone,
+                business_website: payload.business_website,
+                naics_code: payload.naics_code,
+                business_email: payload.business_email,
+                mission_statement: payload.mission_statement,
+                business_plan_summary: payload.business_plan_summary,
+                bank_name: payload.bank_name,
+                account_type: payload.account_type,
+                profile_status: 'in_progress',
+              });
+            }}
+            onSetStepStatus={async (stepKey, stepStatus, notes) => {
+              await business.setProgress({
+                step_key: stepKey,
+                step_status: stepStatus,
+                notes,
+              });
+            }}
+          />
+
+        </div>
+
         <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
           <SectionCard eyebrow="Progress" title="Business setup roadmap" helper="This is a direct light-mode wrapper over the existing business foundation data model.">
             {progressRows.length === 0 ? (
@@ -767,8 +877,8 @@ export default function ClientPortalV2(props: {
       <div className="mx-auto max-w-[1400px] space-y-6">
         <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-[#607CC1]">NexusOne client portal</p>
-            <p className="mt-2 text-base text-[#61769D]">{demoMode ? 'Light-mode shell preview with representative data.' : 'Parallel route group using current services and additive routing.'}</p>
+            <p className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-[#607CC1]">{headerTitle}</p>
+            <p className="mt-2 text-base text-[#61769D]">{demoMode ? 'Light-mode shell preview with representative data.' : headerDescription}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <StatusChip tone={demoMode ? 'success' : moduleError ? 'warning' : 'success'}>{demoMode ? 'Demo data active' : moduleError ? 'Stable fallback mode' : 'Live data connected'}</StatusChip>

@@ -62,6 +62,13 @@ export const ENV = {
   SUPABASE_SERVICE_ROLE_KEY: required('SUPABASE_SERVICE_ROLE_KEY'),
   SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || '',
 
+  GOOGLE_SERVICE_ACCOUNT_KEYFILE: process.env.GOOGLE_SERVICE_ACCOUNT_KEYFILE || '/opt/nexus-api/secrets/google-service-account.json',
+  GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
+  GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET || '',
+  GOOGLE_OAUTH_REDIRECT_URI: process.env.GOOGLE_OAUTH_REDIRECT_URI || 'https://api.goclearonline.cc/api/google/oauth/callback',
+  GOOGLE_OAUTH_TOKEN_FILE: process.env.GOOGLE_OAUTH_TOKEN_FILE || '/opt/nexus-api/secrets/google-oauth-tokens.json',
+  GOOGLE_OAUTH_STATE_FILE: process.env.GOOGLE_OAUTH_STATE_FILE || '/opt/nexus-api/secrets/google-oauth-state.json',
+
   TRADINGVIEW_WEBHOOK_SECRET: process.env.TRADINGVIEW_WEBHOOK_SECRET || '',
 
   OANDA_API_KEY: process.env.OANDA_API_KEY || '',

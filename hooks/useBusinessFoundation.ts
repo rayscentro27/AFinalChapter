@@ -4,6 +4,7 @@ import {
   getBusinessFoundationProfile,
   setBusinessFoundationPath,
   setBusinessFoundationProgress,
+  updateBusinessFoundationProfile,
 } from '../services/fundingFoundationService';
 
 export default function useBusinessFoundation(tenantId?: string) {
@@ -84,6 +85,43 @@ export default function useBusinessFoundation(tenantId?: string) {
     [tenantId]
   );
 
+  const updateProfile = useCallback(
+    async (input: {
+      legal_name?: string | null;
+      entity_type?: string | null;
+      ein?: string | null;
+      business_address?: string | null;
+      business_phone?: string | null;
+      business_website?: string | null;
+      naics_code?: string | null;
+      business_email?: string | null;
+      mission_statement?: string | null;
+      business_plan_summary?: string | null;
+      bank_name?: string | null;
+      account_type?: string | null;
+      profile_status?: 'not_started' | 'in_progress' | 'ready' | 'completed' | null;
+      metadata_patch?: Record<string, unknown> | null;
+    }) => {
+      if (!tenantId) return null;
+      setSaving(true);
+      setError('');
+      try {
+        const response = await updateBusinessFoundationProfile({
+          tenant_id: tenantId,
+          ...input,
+        });
+        setData(response);
+        return response;
+      } catch (err: any) {
+        setError(String(err?.message || 'Unable to update business profile.'));
+        return null;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [tenantId]
+  );
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -96,5 +134,6 @@ export default function useBusinessFoundation(tenantId?: string) {
     refresh,
     setPath,
     setProgress,
+    updateProfile,
   };
 }

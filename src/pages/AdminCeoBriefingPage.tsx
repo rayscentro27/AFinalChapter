@@ -5,7 +5,13 @@ import ExecutiveOperationsRollup from '../components/ceoBriefing/ExecutiveOperat
 import RecentAgentHighlights from '../components/ceoBriefing/RecentAgentHighlights';
 import RecommendedActionsPanel from '../components/ceoBriefing/RecommendedActionsPanel';
 import TopUpdatesList from '../components/ceoBriefing/TopUpdatesList';
+import CeoDropoffInsightsPanel from '../components/ceoRevenue/CeoDropoffInsightsPanel';
+import CeoReferralPerformancePanel from '../components/ceoRevenue/CeoReferralPerformancePanel';
+import CeoRetentionFunnelPanel from '../components/ceoRevenue/CeoRetentionFunnelPanel';
+import CeoRevenuePipelinePanel from '../components/ceoRevenue/CeoRevenuePipelinePanel';
+import CeoRevenueSummary from '../components/ceoRevenue/CeoRevenueSummary';
 import { useCeoBriefingDashboard } from '../hooks/useCeoBriefingDashboard';
+import { useCeoRevenueDashboard } from '../hooks/useCeoRevenueDashboard';
 import { useExecutiveOperationsRollup } from '../hooks/useExecutiveOperationsRollup';
 
 function alertTone(items: string[]) {
@@ -23,9 +29,20 @@ function openSourceRegistry() {
   window.location.hash = 'admin_source_registry';
 }
 
+function openCommissions() {
+  window.history.pushState({}, '', '/admin/commissions');
+  window.location.hash = 'admin_commissions';
+}
+
+function openFunnelMetrics() {
+  window.history.pushState({}, '', '/admin/funnel-metrics');
+  window.location.hash = 'admin_funnel_metrics';
+}
+
 export default function AdminCeoBriefingPage() {
   const { user, checkingAccess, isAuthorized, loading, refreshing, error, hours, setHours, limit, setLimit, briefing, briefings, recentHighlights, generatedAt, refresh } = useCeoBriefingDashboard();
   const operations = useExecutiveOperationsRollup();
+  const revenue = useCeoRevenueDashboard(hours);
 
   if (checkingAccess) {
     return <div className="min-h-[50vh] flex items-center justify-center text-slate-300">Verifying CEO briefing access...</div>;
@@ -82,8 +99,29 @@ export default function AdminCeoBriefingPage() {
       </div>
 
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {revenue.error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{revenue.error}</div> : null}
 
       {loading && !briefing ? <div className="rounded-[2rem] border border-slate-200 bg-white p-6 text-slate-600 shadow-sm">Loading CEO briefing dashboard...</div> : null}
+      {revenue.loading && !revenue.snapshot ? <div className="rounded-[2rem] border border-slate-200 bg-white p-6 text-slate-600 shadow-sm">Loading founder revenue dashboard...</div> : null}
+
+      {revenue.snapshot ? (
+        <>
+          <CeoRevenueSummary summary={revenue.snapshot.summary} />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <CeoRevenuePipelinePanel pipeline={revenue.snapshot.pipeline} />
+            <CeoReferralPerformancePanel referral={revenue.snapshot.referral} />
+          </div>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+            <CeoRetentionFunnelPanel funnel={revenue.snapshot.retentionFunnel} />
+            <CeoDropoffInsightsPanel
+              items={revenue.snapshot.dropOffInsights}
+              notes={revenue.snapshot.dependencyNotes}
+              onOpenCommissions={openCommissions}
+              onOpenFunnel={openFunnelMetrics}
+            />
+          </div>
+        </>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <ExecutiveBriefingCard briefing={briefing} />

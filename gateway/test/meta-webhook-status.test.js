@@ -383,3 +383,78 @@ test('POST /webhooks/meta handles exact IG sample shape with sender.id + top-lev
 
   await app.close();
 });
+
+test('POST /webhooks/meta stores Instagram inbound messaging payloads as igsid identities', async () => {
+  const contactInputs = [];
+  const conversationInputs = [];
+  const messageInputs = [];
+
+  const app = await buildApp({
+    getSourceIp: () => '127.0.0.1',
+    resolveChannelAccount: async () => ({ tenantId: 'tenant-ig', channelAccountId: 'channel-ig' }),
+    storeProviderEvent: async () => {},
+    updateMessageStatusByProviderRealId: async () => {},
+    markMessagesReadByRecipientWatermark: async () => 0,
+    markConversationMessagesReadByWatermark: async () => 0,
+    resolveConversationIdByMetaParticipants: async () => null,
+    upsertContact: async (input) => {
+      contactInputs.push(input);
+      return 'contact-ig-1';
+    },
+    getOrCreateConversation: async (input) => {
+      conversationInputs.push(input);
+      return 'convo-ig-inbound-1';
+    },
+    upsertMetaParticipant: async () => true,
+    upsertMessage: async (input) => {
+      messageInputs.push(input);
+      return 'message-ig-1';
+    },
+    runRouting: async () => {},
+  });
+
+  const payload = {
+    object: 'instagram',
+    entry: [
+      {
+        id: '17841480265043148',
+        messaging: [
+          {
+            sender: { id: 'IG_USER_99' },
+            recipient: { id: '17841480265043148' },
+            message: {
+              mid: 'ig_mid_99',
+              text: 'hello from instagram',
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  const raw = JSON.stringify(payload);
+  const response = await app.inject({
+    method: 'POST',
+    url: '/webhooks/meta',
+    headers: {
+      'content-type': 'application/json',
+      'x-hub-signature-256': signMeta(raw),
+    },
+    payload: raw,
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().ok, true);
+  assert.equal(response.json().processed, 1);
+
+  assert.equal(contactInputs.length, 1);
+  assert.equal(contactInputs[0].fbPsid, 'ig:IG_USER_99');
+  assert.equal(contactInputs[0].metadata.channel, 'instagram');
+  assert.equal(conversationInputs.length, 1);
+  assert.equal(conversationInputs[0].subject, 'Instagram IG_USER_99');
+  assert.equal(messageInputs.length, 1);
+  assert.equal(messageInputs[0].fromId, 'IG_USER_99');
+  assert.equal(messageInputs[0].toId, '17841480265043148');
+
+  await app.close();
+});

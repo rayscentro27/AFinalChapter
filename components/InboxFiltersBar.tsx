@@ -5,7 +5,8 @@ const STORAGE_KEY = 'nexus_inbox_saved_views_v1';
 type AssignedFilter = 'any' | 'unassigned' | 'mine' | 'ai' | 'agent';
 type SlaFilter = 'any' | 'stale' | 'breach';
 type StatusFilter = 'any' | 'open' | 'pending' | 'pending_client' | 'pending_staff' | 'escalated' | 'closed';
-type ProviderFilter = 'any' | 'meta' | 'matrix' | 'google_voice';
+type ProviderFilter = 'any' | 'meta' | 'matrix' | 'google_voice' | 'nexus_chat';
+export type WorkflowFilter = 'all' | 'new' | 'active' | 'waiting' | 'qualified' | 'closed' | 'unassigned' | 'high_priority';
 
 export type InboxFilters = {
   q: string;
@@ -13,6 +14,7 @@ export type InboxFilters = {
   provider: ProviderFilter;
   assigned: AssignedFilter;
   sla: SlaFilter;
+  workflow: WorkflowFilter;
 };
 
 function FiltersToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
@@ -34,11 +36,28 @@ type SavedView = {
 };
 
 const DEFAULT_VIEWS: SavedView[] = [
-  { name: 'Unassigned', filters: { q: '', status: 'any', provider: 'any', assigned: 'unassigned', sla: 'any' } },
-  { name: 'My Conversations', filters: { q: '', status: 'any', provider: 'any', assigned: 'mine', sla: 'any' } },
-  { name: 'Breach Only', filters: { q: '', status: 'any', provider: 'any', assigned: 'any', sla: 'breach' } },
-  { name: 'Messenger', filters: { q: '', status: 'any', provider: 'meta', assigned: 'any', sla: 'any' } },
-  { name: 'Pending Client', filters: { q: '', status: 'pending_client', provider: 'any', assigned: 'any', sla: 'any' } },
+  { name: 'New', filters: { q: '', status: 'any', provider: 'any', assigned: 'any', sla: 'any', workflow: 'new' } },
+  { name: 'Active', filters: { q: '', status: 'any', provider: 'any', assigned: 'any', sla: 'any', workflow: 'active' } },
+  { name: 'Waiting', filters: { q: '', status: 'any', provider: 'any', assigned: 'any', sla: 'any', workflow: 'waiting' } },
+  { name: 'Qualified Leads', filters: { q: '', status: 'any', provider: 'any', assigned: 'any', sla: 'any', workflow: 'qualified' } },
+  { name: 'Closed', filters: { q: '', status: 'any', provider: 'any', assigned: 'any', sla: 'any', workflow: 'closed' } },
+  { name: 'Unassigned', filters: { q: '', status: 'any', provider: 'any', assigned: 'unassigned', sla: 'any', workflow: 'all' } },
+  { name: 'High Priority', filters: { q: '', status: 'any', provider: 'any', assigned: 'any', sla: 'any', workflow: 'high_priority' } },
+  { name: 'My Conversations', filters: { q: '', status: 'any', provider: 'any', assigned: 'mine', sla: 'any', workflow: 'all' } },
+  { name: 'Breach Only', filters: { q: '', status: 'any', provider: 'any', assigned: 'any', sla: 'breach', workflow: 'all' } },
+  { name: 'Messenger', filters: { q: '', status: 'any', provider: 'meta', assigned: 'any', sla: 'any', workflow: 'all' } },
+  { name: 'Pending Client', filters: { q: '', status: 'pending_client', provider: 'any', assigned: 'any', sla: 'any', workflow: 'all' } },
+];
+
+const WORKFLOW_PRESETS: Array<{ value: WorkflowFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'new', label: 'New' },
+  { value: 'active', label: 'Active' },
+  { value: 'waiting', label: 'Waiting' },
+  { value: 'qualified', label: 'Qualified Leads' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'unassigned', label: 'Unassigned' },
+  { value: 'high_priority', label: 'High Priority' },
 ];
 
 function readSavedViews(): SavedView[] {
@@ -65,6 +84,7 @@ export default function InboxFiltersBar({
   const [provider, setProvider] = useState<ProviderFilter>('any');
   const [assigned, setAssigned] = useState<AssignedFilter>('any');
   const [sla, setSla] = useState<SlaFilter>('any');
+  const [workflow, setWorkflow] = useState<WorkflowFilter>('all');
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
   useEffect(() => {
@@ -78,9 +98,10 @@ export default function InboxFiltersBar({
       provider,
       assigned,
       sla,
+      workflow,
       meUserId,
     }),
-    [q, status, provider, assigned, sla, meUserId]
+    [q, status, provider, assigned, sla, workflow, meUserId]
   );
 
   useEffect(() => {
@@ -100,6 +121,7 @@ export default function InboxFiltersBar({
           provider,
           assigned,
           sla,
+          workflow,
         },
       },
       ...savedViews,
@@ -116,6 +138,7 @@ export default function InboxFiltersBar({
     setProvider((f.provider as ProviderFilter) || 'any');
     setAssigned((f.assigned as AssignedFilter) || 'any');
     setSla((f.sla as SlaFilter) || 'any');
+    setWorkflow((f.workflow as WorkflowFilter) || 'new');
   }
 
   function removeView(index: number) {
@@ -147,6 +170,7 @@ export default function InboxFiltersBar({
         <select value={provider} onChange={(event) => setProvider(event.target.value as ProviderFilter)} className="rounded-xl border border-[#DCE7FA] bg-white px-2.5 py-2 text-xs font-bold uppercase tracking-widest text-slate-700">
           <option value="any">Channel: Any</option>
           <option value="meta">Facebook/Instagram Messenger</option>
+          <option value="nexus_chat">Portal Chat</option>
           <option value="matrix">Matrix</option>
           <option value="google_voice">Google Voice</option>
         </select>
@@ -171,6 +195,23 @@ export default function InboxFiltersBar({
         >
           Save View
         </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Workflow</span>
+        {WORKFLOW_PRESETS.map((item) => (
+          <button
+            key={item.value}
+            onClick={() => setWorkflow(item.value)}
+            className={`rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-wider transition-colors ${
+              workflow === item.value
+                ? 'border-[#4A7AE8] bg-[#EEF4FF] text-[#315FD0]'
+                : 'border-[#DCE7FA] bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

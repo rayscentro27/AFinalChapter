@@ -30,6 +30,7 @@ import { enterpriseRoutes } from './routes/enterprise.js';
 import { tradingviewRoutes } from './routes/tradingview.js';
 import { researchRoutes } from './routes/research.js';
 import { systemHealthRoutes } from './routes/system_health.js';
+import { googleRoutes } from './routes/google.js';
 import { adminMembershipRoutes } from './routes/admin_membership.js';
 import { controlPlaneRoutes } from './routes/control_plane.js';
 import { adminCommandRoutes } from './routes/admin_commands.js';
@@ -186,6 +187,7 @@ await fastify.register(multipart, {
 
 await fastify.register(healthRoutes);
 await fastify.register(systemHealthRoutes);
+await fastify.register(googleRoutes);
 await fastify.register(aiGatewayRoutes);
 await fastify.register(metaRoutes);
 await fastify.register(matrixRoutes);

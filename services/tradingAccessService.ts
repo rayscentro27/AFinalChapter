@@ -22,6 +22,12 @@ export type TradingAccessSnapshot = {
   paper_trading_recommended: boolean;
   reserve_confirmed: boolean;
   business_growth_positioned: boolean;
+  trading_access_tier: 'super_admin' | 'internal_operator' | 'client_basic' | 'client_intermediate' | 'client_advanced';
+  trading_stage: 'education_only' | 'paper_trading' | 'strategy_view' | 'demo_broker_enabled' | 'admin_lab_full';
+  admin_lab_enabled: boolean;
+  strategy_access_allowed: boolean;
+  demo_connection_allowed: boolean;
+  trading_level: number;
   updated_at: string | null;
 };
 

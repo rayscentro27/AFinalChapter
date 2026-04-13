@@ -91,7 +91,7 @@ export interface InboxRouting {
   tenantId?: string;
   conversation_id?: string;
   conversationId?: string;
-  provider?: 'meta' | 'matrix' | 'google_voice';
+  provider?: 'meta' | 'matrix' | 'google_voice' | 'nexus_chat';
   to?: string;
   recipient_id?: string;
   recipientId?: string;
@@ -126,6 +126,7 @@ export interface AuditLogEntry {
 
 export interface Contact {
   id: string;
+  tenantId?: string;
   name: string;
   email: string;
   phone: string;
@@ -429,6 +430,7 @@ export enum ViewMode {
   CLIENT_MAILING_APPROVALS = 'CLIENT_MAILING_APPROVALS',
   TERMS = 'TERMS',
   PRIVACY = 'PRIVACY',
+  DATA_DELETION = 'DATA_DELETION',
   AI_DISCLOSURE = 'AI_DISCLOSURE',
   REFUND_POLICY = 'REFUND_POLICY',
   DISCLAIMERS = 'DISCLAIMERS',
@@ -439,6 +441,7 @@ export enum ViewMode {
   ADMIN_EMAIL_PROVIDERS = 'ADMIN_EMAIL_PROVIDERS',
   ADMIN_EMAIL_ROUTING = 'ADMIN_EMAIL_ROUTING',
   ADMIN_EMAIL_LOGS = 'ADMIN_EMAIL_LOGS',
+  ADMIN_EMAIL_POLICY_VIEWER = 'ADMIN_EMAIL_POLICY_VIEWER',
   ADMIN_WORKFLOWS = 'ADMIN_WORKFLOWS',
   FREE_SCORE = 'FREE_SCORE',
   FREE_CHECKLIST = 'FREE_CHECKLIST',
@@ -456,6 +459,8 @@ export enum ViewMode {
   ADMIN_FUNNEL_CONTROL_CENTER = 'ADMIN_FUNNEL_CONTROL_CENTER',
   ADMIN_WHITE_LABEL_SETTINGS = 'ADMIN_WHITE_LABEL_SETTINGS',
   ADMIN_EXECUTIVE_DASHBOARD = 'ADMIN_EXECUTIVE_DASHBOARD',
+  ADMIN_HERMES = 'ADMIN_HERMES',
+  ADMIN_TRADING_LAB = 'ADMIN_TRADING_LAB',
   ADMIN_NEXUS_ONE = 'ADMIN_NEXUS_ONE',
   ADMIN_CREDENTIALS = 'ADMIN_CREDENTIALS',
   ADMIN_DEAL_ESCALATIONS = 'ADMIN_DEAL_ESCALATIONS',

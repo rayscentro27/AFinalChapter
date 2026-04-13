@@ -52,11 +52,12 @@ type ReportCard = {
   id: string;
   sourceLabel: string;
   sourceKey: string;
+  sourceKind: 'founder' | 'employee' | 'unassigned';
   title: string;
   summary: string;
   severity: WorkforceStatus;
   timestamp: string;
-  linkedEntity: SelectedEntity;
+  linkedEntity: SelectedEntity | null;
   recommendedAction: string;
 };
 
@@ -301,10 +302,6 @@ function deriveEmployeeStatus(identity: WorkforceIdentity, dependencyStatuses: R
     return 'inactive';
   }
 
-  if (identity.employee_key === 'Stacking Shield' && hasDependencyWarning('Supabase')) {
-    return 'warning';
-  }
-
   return 'active';
 }
 
@@ -368,6 +365,7 @@ export default function AdminSuperAdminCommandCenterPage() {
   const activation = useAdminActivationCenter();
   const briefing = useCeoBriefingDashboard();
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
   const combinedLoading = activation.checkingAccess || briefing.checkingAccess;
   const isAuthorized = activation.isAuthorized && briefing.isAuthorized;
@@ -381,6 +379,7 @@ export default function AdminSuperAdminCommandCenterPage() {
         id: latestBriefing.id,
         sourceLabel: 'Nexus Founder',
         sourceKey: 'Nexus Founder',
+        sourceKind: 'founder',
         title: latestBriefing.title,
         summary: latestBriefing.summary,
         severity: latestBriefing.urgency === 'critical' ? 'issue' : latestBriefing.urgency === 'high' ? 'warning' : 'active',
@@ -391,16 +390,17 @@ export default function AdminSuperAdminCommandCenterPage() {
     }
 
     briefing.recentHighlights.slice(0, 8).forEach((highlight: AgentSummaryHighlight) => {
-      const key = matchEmployeeKey(highlight.agentName) || 'Nexus Founder';
+      const matchedKey = matchEmployeeKey(highlight.agentName);
       reportFeed.push({
         id: highlight.id,
-        sourceLabel: highlight.agentName,
-        sourceKey: key,
+        sourceLabel: matchedKey ? highlight.agentName : `${highlight.agentName} (unassigned)`,
+        sourceKey: matchedKey || highlight.agentName,
+        sourceKind: matchedKey ? 'employee' : 'unassigned',
         title: highlight.headline,
         summary: highlight.summary,
         severity: highlight.riskLevel === 'critical' ? 'issue' : highlight.riskLevel === 'high' ? 'warning' : highlight.status === 'failed' ? 'issue' : 'active',
         timestamp: highlight.createdAt,
-        linkedEntity: { kind: 'employee', key },
+        linkedEntity: matchedKey ? { kind: 'employee', key: matchedKey } : null,
         recommendedAction: highlight.status === 'failed' ? 'Open the related detail panel and review the failure.' : 'Review the latest summary and confirm the next step.',
       });
     });
@@ -410,6 +410,7 @@ export default function AdminSuperAdminCommandCenterPage() {
         id: item.id,
         sourceLabel: 'Founder Briefing Archive',
         sourceKey: 'Nexus Founder',
+        sourceKind: 'founder',
         title: item.title,
         summary: item.summary,
         severity: item.urgency === 'critical' ? 'issue' : item.urgency === 'high' ? 'warning' : 'active',
@@ -475,7 +476,7 @@ export default function AdminSuperAdminCommandCenterPage() {
     );
 
     const employees: EmployeeCard[] = AI_EMPLOYEE_REGISTRY.slice().sort((a, b) => a.sort_order - b.sort_order).map((identity) => {
-      const latestReport = reportFeed.find((item) => item.sourceKey === identity.employee_key || item.linkedEntity.key === identity.employee_key);
+      const latestReport = reportFeed.find((item) => item.sourceKey === identity.employee_key || item.linkedEntity?.key === identity.employee_key);
       const dependencies = (EMPLOYEE_DEPENDENCIES[identity.employee_key] || []).map((name) => ({
         name,
         status: dependencyStatuses[name] || 'active',
@@ -497,7 +498,7 @@ export default function AdminSuperAdminCommandCenterPage() {
         issueSummary,
         recommendedAction,
         dependencies,
-        recentReports: reportFeed.filter((item) => item.linkedEntity.key === identity.employee_key).slice(0, 3),
+        recentReports: reportFeed.filter((item) => item.linkedEntity?.key === identity.employee_key).slice(0, 3),
       };
     });
 
@@ -625,14 +626,14 @@ export default function AdminSuperAdminCommandCenterPage() {
   ]);
 
   useEffect(() => {
-    if (selectedEntity) return;
+    if (selectedEntity || selectedReportId) return;
     const defaultEmployee = derivedData.employees.find((item) => item.identity.employee_key === 'Nexus Founder' && item.status !== 'inactive')
       || derivedData.employees.find((item) => item.status !== 'inactive')
       || derivedData.employees[0];
     if (defaultEmployee) {
       setSelectedEntity({ kind: 'employee', key: defaultEmployee.identity.employee_key });
     }
-  }, [selectedEntity, derivedData.employees]);
+  }, [selectedEntity, selectedReportId, derivedData.employees]);
 
   if (combinedLoading) {
     return <div className="min-h-[50vh] flex items-center justify-center text-slate-300">Loading workforce command center...</div>;
@@ -657,8 +658,8 @@ export default function AdminSuperAdminCommandCenterPage() {
   const selectedService = selectedEntity?.kind === 'runtime_service'
     ? derivedData.services.find((item) => item.identity.employee_key === selectedEntity.key)
     : undefined;
-  const selectedReport = selectedEntity?.kind === 'employee' && selectedEntity.key === 'Nexus Founder'
-    ? derivedData.latestBriefing
+  const selectedReport = selectedReportId
+    ? derivedData.reportFeed.find((item) => item.id === selectedReportId) || null
     : null;
   const activeSelection = selectedEmployee || selectedService;
 
@@ -677,7 +678,10 @@ export default function AdminSuperAdminCommandCenterPage() {
             <button
               type="button"
               className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-700"
-              onClick={() => selectPath('/admin/ceo-briefing', 'admin_ceo_briefing')}
+              onClick={() => {
+                setSelectedReportId(null);
+                selectPath('/admin/ceo-briefing', 'admin_ceo_briefing');
+              }}
             >
               Open Founder
             </button>
@@ -727,7 +731,10 @@ export default function AdminSuperAdminCommandCenterPage() {
                 <button
                   key={employee.identity.employee_key}
                   type="button"
-                  onClick={() => setSelectedEntity({ kind: 'employee', key: employee.identity.employee_key })}
+                  onClick={() => {
+                    setSelectedEntity({ kind: 'employee', key: employee.identity.employee_key });
+                    setSelectedReportId(null);
+                  }}
                   className={`rounded-[1.5rem] border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md ${selectedEntity?.kind === 'employee' && selectedEntity.key === employee.identity.employee_key ? 'border-blue-300 bg-blue-50/60' : 'border-slate-200 bg-slate-50'}`}
                 >
                   <div className="flex items-start gap-4">
@@ -782,7 +789,10 @@ export default function AdminSuperAdminCommandCenterPage() {
                 <button
                   key={service.identity.employee_key}
                   type="button"
-                  onClick={() => setSelectedEntity({ kind: 'runtime_service', key: service.identity.employee_key })}
+                  onClick={() => {
+                    setSelectedEntity({ kind: 'runtime_service', key: service.identity.employee_key });
+                    setSelectedReportId(null);
+                  }}
                   className={`w-full rounded-[1.5rem] border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md ${selectedEntity?.kind === 'runtime_service' && selectedEntity.key === service.identity.employee_key ? 'border-blue-300 bg-blue-50/60' : 'border-slate-200 bg-slate-50'}`}
                 >
                   <div className="flex items-start gap-4">
@@ -846,11 +856,20 @@ export default function AdminSuperAdminCommandCenterPage() {
                 <button
                   key={report.id}
                   type="button"
-                  onClick={() => setSelectedEntity(report.linkedEntity)}
+                  onClick={() => {
+                    setSelectedEntity(report.linkedEntity);
+                    setSelectedReportId(report.id);
+                  }}
                   className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
                 >
                   <div className="flex items-start gap-4">
-                    <AiEmployeeIcon employee={report.sourceKey} size={42} />
+                    {report.sourceKind === 'unassigned' ? (
+                      <span className="inline-flex h-[42px] w-[42px] items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-slate-600">
+                        <FileText className="h-5 w-5" />
+                      </span>
+                    ) : (
+                      <AiEmployeeIcon employee={report.sourceKey as AiEmployeeKey} size={42} />
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-base font-semibold text-slate-950">{report.title}</h3>
@@ -858,6 +877,11 @@ export default function AdminSuperAdminCommandCenterPage() {
                           {statusIndicator(report.severity)}
                           {toStatusLabel(report.severity)}
                         </span>
+                        {report.sourceKind === 'unassigned' ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">
+                            Unassigned
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-1 text-sm text-slate-500">Source: {report.sourceLabel}</p>
                       <p className="mt-3 text-sm leading-6 text-slate-700">{report.summary}</p>
@@ -916,7 +940,10 @@ export default function AdminSuperAdminCommandCenterPage() {
                 <button
                   key={`${item.kind}-${item.key}`}
                   type="button"
-                  onClick={() => setSelectedEntity({ kind: item.kind, key: item.key })}
+                  onClick={() => {
+                    setSelectedEntity({ kind: item.kind, key: item.key });
+                    setSelectedReportId(null);
+                  }}
                   className="w-full rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
                 >
                   <div className="flex items-start gap-3">
@@ -942,95 +969,119 @@ export default function AdminSuperAdminCommandCenterPage() {
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Detail Panel</p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-950">{activeSelection?.identity.display_name || 'Select an employee or service'}</h2>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-950">{activeSelection?.identity.display_name || selectedReport?.title || 'Select an employee, service, or report'}</h2>
               </div>
               {activeSelection ? (
                 <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${statusClass(activeSelection.status)}`}>
                   {statusIndicator(activeSelection.status)}
                   {toStatusLabel(activeSelection.status)}
                 </span>
+              ) : selectedReport ? (
+                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${severityClass(selectedReport.severity)}`}>
+                  {statusIndicator(selectedReport.severity)}
+                  {toStatusLabel(selectedReport.severity)}
+                </span>
               ) : null}
             </div>
 
-            {activeSelection ? (
+            {activeSelection || selectedReport ? (
               <div className="mt-4 space-y-4">
-                <div className="flex items-start gap-4 rounded-[1.5rem] border border-slate-200 bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_100%)] p-4">
-                  <AiEmployeeIcon employee={activeSelection.identity.employee_key} size={56} />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-lg font-semibold text-slate-950">{activeSelection.identity.short_label}</div>
-                    <p className="mt-1 text-sm text-slate-500">{activeSelection.identity.short_role_description}</p>
-                    <p className="mt-3 text-sm font-medium text-slate-700">
-                      {selectedEmployee ? selectedEmployee.currentActivity : selectedService?.purpose || 'No activity summary available.'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <InfoTile label="Last activity" value={selectedEmployee ? formatTimestamp(selectedEmployee.lastActivityAt) : formatTimestamp(selectedService?.lastHeartbeat)} />
-                  <InfoTile label="Recommended next step" value={selectedEmployee ? selectedEmployee.recommendedAction : selectedService?.recommendedAction || 'Monitor and confirm health.'} />
-                </div>
-
-                {selectedService?.identity.employee_key === 'openclaw' ? (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <InfoTile label="Auth state" value={selectedService.authState} />
-                    <InfoTile label="Last error" value={selectedService.lastError} />
+                {selectedReport ? (
+                  <div className="flex items-start gap-4 rounded-[1.5rem] border border-slate-200 bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_100%)] p-4">
+                    {selectedReport.sourceKind === 'unassigned' ? (
+                      <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-slate-600">
+                        <FileText className="h-6 w-6" />
+                      </span>
+                    ) : (
+                      <AiEmployeeIcon employee={selectedReport.sourceKey as AiEmployeeKey} size={56} />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-lg font-semibold text-slate-950">{selectedReport.title}</div>
+                      <p className="mt-1 text-sm text-slate-500">Source: {selectedReport.sourceLabel}</p>
+                      <p className="mt-3 text-sm font-medium text-slate-700">{selectedReport.summary}</p>
+                      <p className="mt-3 text-xs font-semibold text-blue-600">{selectedReport.recommendedAction}</p>
+                    </div>
                   </div>
                 ) : null}
 
-                <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">What this does</div>
-                  <div className="mt-2 text-sm leading-6 text-slate-700">{selectedEmployee ? EMPLOYEE_FOCUS[selectedEmployee.identity.employee_key] || selectedEmployee.identity.short_role_description : selectedService?.purpose}</div>
-                  <div className="mt-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">What this does not do</div>
-                  <div className="mt-2 text-sm leading-6 text-slate-700">{selectedEmployee ? doesNotDoFor(selectedEmployee.identity) : 'Does not replace human review, billing, or policy decisions.'}</div>
-                </div>
+                {activeSelection ? (
+                  <>
+                    <div className="flex items-start gap-4 rounded-[1.5rem] border border-slate-200 bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_100%)] p-4">
+                      <AiEmployeeIcon employee={activeSelection.identity.employee_key} size={56} />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-lg font-semibold text-slate-950">{activeSelection.identity.short_label}</div>
+                        <p className="mt-1 text-sm text-slate-500">{activeSelection.identity.short_role_description}</p>
+                        <p className="mt-3 text-sm font-medium text-slate-700">
+                          {selectedEmployee ? selectedEmployee.currentActivity : selectedService?.purpose || 'No activity summary available.'}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Dependencies</div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {(selectedEmployee?.dependencies || selectedService?.dependencyNames.map((name) => ({
-                      name,
-                      status: derivedData.dependencyStatuses[name] || 'active',
-                      affected: derivedData.dependencyStatuses[name] === 'issue' || derivedData.dependencyStatuses[name] === 'warning',
-                    })) || []).map((dependency) => (
-                      <span key={dependency.name} className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${severityClass(dependency.status)}`}>
-                        {statusIndicator(dependency.status)}
-                        {dependency.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <InfoTile label="Last activity" value={selectedEmployee ? formatTimestamp(selectedEmployee.lastActivityAt) : formatTimestamp(selectedService?.lastHeartbeat)} />
+                      <InfoTile label="Recommended next step" value={selectedEmployee ? selectedEmployee.recommendedAction : selectedService?.recommendedAction || 'Monitor and confirm health.'} />
+                    </div>
 
-                <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Recent reports</div>
-                  <div className="mt-3 space-y-3">
-                    {selectedEmployee?.recentReports.length || selectedReport ? null : (
-                      <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-500">No recent reports were matched to this selection yet.</div>
-                    )}
-                    {selectedEmployee?.recentReports.slice(0, 2).map((report) => (
-                      <button
-                        key={report.id}
-                        type="button"
-                        onClick={() => setSelectedEntity(report.linkedEntity)}
-                        className="w-full rounded-xl border border-white bg-white px-4 py-3 text-left"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-sm font-semibold text-slate-900">{report.title}</div>
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] ${severityClass(report.severity)}`}>
-                            {statusIndicator(report.severity)}
-                            {toStatusLabel(report.severity)}
-                          </span>
-                        </div>
-                        <div className="mt-2 text-sm text-slate-600">{report.summary}</div>
-                      </button>
-                    ))}
-                    {selectedReport ? (
-                      <div className="rounded-xl border border-white bg-white px-4 py-3">
-                        <div className="text-sm font-semibold text-slate-900">{selectedReport.title}</div>
-                        <p className="mt-2 text-sm text-slate-600">{selectedReport.summary}</p>
+                    {selectedService?.identity.employee_key === 'openclaw' ? (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <InfoTile label="Auth state" value={selectedService.authState} />
+                        <InfoTile label="Last error" value={selectedService.lastError} />
                       </div>
                     ) : null}
-                  </div>
-                </div>
+
+                    <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">What this does</div>
+                      <div className="mt-2 text-sm leading-6 text-slate-700">{selectedEmployee ? EMPLOYEE_FOCUS[selectedEmployee.identity.employee_key] || selectedEmployee.identity.short_role_description : selectedService?.purpose}</div>
+                      <div className="mt-3 text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">What this does not do</div>
+                      <div className="mt-2 text-sm leading-6 text-slate-700">{selectedEmployee ? doesNotDoFor(selectedEmployee.identity) : 'Does not replace human review, billing, or policy decisions.'}</div>
+                    </div>
+
+                    <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Dependencies</div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {(selectedEmployee?.dependencies || selectedService?.dependencyNames.map((name) => ({
+                          name,
+                          status: derivedData.dependencyStatuses[name] || 'active',
+                          affected: derivedData.dependencyStatuses[name] === 'issue' || derivedData.dependencyStatuses[name] === 'warning',
+                        })) || []).map((dependency) => (
+                          <span key={dependency.name} className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${severityClass(dependency.status)}`}>
+                            {statusIndicator(dependency.status)}
+                            {dependency.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Recent reports</div>
+                      <div className="mt-3 space-y-3">
+                        {selectedEmployee?.recentReports.length ? null : (
+                          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-500">No recent reports were matched to this selection yet.</div>
+                        )}
+                        {selectedEmployee?.recentReports.slice(0, 2).map((report) => (
+                          <button
+                            key={report.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedEntity(report.linkedEntity);
+                              setSelectedReportId(report.id);
+                            }}
+                            className="w-full rounded-xl border border-white bg-white px-4 py-3 text-left"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-sm font-semibold text-slate-900">{report.title}</div>
+                              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] ${severityClass(report.severity)}`}>
+                                {statusIndicator(report.severity)}
+                                {toStatusLabel(report.severity)}
+                              </span>
+                            </div>
+                            <div className="mt-2 text-sm text-slate-600">{report.summary}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : null}
               </div>
             ) : (
               <div className="mt-4 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">Select a card to open a review-first detail panel.</div>

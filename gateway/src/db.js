@@ -202,7 +202,16 @@ export async function upsertContactByIG({ tenant_id, ig_handle, matrix_user_id, 
   return created.id;
 }
 
-export async function getOrCreateConversation({ tenant_id, channel_account_id, contact_id }) {
+export async function getOrCreateConversation({
+  tenant_id,
+  channel_account_id,
+  contact_id,
+  channel_type = 'nexus_chat',
+  workflow_thread_type = 'general',
+  thread_status = 'new',
+  owner_user_id = null,
+  ai_mode = 'off',
+}) {
   const { data: existing, error: e1 } = await supabaseAdmin
     .from('conversations')
     .select('id')
@@ -224,9 +233,32 @@ export async function getOrCreateConversation({ tenant_id, channel_account_id, c
       contact_id,
       status: 'open',
       priority: 3,
+      channel_type,
+      workflow_thread_type,
+      thread_status,
+      owner_user_id,
+      ai_mode,
     })
     .select('id')
     .single();
+
+  if (e2 && String(e2.message || '').toLowerCase().includes('column')) {
+    const fallbackPayload = {
+      tenant_id,
+      channel_account_id,
+      contact_id,
+      status: 'open',
+      priority: 3,
+    };
+    const fallback = await supabaseAdmin
+      .from('conversations')
+      .insert(fallbackPayload)
+      .select('id')
+      .single();
+
+    if (fallback.error) throw new Error(`conversations insert failed: ${fallback.error.message}`);
+    return fallback.data.id;
+  }
 
   if (e2) throw new Error(`conversations insert failed: ${e2.message}`);
   return created.id;

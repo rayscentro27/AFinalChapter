@@ -49,6 +49,9 @@ payload.json
 
 # dotenv
 .env
+env/**/.env
+env/deploy/pending-secrets.env
+.codex
 
 # Doppler staging env files (local only)
 .doppler.missing.env
